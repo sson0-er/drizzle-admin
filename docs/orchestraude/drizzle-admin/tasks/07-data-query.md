@@ -1,7 +1,7 @@
 ---
 id: 07-data-query
 depends_on: [02-support-time, 03-introspect]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 07: data-query
