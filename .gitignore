@@ -1,0 +1,12 @@
+node_modules/
+dist/
+coverage/
+example/*.sqlite*
+
+# Claude Code local settings
+.claude/settings.local.json
+
+# Orchestration intermediates (logs, snapshots, raw JSON); the markdown artifacts are committed
+docs/orchestraude/**/*.json
+docs/orchestraude/**/*.verify.log
+docs/orchestraude/**/*.snapshot

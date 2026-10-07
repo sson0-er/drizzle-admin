@@ -1,0 +1,56 @@
+{
+  "name": "drizzle-admin",
+  "version": "0.1.0",
+  "description": "Django Admin-style, server-rendered CRUD admin for Drizzle ORM tables",
+  "license": "MIT",
+  "author": "Shoma Sonoda",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "sideEffects": false,
+  "keywords": [
+    "drizzle",
+    "drizzle-orm",
+    "admin",
+    "hono",
+    "crud"
+  ],
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "biome check .",
+    "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
+    "example": "tsx example/server.ts",
+    "format": "biome check --write ."
+  },
+  "peerDependencies": {
+    "drizzle-orm": "^0.45.3"
+  },
+  "dependencies": {
+    "hono": "^4.13.13",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@electric-sql/pglite": "0.5.8",
+    "@hono/node-server": "2.1.3",
+    "@types/better-sqlite3": "9.6.0",
+    "@types/node": "24.19.1",
+    "better-sqlite3": "13.0.3",
+    "drizzle-orm": "0.45.3",
+    "parse5": "8.0.1",
+    "tsx": "4.23.15",
+    "typescript": "7.0.2",
+    "vitest": "5.0.3"
+  }
+}

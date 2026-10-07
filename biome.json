@@ -1,0 +1,18 @@
+{
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**", "!dist", "!node_modules", "!docs", "!.claude"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 100 },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "suspicious": { "noExplicitAny": "error" },
+      "security": { "noDangerouslySetInnerHtml": "error" }
+    }
+  },
+  "overrides": [
+    {
+      "includes": ["src/**"],
+      "linter": { "rules": { "correctness": { "noNodejsModules": "error" } } }
+    }
+  ]
+}
