@@ -9,3 +9,13 @@ describe("example app (phase 1)", () => {
     expect(res.headers.get("Location")).toBe("/admin/");
   });
 });
+
+describe("example app (phase 2)", () => {
+  it("serves the dashboard and every model list", async () => {
+    const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });
+    for (const path of ["/admin/", "/admin/users/", "/admin/posts/", "/admin/tags/"]) {
+      const res = await app.request(path);
+      expect(res.status, path).toBe(200);
+    }
+  });
+});

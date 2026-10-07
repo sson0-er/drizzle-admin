@@ -1,8 +1,8 @@
 ---
 id: 15-routes-list
 depends_on: [14-routes-app-shell, 11-views-layout-and-list-pages]
-status: pending
-attempts: 0
+status: done
+attempts: 1
 ---
 # Task 15: routes-list
 
@@ -46,3 +46,5 @@ attempts: 0
 - Decisions: docs/orchestraude/decisions/013-unspecified-page-behaviors.md (items 4-7), 016-custom-action-permission.md, 018-pg-search-text-cast.md, 019-date-only-calendar-dates.md, 022-unmatched-routes-and-error-rendering.md, 023-pg-date-string-mode-support.md
 
 ## History
+
+- Attempt 1: verify failed (exit 1; PGlite startup timeout in test/errors.test.ts under parallel load)

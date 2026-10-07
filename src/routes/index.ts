@@ -8,6 +8,7 @@ import { ADMIN_CSS } from "../static/admin-css.js";
 import type { AdminState } from "../types.js";
 import { type AdminContext, type AdminEnv, errorPage } from "./context.js";
 import { dashboardHandler } from "./dashboard.js";
+import { listHandler } from "./list.js";
 import {
   csrfToken,
   initVars,
@@ -65,6 +66,7 @@ export function buildApp(state: AdminState): Hono {
 
   // Routes 2-9 (login, logout, list, action, add, change, delete) are registered here, in table
   // order, by tasks 15, 19, 20, 21 and 23. They must stay above the catch-all.
+  app.get("/:model/", listHandler); // route 4
 
   app.get("/*", catchAll(config.prefix));
   app.all("/*", notFound);
