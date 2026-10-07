@@ -1,7 +1,7 @@
 ---
 id: 17-forms-coerce-validate
 depends_on: [16-forms-fields, 02-support-time]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 17: forms-coerce-validate
