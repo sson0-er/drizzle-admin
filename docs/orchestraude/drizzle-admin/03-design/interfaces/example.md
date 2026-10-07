@@ -1,0 +1,68 @@
+# Interface: example app
+
+Files: `example/schema.ts`, `example/seed.ts`, `example/app.ts`, `example/server.ts` (`app.ts` is an addition to §4 so the smoke test can build the app without listening on a port). It imports the library from `../src/index.js` (run with tsx; decision 005). It uses SQLite through better-sqlite3 so it runs with no external services.
+
+## Responsibilities
+- Demonstrate §5.1 usage, with users, posts (author → users) and tags.
+- Give the user a browser check of login, dashboard, list, add, change, delete and actions.
+
+## API
+
+### `example/schema.ts`
+```ts
+export const users = sqliteTable("users", {
+  id: integer().primaryKey({ autoIncrement: true }),
+  email: text().notNull().unique(),
+  name: text().notNull(),
+  role: text({ enum: ["admin", "editor", "viewer"] }).notNull().default("viewer"),
+  isActive: integer({ mode: "boolean" }).notNull().default(true),
+  createdAt: integer({ mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+export const posts = sqliteTable("posts", {
+  id: integer().primaryKey({ autoIncrement: true }),
+  title: text().notNull(),
+  body: text(),
+  status: text({ enum: ["draft", "published"] }).notNull().default("draft"),
+  authorId: integer().notNull().references(() => users.id),
+  publishedAt: integer({ mode: "timestamp" }),
+  metadata: text({ mode: "json" }),
+});
+export const tags = sqliteTable("tags", {
+  id: integer().primaryKey({ autoIncrement: true }),
+  name: text().notNull().unique(),
+});
+```
+### `example/seed.ts`
+```ts
+export function createSchema(sqlite: Database.Database): void; // constant CREATE TABLE DDL matching schema.ts, via sqlite.exec
+export async function seed(db: BetterSQLite3Database): Promise<void>;
+```
+Seed data: 5 users (one inactive, mixed roles), 60 posts spread across authors, statuses and dates (some within today / past 7 days / this month, so that pagination and filters show), 8 tags. The data is deterministic (no randomness).
+
+### `example/app.ts`
+```ts
+export async function createExampleApp(opts: { secret: string; adminPassword: string }): Promise<{ app: Hono; admin: Admin }>;
+```
+Everything below except the port and environment handling lives here; `server.ts` reads the environment, calls it and serves.
+
+### `example/server.ts` (behavior of app.ts + server.ts together)
+- `new Database(":memory:")`, `PRAGMA foreign_keys = ON`, `createSchema`, `drizzle(sqlite)`, `await seed(db)`.
+- `createAdmin({ db, dialect: "sqlite", basePath: "/admin", siteTitle: "drizzle-admin demo", secret, auth: { verifyCredentials } })`
+  - `secret = process.env.ADMIN_SECRET ?? <random 32-byte hex generated at startup>`; sessions do not survive a restart unless it is set.
+  - `verifyCredentials`: username `admin`, password `process.env.ADMIN_PASSWORD ?? "admin"`. Prints a warning at startup when the default password is in use.
+- Registrations:
+  - users: the §5.1 options (listDisplay id/email/isActive/createdAt, searchFields email/name, listFilter isActive and role, ordering `-createdAt`, readonlyFields createdAt, toString email). Action `deactivate` sets `isActive = false` for the ids and has `confirm: true`. Action `activate` does the opposite without confirmation.
+  - posts: listDisplay id/title/authorId/status/publishedAt, searchFields title, listFilter status/authorId/publishedAt, listPerPage 20, toString title.
+  - tags: defaults only.
+- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` on `Number(process.env.PORT ?? 3000)`. Prints the URL and login hint.
+
+## Data formats
+Run instructions (also in the README "Development" section):
+```
+mise install          # node 24.21.0 and pnpm 12.10.0 from mise.toml
+pnpm install
+pnpm example          # then open http://localhost:3000/admin/ and log in as admin / admin
+```
+
+## Errors
+- Startup failures (port in use, etc.) surface as the thrown error; no special handling.
