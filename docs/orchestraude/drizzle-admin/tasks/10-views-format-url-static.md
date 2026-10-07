@@ -1,7 +1,7 @@
 ---
 id: 10-views-format-url-static
 depends_on: [08-db-helpers-and-repository]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 10: views-format-url-static
