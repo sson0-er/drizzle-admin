@@ -1,7 +1,7 @@
 ---
 id: 16-forms-fields
 depends_on: [05-register-and-finalize]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 16: forms-fields
