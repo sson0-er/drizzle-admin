@@ -1,7 +1,7 @@
 ---
 id: 13-auth-origin-check
 depends_on: [01-project-setup]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 13: auth-origin-check
