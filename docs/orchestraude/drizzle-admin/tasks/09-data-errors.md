@@ -1,7 +1,7 @@
 ---
 id: 09-data-errors
 depends_on: [08-db-helpers-and-repository]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 09: data-errors
