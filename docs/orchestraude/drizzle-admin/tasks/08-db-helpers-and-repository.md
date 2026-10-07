@@ -1,7 +1,7 @@
 ---
 id: 08-db-helpers-and-repository
 depends_on: [07-data-query]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 08: db-helpers-and-repository
