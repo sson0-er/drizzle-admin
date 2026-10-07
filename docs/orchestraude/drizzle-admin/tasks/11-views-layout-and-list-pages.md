@@ -1,7 +1,7 @@
 ---
 id: 11-views-layout-and-list-pages
 depends_on: [10-views-format-url-static]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 11: views-layout-and-list-pages
