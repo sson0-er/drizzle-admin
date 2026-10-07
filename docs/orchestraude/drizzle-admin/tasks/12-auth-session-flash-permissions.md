@@ -1,7 +1,7 @@
 ---
 id: 12-auth-session-flash-permissions
 depends_on: [05-register-and-finalize, 11-views-layout-and-list-pages]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 12: auth-session-flash-permissions
