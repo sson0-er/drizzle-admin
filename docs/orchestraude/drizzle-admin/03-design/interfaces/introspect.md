@@ -50,6 +50,7 @@ interface ModelMeta { table: Table; tableName: string; pk: FieldMeta; fields: Fi
 ### Mapping rules (decision 010)
 Changed 2026-10-07: values of `isDateOnly` fields are UTC-midnight Dates (decision 019).
 Changed 2026-10-07: `isDateOnly` also covers PG `date()` string mode, which keeps kind string (decision 023).
+Changed 2026-10-07: SQLite `blob({mode:"bigint"})` is the SQLite bigint column and maps to kind bigint (decision 026).
 
 | Input | Result |
 |---|---|
@@ -65,7 +66,7 @@ Changed 2026-10-07: `isDateOnly` also covers PG `date()` string mode, which keep
 | `foreignKey` | for FKs with exactly one column: `{ table: foreignTable, column: <key of foreignColumns[0] in getTableColumns(foreignTable)> }`. Multi-column FKs are ignored. `slug` is filled at finalization (admin.md) |
 
 Observed values (runtime, drizzle 0.45.3) that the snapshot tests must reproduce (evidence: 2026-10-07-drizzle-column-introspection, 2026-10-07-drizzle-column-variants, 2026-10-07-drizzle-driver-runtime-behavior):
-- SQLite `integer({mode:"boolean"})` → boolean; `integer({mode:"timestamp"|"timestamp_ms"})` → date; `text({mode:"json"})` → json; `text({enum})` → enum; `integer().primaryKey({autoIncrement:true})` → number, hasDefault, autoIncrement.
+- SQLite `integer({mode:"boolean"})` → boolean; `integer({mode:"timestamp"|"timestamp_ms"})` → date; `text({mode:"json"})` → json; `text({enum})` → enum; `integer().primaryKey({autoIncrement:true})` → number, hasDefault, autoIncrement; `blob({mode:"bigint"})` (columnType `SQLiteBigInt`) → bigint. SQLite `integer()` has no bigint mode, so this is the only SQLite bigint column; its values sort as BLOBs, not numerically (evidence: 2026-10-07-sqlite-blob-bigint-ordering; decision 026). Other `blob` modes (dataType buffer/json) follow the table above.
 - PG `serial` → number, notNull, hasDefault, autoIncrement; `pgEnum` column → enum; `timestamp` → date; `jsonb` → json; `text` → string + isLongText; `varchar` → string; `bigint({mode:"bigint"})` → bigint; `uuid().defaultRandom()` → string, hasDefault, not autoIncrement; `date()` → string + isDateOnly (PgDateString); `date({mode:"date"})` → date + isDateOnly.
 
 ## Errors

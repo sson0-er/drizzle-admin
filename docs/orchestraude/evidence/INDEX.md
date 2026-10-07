@@ -16,3 +16,4 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-07-pg-search-non-text-columns | Does PG ilike work on non-text string-kind/pgEnum columns, does ::text fix it, does SQLite LIKE work on numeric? | expires 2026-11-06
 - 2026-10-07-pg-date-string-mode-filtering | Do YYYY-MM-DD string bounds filter PG date() string-mode columns, and how does PG treat malformed date strings? | expires 2026-11-06
 - 2026-10-07-zoned-to-instant-dst-algorithm | Does the support.md zonedToInstant algorithm give the stated DST gap/overlap outcomes, and does src/time.ts? | expires 2027-01-05
+- 2026-10-07-sqlite-blob-bigint-ordering | How are SQLite blob({mode:"bigint"}) values stored, and are ordering/range/equality comparisons numeric? | expires 2027-01-05

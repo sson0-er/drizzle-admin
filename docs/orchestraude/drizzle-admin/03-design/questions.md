@@ -3,11 +3,13 @@
 ## Open questions
 (The designer could not decide these. The orchestrator relays them to the user.)
 Changed 2026-10-07: Q5 added (proposal from the review revision), then answered and moved to Resolved questions.
+Changed 2026-10-07: SQLite blob-bigint question (raised in task 03-introspect review) answered and added to Resolved questions (decision 026).
 
 (None.)
 
 ## Resolved questions
 (Question, answer, date. Move items here once the user has decided.)
+- **SQLite bigint columns (task 03-introspect review).** drizzle's SQLite `integer()` has no bigint mode, so a SQLite bigint column is `blob({ mode: "bigint" })`, as in the fixture `articles.big` (evidence: 2026-10-07-sqlite-blob-bigint-ordering). Answer: keep supporting it as kind `bigint`. Known limitation, documented in the README: on SQLite, ordering and range comparison on such columns are not numeric, because SQLite compares them as BLOBs; equality works. Later tasks' SQLite tests must not assume numeric ordering or range filtering on blob-bigint columns. No code change (2026-10-07; decision 026; project-setup.md, data.md, introspect.md, test-strategy.md).
 - **Q5. Date widget for PG `date()` string-mode columns.** Answer: yes (option (a)). `date()` fields get `isDateOnly`, the `date` widget (`<input type="date">`) and the date-preset filters; values stay `YYYY-MM-DD` strings end to end with no Date conversion. Coercion validates the strict `YYYY-MM-DD` format and keeps the string; filter bounds are `toDateOnly` strings of `calendarPresetRange`, so the time zone only decides "today" (consistent with decision 019). List display stays as stored (`2026-10-07`) (2026-10-07; decision 023; introspect.md, forms.md, data.md, views.md, support.md, admin.md, routes-handlers.md, test-strategy.md).
 - **hono/csrf fixed-origin comparison (review revision).** Answer: whether `csrf({ origin: publicOrigin })` compares by exact equality stays unverified at design time. The implementation task must prove it with tests: a non-matching Origin, such as a different port or a trailing slash, is rejected with 403. If the behaviour differs, the implementer reports blocked (2026-10-07; decision 020; auth.md, test-strategy.md).
 - pnpm provisioning: pnpm is provisioned via mise.toml with a pinned version. The user pinned `pnpm = "12.10.0"` themselves, so no implementation task edits mise.toml (2026-10-07; decision 001).

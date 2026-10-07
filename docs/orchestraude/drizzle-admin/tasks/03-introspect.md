@@ -1,7 +1,7 @@
 ---
 id: 03-introspect
 depends_on: [01-project-setup]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 03: introspect

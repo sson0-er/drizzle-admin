@@ -4,6 +4,7 @@
 Changed 2026-10-07: added 014-017 (answers to Q1-Q4); 008 updated to point to them. Review revision: added 018-022; 009 updated to point to 018 and 019.
 Changed 2026-10-07: added 023 (answer to Q5); 010 and 019 updated to point to it.
 Changed 2026-10-07: added 025 (correction found in task 02-support-time: `zonedToInstant` algorithm text).
+Changed 2026-10-07: added 026 (user answer to the SQLite blob-bigint question from task 03-introspect).
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -30,6 +31,7 @@ Changed 2026-10-07: added 025 (correction found in task 02-support-time: `zonedT
 - 022-unmatched-routes-and-error-rendering: all-methods fallback route for 404, HTML 403 for the Origin check, full logging for non-DB errors.
 - 023-pg-date-string-mode-support: PG `date()` string mode keeps kind string, gets `isDateOnly`, the `date` widget and date-preset filters with `YYYY-MM-DD` string values and string bounds (Q5).
 - 025-zoned-to-instant-dst-algorithm: `zonedToInstant` takes candidates from the offsets one day before and after the guess, returns the earliest that round-trips (overlap → first occurrence), else the later candidate (gap → later valid instant); replaces the single-pass correction, which contradicted those outcomes.
+- 026-sqlite-blob-bigint-support: SQLite bigint columns are `blob({ mode: "bigint" })` and stay kind `bigint`; ordering and range comparison on them are bytewise (documented limitation), equality works; SQLite tests must not assume numeric order or range filtering on them.
 
 ## Evidence referenced
 - 2026-10-07-drizzle-orm-release-lines (research)
@@ -46,5 +48,6 @@ Changed 2026-10-07: added 025 (correction found in task 02-support-time: `zonedT
 - 2026-10-07-pg-search-non-text-columns (design revision): PG `ilike` fails (42883) on uuid/numeric/interval/date/string-timestamp/pgEnum; `::text` cast fixes it; SQLite LIKE works on numeric; `DrizzleQueryError` needs `instanceof`.
 - 2026-10-07-pg-date-string-mode-filtering (design, Q5): `YYYY-MM-DD` string bounds filter `date()` columns exactly under any process TZ; PG rejects `2026-02-30` (22008) but accepts `2026/10/07`.
 - 2026-10-07-zoned-to-instant-dst-algorithm (design correction, decision 025): the single-pass correction gives 06:30Z for the New York gap and 01:30Z for the Berlin overlap; src/time.ts gives the expected 07:30Z / 05:30Z / 01:30Z / 00:30Z and its tests pass under any process TZ. Expires 2027-01-05.
+- 2026-10-07-sqlite-blob-bigint-ordering (design, decision 026): SQLite `integer()` has no bigint mode; `blob({mode:"bigint"})` stores decimal digits as BLOB bytes; `order by` is bytewise (-5, 10, 100, 9), a numeric bound matches every row, equality works. Expires 2027-01-05.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

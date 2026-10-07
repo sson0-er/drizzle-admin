@@ -61,6 +61,7 @@ Changed 2026-10-07: date-only strings for PG `date()` string mode (decision 023)
 ## Index
 Changed 2026-10-07: questions and decisions summaries updated for Q1-Q4, then for the review revision (decisions 018-022, Q5).
 Changed 2026-10-07: Q5 answered (decision 023).
+Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisions summary range updated.
 
 | File | Summary |
 |---|---|
@@ -77,5 +78,5 @@ Changed 2026-10-07: Q5 answered (decision 023).
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test |
-| decisions-and-evidence.md | Decisions 001-023 and evidence ids referenced by this design |
+| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support |
+| decisions-and-evidence.md | Decisions 001-026 and evidence ids referenced by this design |

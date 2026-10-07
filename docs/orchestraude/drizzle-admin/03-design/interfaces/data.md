@@ -22,6 +22,7 @@ export function asQueryDb(db: unknown): QueryDb; // single cast, reasoned biome-
 ### `src/data/query.ts` (pure, unit-tested)
 Changed 2026-10-07: PG search casts every column to `::text` (decision 018). Date presets on date-only fields use `calendarPresetRange` (decision 019).
 Changed 2026-10-07: date presets also apply to date-only strings (PG `date()` string mode), with string bounds (decision 023).
+Changed 2026-10-07: SQLite blob-bigint columns sort and compare as BLOBs, not numerically (decision 026).
 
 ```ts
 export function escapeLike(s: string): string;            // "\" -> "\\", "%" -> "\%", "_" -> "\_"
@@ -47,6 +48,7 @@ Rules:
     The date branch is checked before the FK branch, matching admin.md finalization (a date-kind or date-only FK filters by presets).
   - Invalid values are silently ignored (the page shows "all").
 - `buildOrderBy`: `desc(col)` / `asc(col)` per item, then `asc(pk)` appended if the PK is not present. Keys are already whitelisted by routes.
+- SQLite blob-bigint (`blob({ mode: "bigint" })`, kind bigint; decision 026): no special case. Drizzle stores the decimal digits as BLOB bytes, so `buildOrderBy` on such a column sorts bytewise, not numerically (9, 10, -5, 100 sort as -5, 10, 100, 9), and any range comparison (`gt`/`lt`) on it is bytewise too. Equality (`eq`, `inArray`) works, so FK filters, `get`/`getMany` and PK lookups are correct (evidence: 2026-10-07-sqlite-blob-bigint-ordering). No numeric range filter exists in this design. SQLite tests must not assert numeric ordering or range filtering on blob-bigint columns; PG `bigint({mode:"bigint"})` orders numerically.
 - `parsePk` / `parseFieldValue` by `field.kind`: number → `/^-?\d+$/` and `Number.isSafeInteger` for integer fields (`/^-?\d+(\.\d+)?$/` otherwise) → number; bigint → `/^-?\d+$/` → `BigInt`; string/enum → raw; anything else → `null`.
 
 ### `src/data/repository.ts`
@@ -95,8 +97,10 @@ Walks `err` and up to 5 `.cause` levels, reading `code` (decision 011). better-s
 
 ## Data formats
 Changed 2026-10-07: date-only representation (decision 019). Date-only strings added (decision 023).
+Changed 2026-10-07: SQLite blob-bigint storage noted (decision 026).
 
 - Row values are whatever Drizzle returns (Date for date kinds, boolean for SQLite boolean mode, bigint for bigint mode, parsed JSON for json).
+- Bigint values are JS `bigint` on both dialects. On SQLite the column is `blob({ mode: "bigint" })` and the stored form is the decimal digits as BLOB bytes; drizzle converts in both directions, so the repository sees only `bigint` (evidence: 2026-10-07-sqlite-blob-bigint-ordering; decision 026).
 - Date-only (kind date + `isDateOnly`, PG `date({mode:"date"})`) values are Dates at UTC midnight of the calendar date, both read and written. Drizzle reads `YYYY-MM-DD` as UTC midnight and writes with `toISOString()`, so any other offset changes the stored day (evidence: 2026-10-07-drizzle-pg-date-mapping). The repository passes values through unchanged; forms produce UTC-midnight Dates.
 - Date-only strings (kind string + `isDateOnly`, PG `date()` string mode) are `YYYY-MM-DD` strings, both read and written; drizzle passes them through unchanged (evidence: 2026-10-07-drizzle-pg-date-mapping). No component converts them to `Date`.
 - PK strings in URLs are `String(value)` of the PK value.
