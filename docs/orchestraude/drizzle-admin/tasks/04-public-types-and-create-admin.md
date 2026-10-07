@@ -1,7 +1,7 @@
 ---
 id: 04-public-types-and-create-admin
 depends_on: [02-support-time, 03-introspect]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 04: public-types-and-create-admin
