@@ -37,9 +37,22 @@ SQLite blob-bigint rule (decision 026): on SQLite, `articles.big` values compare
 
 ## Integration coverage (§12)
 Changed 2026-10-07: hook ctx assertions use the fixed `HookCtx` (decision 015). Review revision: date-only round trip, fallback route, error page and logging cases (decisions 019, 022).
+Changed 2026-10-08: `basePath: "/"` trailing-slash cases (decision 029) and flash display on the page after a redirect (decision 027).
+Changed 2026-10-08: trailing-slash cases for the allowlist rule (tab, LF, CR, `///` paths, ordinary redirect with a query) after the tab bypass of the denylist (decision 029).
+Changed 2026-10-08: whitespace case `/a%20b` → 404; LF/CR cases are a known limitation (decision 029).
 
 - Every page GET returns 200: dashboard, list, add, change, delete, login, action confirmation; static CSS 200 with long cache.
 - Trailing slash: `/admin`, `/admin/authors`, `/admin/authors/1/change` → 301 to the slashed URL with the query kept; unknown model/pk → 404.
+- Trailing slash, open-redirect guard (decision 029, `admin.fetch`). Each "→ 404 without `Location`" case asserts status 404 and `res.headers.get("Location") === null`.
+  - `basePath: "/"`:
+    - `GET //evil.example`, `GET /%5Cevil.example`, `GET ///evil.example`, `GET /%09/evil.example` → 404 HTML page (layout, `Content-Type: text/html`) without `Location`.
+    - `GET /%0a/evil.example`, `GET /%0d/evil.example` → 404 without `Location`. Assert only status and the missing `Location`: these paths do not reach any admin route (Hono's `/*` does not match a decoded LF/CR), so the body is Hono's plain `404 Not Found` (evidence: 2026-10-08-trailing-slash-control-char-bypass; accepted known limitation, decision 029). Do not assert the security headers on these two responses.
+    - `GET /a%20b` → 404 HTML page without `Location` (whitespace is outside the allowlist).
+    - `GET /users?a=1` → 301 with `Location: /users/?a=1` (`users` is not a fixture model; the redirect does not depend on registration); `GET /authors?x=1` → 301 with `Location: /authors/?x=1`.
+    - `GET /` (logged in) → dashboard 200.
+  - `basePath: "/admin"`: the same paths under the prefix: `GET /admin//evil.example`, `GET /admin/%5Cevil.example`, `GET /admin///evil.example`, `GET /admin/%09/evil.example` → 404 HTML page without `Location`; `GET /admin/%0a/evil.example`, `GET /admin/%0d/evil.example` → 404 without `Location`; `GET /admin/a%20b` → 404 HTML page without `Location`; `GET /admin/users?a=1` → 301 `Location: /admin/users/?a=1`; `GET /admin?a=1` → 301 `Location: /admin/?a=1`.
+  - For every 301/302/303 asserted anywhere in the route tests the `Location` starts with `${prefix}/`, does not start with `//`, and contains no `\`, no control character (U+0000-U+001F, U+007F) and no whitespace (the external `loginUrl` redirect excepted).
+- Flash display (decision 027): after a redirect that sets a flash (e.g. a successful add), the next GET page shows the message once (`ul.messagelist`) and a second GET does not.
 - List: search (incl. wildcard literal), each filter kind with selected state and other params preserved, header cycle asc → desc → off, non-listDisplay `o` ignored, pagination and total, ✓/✗, `-` for null, FK link + label, truncation. No N+1: query count for a page with 30 rows of `articles` (FK displayed) equals that for 3 rows.
 - Add/change, for every column type: happy path (303 + flash + DB state), each coercion error (400, values kept, `ul.errorlist`), required, unique violation (form error, 400), `validate` errors, `beforeSave`/`afterSave` called with the expected `HookCtx` (`mode` add/change, `user`, `db` identical to `AdminConfig.db`; decision 015), three buttons → correct Location, mass-assignment ignored, readonly/auto PK not writable.
 - Date-only (PG only, `events`): for `timeZone` `Asia/Tokyo` and `America/New_York`, add with `day=2026-10-07` → `select day::text` returns `2026-10-07`; the change page input value is `2026-10-07`; the list cell shows `2026/10/07`; change POST keeps the day (decision 019).
@@ -51,6 +64,8 @@ Changed 2026-10-07: hook ctx assertions use the fixed `HookCtx` (decision 015). 
 
 ## §10 test matrix (`auth.test.ts`, `headers.test.ts`, `proxy.test.ts`)
 Changed 2026-10-07: rows for `publicOrigin` (decision 017), external-mode CSRF cookie (decision 014) and action permission (decision 016).
+Changed 2026-10-08: open-redirect row covers the trailing-slash catch-all with `basePath: "/"` (decision 029).
+Changed 2026-10-08: open-redirect row adds tab/LF/CR and `///` paths for the allowlist rule (decision 029).
 | §10 item | Test |
 |---|---|
 | Signed cookie (HMAC-SHA256) | tampered or foreign-secret cookie → treated as logged out (redirect to login) |
@@ -59,7 +74,7 @@ Changed 2026-10-07: rows for `publicOrigin` (decision 017), external-mode CSRF c
 | Session contents limited | decoded payload has only `u`, `csrf`, `iat` |
 | Session expiry | `iat` older than `sessionMaxAgeSec` → redirect to login |
 | Unauthenticated redirect with `next` | GET list while logged out → 302 to `/admin/login/?next=%2Fadmin%2F...`; login then lands on `next` |
-| Open-redirect protection | login with `next=//evil.example`, `https://evil.example`, `/other/` → redirect to `/admin/` |
+| Open-redirect protection | login with `next=//evil.example`, `https://evil.example`, `/other/` → redirect to `/admin/`; trailing-slash catch-all with `basePath: "/"` and `"/admin"`: `//evil.example`, `/%5Cevil.example`, `///evil.example`, `/%09/evil.example`, `/%0a/evil.example`, `/%0d/evil.example` → 404 without `Location` (decision 029, see Integration coverage) |
 | External auth | `getUser` null + `loginUrl` → 302 to loginUrl with next; without `loginUrl` → 401; `getUser` user → 200; `/login/` → 404; the first GET sets `da_session` whose payload has `u: null`; a POST (e.g. change) with that cookie's token → success, without `_csrf` → 403 (decision 014) |
 | CSRF token | POST without `_csrf` → 403; wrong token → 403; correct → success |
 | Origin check (`hono/csrf`) | correct token but `Origin: http://evil.example` → 403; no Origin and no Sec-Fetch-Site → 403 |

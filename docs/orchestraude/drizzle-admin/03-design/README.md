@@ -39,16 +39,20 @@ Changed 2026-10-07: Origin check and cookie `Secure` flag follow `AdminConfig.pu
 1. Setup: `createAdmin(config)` validates config → `admin.register(table, opts)` → `introspectTable(table, dialect)` → `ModelMeta` → option validation → `ResolvedModel` stored by slug.
 2. First access of `admin.app` / `admin.fetch` → `finalize()` resolves `foreignKey.slug`, validates cross-model options, freezes the registry → `buildApp(adminState)` creates the Hono app.
 3. Request: security headers (wrap) → static CSS route (no auth) → `hono/csrf` Origin check (unsafe form posts; expected origin = `publicOrigin` if configured, else the request URL origin) → session load/issue (signed cookie, `Secure` per `publicOrigin` or request scheme; `u: null` in external mode) → resolve user (session or `getUser`) → auth guard (redirect to login / `loginUrl`) → POST `_csrf` token check → handler.
-4. Handler: resolve model by slug (404) → permission check (403) → parse query/body → repository and forms → either render HTML (200 / 400) via `renderPage`, or set flash + 303 redirect (PRG).
+4. Handler: resolve model by slug (404) → permission check (403) → parse query/body → repository and forms → either render HTML (200 / 400) via `renderPage` (function form receiving the consumed flash, decision 027), or set flash + 303 redirect (PRG).
 5. List rendering: one count query, one page query, one batched `getMany` per FK column shown, and option queries per FK filter. The number of queries does not depend on the row count (no N+1).
 
 ## Error handling
 Changed 2026-10-07: unmatched paths of any method, the Origin-check 403 page and 500 logging (decision 022); PG search cast and date-only values (decisions 018, 019).
 Changed 2026-10-07: date-only strings for PG `date()` string mode (decision 023).
+Changed 2026-10-08: the trailing-slash redirect never leaves the prefix (decision 029).
+Changed 2026-10-08: allowlist instead of denylist after a tab-character bypass (decision 029).
+Changed 2026-10-08: whitespace excluded from the allowlist; decoded LF/CR 404 accepted as a known limitation (decision 029, former Q6).
 
 - Configuration errors (`createAdmin`, `register`, finalization): throw `Error` with message prefix `drizzle-admin: ` naming the table/option/key. Never deferred to request time.
 - Unknown model slug, invalid or unknown primary key → 404 HTML page.
 - Unmatched path with any method → 404 HTML page via an explicit all-methods fallback route, which also works when `admin.app` is mounted.
+- Unslashed GET path → 301 to the slashed path only when the path after the prefix is empty or a `/segment/...` shape with non-empty segments and no `\`, control character or whitespace (allowlist); anything else → 404 without `Location`, so no `Location` can point off-site, including with `basePath: "/"` (decision 029). Known limitation: paths with a decoded LF/CR never reach the admin routes, so they get Hono's (or the host's) plain 404 without `Location` and without the admin's security headers (decision 029).
 - Missing permission → 403 HTML page. Missing/invalid CSRF token or failed Origin check → 403 HTML page (layout, `messages.csrfFailed`).
 - Unauthenticated → 302 redirect to `<prefix>/login/?next=...` (built-in) or `loginUrl?next=...` (external); external without `loginUrl` → 401.
 - Form problems (coercion, zod, `validate`, DB constraint, `beforeSave` failure) → 400 with the form re-rendered, raw submitted values kept, field and form-level errors shown.
@@ -62,6 +66,7 @@ Changed 2026-10-07: date-only strings for PG `date()` string mode (decision 023)
 Changed 2026-10-07: questions and decisions summaries updated for Q1-Q4, then for the review revision (decisions 018-022, Q5).
 Changed 2026-10-07: Q5 answered (decision 023).
 Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisions summary range updated.
+Changed 2026-10-08: decisions 027-029 (task 14 follow-ups) added; summaries updated.
 
 | File | Summary |
 |---|---|
@@ -78,5 +83,5 @@ Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisio
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support |
-| decisions-and-evidence.md | Decisions 001-026 and evidence ids referenced by this design |
+| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404) |
+| decisions-and-evidence.md | Decisions 001-029 and evidence ids referenced by this design |

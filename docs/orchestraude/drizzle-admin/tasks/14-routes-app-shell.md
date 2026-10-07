@@ -1,8 +1,8 @@
 ---
 id: 14-routes-app-shell
 depends_on: [06-example-app, 09-data-errors, 12-auth-session-flash-permissions, 13-auth-origin-check]
-status: pending
-attempts: 0
+status: done
+attempts: 2
 ---
 # Task 14: routes-app-shell
 
@@ -52,3 +52,16 @@ attempts: 0
 - Evidence: 2026-10-07-hono-routing-cookies-script-escaping, 2026-10-07-hono-csrf-and-jsx
 
 ## History
+- Added internal type `FormBody` to src/types.ts (routes.md `AdminVars.body`; the forms task may re-export it).
+- `buildApp` returns plain `Hono` (cast from the internal `Hono<AdminEnv>`), because `Admin.app` / src/admin.ts use `Hono` and cannot be changed in this task.
+- `renderPage` takes either a ready element or a `(flash) => element` function; the function form is how a 200/400 page receives the flash it consumed (routes.md leaves this open). Added helpers `pageChrome` and `errorPage` in context.ts. An extra first middleware (`initVars`) sets `state`, `repo` and `body: null` so `onError` can render.
+- test/register.test.ts: the fetch smoke test now requests `/admin/anything/` (the unslashed path is a 301 now); outside the Scope list but required for verify.
+- Test client sends no Origin on PUT by default; `hono/csrf` treats a content-type-less PUT as a form post, so the PUT test sets `Origin: http://localhost`.
+- Review fix (high): the catch-all no longer redirects when the part after the prefix starts with `//` or contains a backslash (open redirect with basePath "/"); it renders the 404 page. routes.md "301 to path + / + search" should be amended accordingly (design not touched here).
+- Review fixes (low): `initVars` takes `Repository`; the Home breadcrumb is always a link except on the dashboard; CSRF tests assert `messages.csrfFailed`.
+
+- Attempt 1: review round 1 findings (high 1, medium 0)
+- Review fix round 2 (high, x2): the catch-all redirect guard is now an allowlist (`SAFE_REST`): the part after the prefix is empty or one or more `/segment` pieces with no slash, backslash, whitespace or control character in a segment. Hono percent-decodes the path, so `%09` arrived as a literal tab that browsers strip from a Location. Everything else gets the 404 page with no Location. routes.md / decision 029 should state the allowlist rule (design not touched here).
+
+- Attempt 2: review round 2 findings (high 1, medium 0)
+- Note (orchestrator): the trailing-slash guard described in the task Notes (denylist of leading `//` and backslash) is superseded by decision 029 (allowlist; also rejects whitespace and control characters). Decision 029 and interfaces/routes.md are authoritative.

@@ -158,3 +158,6 @@ export interface AdminState {
   models: ReadonlyMap<string, ResolvedModel>;
   modelByTable: ReadonlyMap<Table, ResolvedModel>;
 }
+
+/** Form body as parsed by `c.req.parseBody({ all: true })`. */
+export type FormBody = Record<string, string | File | (string | File)[]>;

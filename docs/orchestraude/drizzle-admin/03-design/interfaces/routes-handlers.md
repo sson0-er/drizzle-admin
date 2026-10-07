@@ -4,6 +4,11 @@ Files: `src/routes/dashboard.ts`, `list.ts`, `actions.ts`, `form.ts`, `delete.ts
 Middleware, context helpers (`renderPage`, `redirectWithFlash`, `modelOr404`) and the route table are in [routes.md](routes.md). Views and their props are in [views.md](views.md).
 Notation: `P` = `prefix`, `M` = resolved model, `U` = current user, `ctx` = `HookCtx` (decision 015), `list URL` = `${P}/${M.slug}/`.
 
+## Rendering pages
+Changed 2026-10-08: 200/400 pages use the function form of `renderPage` (decision 027).
+
+Every page below rendered with status 200 or 400 (dashboard, list, confirm-action, add/change form incl. 400 re-render, delete confirmation, login incl. 400 failure) is rendered as `renderPage(c, status, (flash) => Page({ ...chrome(flash), ...props }))`, where the `PageChrome` gets `flash` from the callback argument. This is how the messages set by the preceding 303 (PRG) appear on the next page. Error pages (403/404, 401, 500) never show flash and may pass a ready element or use the synchronous error-page helper. "→ `XPage(...)`, 200" below always means this form.
+
 ## Dashboard (`GET ${P}/`)
 Models where `can(M, "view", U)`, in registration order → `DashboardPage({ models: [{ slug, label, canAdd }] })`, 200.
 
