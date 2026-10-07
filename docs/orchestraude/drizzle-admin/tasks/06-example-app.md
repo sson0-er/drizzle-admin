@@ -1,8 +1,8 @@
 ---
 id: 06-example-app
 depends_on: [05-register-and-finalize]
-status: pending
-attempts: 0
+status: done
+attempts: 1
 ---
 # Task 06: example-app
 
@@ -36,3 +36,6 @@ The `example/` demo (users, posts, tags) builds with seed data and all registrat
 - Decisions: docs/orchestraude/decisions/005-dependency-set.md
 
 ## History
+- Implementer, attempt 1: manual check RUN. `pnpm example` started (warned about default password and unset secret, printed `http://localhost:3000/admin/`); `curl -si http://localhost:3000/` returned `302 Found` with `location: /admin/`; server stopped afterwards (port no longer answering).
+
+- Attempt 1: review round 1 findings (high 0, medium 1)
