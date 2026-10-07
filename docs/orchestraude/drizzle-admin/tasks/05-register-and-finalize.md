@@ -1,7 +1,7 @@
 ---
 id: 05-register-and-finalize
 depends_on: [04-public-types-and-create-admin]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 05: register-and-finalize
