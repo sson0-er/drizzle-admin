@@ -6,6 +6,7 @@ import { DashboardPage } from "../src/views/dashboard.js";
 import { ErrorPage } from "../src/views/error.js";
 import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
+import { LoginPage } from "../src/views/login.js";
 import { sortHref, withQuery } from "../src/views/url.js";
 import { attr, parse, qs as q1, qsa, text } from "./helpers/html.js";
 
@@ -376,5 +377,61 @@ describe("ErrorPage", () => {
     expect(qsa(doc, { tag: "b" })).toHaveLength(0);
     const msg = q1(doc, { tag: "p", cls: "error-message" });
     expect(msg && text(msg)).toBe("<b>x</b>");
+  });
+});
+
+describe("LoginPage", () => {
+  const render = (over: { username?: string; error?: string; next?: string } = {}) =>
+    parse(
+      String(
+        LoginPage({
+          ...chrome,
+          user: null,
+          showLogout: false,
+          title: messages.login,
+          next: "/admin/authors/?q=a",
+          username: "",
+          ...over,
+        }),
+      ),
+    );
+
+  it("posts the login form to the login URL", () => {
+    const form = q1(render(), { tag: "form", id: "login-form" });
+    expect(form).not.toBeNull();
+    expect(form && attr(form, "method")).toBe("post");
+    expect(form && attr(form, "action")).toBe("/admin/login/");
+  });
+
+  it("keeps the username and never renders a password value", () => {
+    const doc = render({ username: 'al"<ice' });
+    const user = q1(doc, { tag: "input", attrs: { name: "username" } });
+    expect(user && attr(user, "value")).toBe('al"<ice');
+    const pass = q1(doc, { tag: "input", attrs: { name: "password" } });
+    expect(pass && attr(pass, "type")).toBe("password");
+    expect(pass && (attr(pass, "value") ?? "")).toBe("");
+  });
+
+  it("renders the hidden next and _csrf inputs", () => {
+    const doc = render();
+    const next = q1(doc, { tag: "input", attrs: { type: "hidden", name: "next" } });
+    expect(next && attr(next, "value")).toBe("/admin/authors/?q=a");
+    const csrf = q1(doc, { tag: "input", attrs: { type: "hidden", name: "_csrf" } });
+    expect(csrf && attr(csrf, "value")).toBe("tok<en");
+  });
+
+  it("renders the labels and submit button from messages", () => {
+    const doc = render();
+    const form = q1(doc, { tag: "form", id: "login-form" });
+    expect(form && text(form)).toContain(messages.username);
+    expect(form && text(form)).toContain(messages.password);
+    const button = form && q1(form, { tag: "button" });
+    expect(button && text(button)).toBe(messages.login);
+  });
+
+  it("renders p.errornote only when an error is given", () => {
+    expect(qsa(render(), { tag: "p", cls: "errornote" })).toHaveLength(0);
+    const note = q1(render({ error: messages.loginFailed }), { tag: "p", cls: "errornote" });
+    expect(note && text(note)).toBe(messages.loginFailed);
   });
 });

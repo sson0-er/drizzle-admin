@@ -65,11 +65,23 @@ export function loginRedirectUrl(prefix: string, currentPathAndQuery: string): s
 export function externalLoginUrl(loginUrl: string, currentPathAndQuery: string): string;
   // appends `next=` with "?" or "&" depending on whether loginUrl already has a query
 ```
-`safeNext` returns `next` only if all of these hold, otherwise `${prefix}/`:
-- non-empty, starts with `/`, the second char is not `/` or `\`;
-- contains no `\`, no control characters (U+0000-U+001F, U+007F) and no whitespace;
-- `new URL(next, "http://x.invalid")` has origin `http://x.invalid`, and its pathname starts with `${prefix}/` (or equals `${prefix}/`);
-- the returned value is `pathname + search` of that URL (normalized).
+Changed 2026-10-08: `safeNext` also judges the percent-decoded path; decoded whitespace and encoded `%2F` are allowed, decoded `.`/`..` segments, control characters and `\`, raw `//` and malformed escapes are rejected (user decision after the task 22 review; decision 032, consistent with decision 029).
+
+`safeNext` returns a value only if every check below holds, in this order; the first failing check returns `${prefix}/`. Let `url = new URL(next, "http://x.invalid")`, `raw = url.pathname` (still percent-encoded) and `decoded = decodeURIComponent(raw)`.
+1. `next` is non-empty, starts with `/`, and its second char is not `/` or `\`.
+2. `next` (the whole raw string, query included) contains no `\`, no control character (U+0000-U+001F, U+007F) and no whitespace (JS `\s`). Literal whitespace is rejected; encoded whitespace (`%20`) is judged in step 6.
+3. `new URL(...)` does not throw, `url.origin === "http://x.invalid"`, and `raw` starts with `${prefix}/` (this includes equality with `${prefix}/`).
+4. `raw` contains no `//` (decision 032 (b)). Encoded `%2F` / `%2F%2F` is allowed here, as in decision 029. `//` in the query is allowed.
+5. `decodeURIComponent(raw)` does not throw; a malformed percent escape is rejected (decision 032 (c)).
+6. `decoded` contains no control character (U+0000-U+001F, U+007F) and no `\` (decision 032 (a)). Whitespace in `decoded` is allowed, e.g. `/admin/kv/a%20b/change/` for a text primary key with a space.
+7. No segment of `decoded.split("/")` is `.` or `..` (decision 032 (d)), so the decoded target cannot leave the prefix. Empty segments from a decoded `%2F%2F` are allowed.
+
+Changed 2026-10-08: dot segments that URL parsing normalizes are accepted (user answer; decision 032).
+Dot segments are judged after URL normalization. A literal `.` or `..` segment, or a segment that is exactly `%2e` / `%2e%2e` (any case), is resolved by `new URL` before step 3. It is then accepted in normalized form if it stays under the prefix: `/admin/./x` → `/admin/x`, `/admin/a/../b/` → `/admin/b/`, `/admin/%2e/x` → `/admin/x`. It is rejected by step 3 if it leaves the prefix (`/admin/../x`, `/admin/%2e%2e/x` → `/x`). Step 7 rejects only percent-encoded dot segments that survive normalization because they are joined to a neighbour by an encoded slash, and that become `.`/`..` after decoding: `/admin/..%2Fx`, `/admin/%2e%2e%2fx`, `/admin/.%2Fx`, `/admin/a%2F..%2Fb/`.
+
+The return value is `raw + url.search`: the URL parser's normalized, still-encoded form, never `decoded`. It therefore always satisfies the `Location` invariant of decision 029: a single-slash path under the prefix with no `\` and no control character.
+The URL parser already resolves literal and `%2e` dot segments (`/admin/%2e%2e/x` → `/x`, then step 3 rejects it). It does not resolve segments joined by `%2F` (`/admin/..%2Fx` stays as is), and step 7 exists for those (evidence: 2026-10-08-safenext-decoded-path).
+Callers must pass the raw percent-encoded path in `next`. Hono's `c.req.path` decodes `%20` to a space (evidence: 2026-10-08-safenext-decoded-path), which step 2 rejects, so the auth guard builds `next` from `new URL(c.req.url).pathname` (routes.md, decision 032).
 
 ### `permissions.ts`
 Changed 2026-10-07: custom-action permission fixed to `change` (decision 016).

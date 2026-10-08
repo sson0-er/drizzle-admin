@@ -35,3 +35,4 @@ User decisions (2026-10-08) from the high review finding and from the review of 
 - Amends decision 006 (catch-all) and routes.md.
 - test-strategy.md has `basePath: "/"` and `"/admin"` cases for `//`, `\`, tab, LF, CR, `///` and `%20` paths, plus ordinary redirects and `GET /`.
 - Paths with decoded LF/CR get Hono's or the host's plain 404 without the admin's security headers (known limitation, listed in the README outline's known limitations, project-setup.md).
+- Changed 2026-10-08: decision 032 applies the same `Location` invariant to the login `next` target (`safeNext`); there, decoded whitespace and encoded `%2F%2F` stay allowed because the returned path keeps them percent-encoded.

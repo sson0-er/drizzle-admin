@@ -59,6 +59,7 @@ Changed 2026-10-07: originCheck uses `publicOrigin` (decision 017); external-mod
 4. **session**: `readSession` with `CookieOpts { secret, prefix, maxAgeSec: sessionMaxAgeSec, publicOrigin }`. If `null`: for GET/HEAD, create `newSession(null, now)` and `writeSession`; for other methods keep a transient anonymous session without writing it (its token cannot match, so the token check fails with 403). Set `c.var.session`. This is identical in both auth modes; in external mode the session always has `u: null` and only carries the CSRF token and issue time (decision 014).
 5. **user**: builtin → `session.u`; external → `await auth.getUser(c.req.raw)` (`session.u` ignored). Set `c.var.user`. In external mode the token is not rotated when `getUser` starts returning a different user; it rotates only when the session expires (decision 014).
 6. **authGuard** (skipped for exemptions): if `user === null`:
+   Changed 2026-10-08: `path` below is the raw percent-encoded pathname `new URL(c.req.url).pathname`, not `c.req.path` (which decodes `%20` to a space that `safeNext` rejects), and `search` is `new URL(c.req.url).search` (decision 032).
    - builtin → `302` to `loginRedirectUrl(prefix, path + search)`; for non-GET requests use `next = <prefix>/`.
    - external with `loginUrl` → `302` to `externalLoginUrl(loginUrl, path + search)`.
    - external without `loginUrl` → 401 error page.

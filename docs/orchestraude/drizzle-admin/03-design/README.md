@@ -84,5 +84,5 @@ Changed 2026-10-08: decisions summary range updated for 030 (task 18) and 031 (t
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404) |
+| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
 | decisions-and-evidence.md | Decisions 001-031 and evidence ids referenced by this design |

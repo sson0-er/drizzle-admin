@@ -1,8 +1,8 @@
 ---
 id: 22-auth-redirect-and-login-page
 depends_on: [11-views-layout-and-list-pages]
-status: pending
-attempts: 0
+status: done
+attempts: 1
 ---
 # Task 22: auth-redirect-and-login-page
 
@@ -38,3 +38,7 @@ Open-redirect-safe `next` handling and login redirect URL builders exist, and th
 - Decisions: docs/orchestraude/decisions/008-session-csrf-flash.md
 
 ## History
+
+- User decision after round 1 (findings passed at medium, safeNext rule adjusted per decision 032; not counted as a fix attempt)
+
+- Attempt 1: review round 2 findings (high 0, medium 1)

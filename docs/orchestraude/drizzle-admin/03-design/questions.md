@@ -8,11 +8,13 @@ Changed 2026-10-08: three user decisions after task 14 (`renderPage` flash callb
 Changed 2026-10-08: Q6 added (raised while amending decision 029 to an allowlist).
 Changed 2026-10-08: Q6 answered and moved to Resolved questions; allowlist whitespace answer added there.
 Changed 2026-10-08: task 18 `FormPage` `timeZone` gap resolved under the existing task-14 policy and added to Resolved questions (decision 030).
+Changed 2026-10-08: `safeNext` raw-vs-decoded question from the task 22 review answered and added to Resolved questions (decision 032).
 
 (None.)
 
 ## Resolved questions
 (Question, answer, date. Move items here once the user has decided.)
+- **`safeNext`: is `next` judged in raw or percent-decoded form (task 22 review)?** The first implementation rejected `/admin/kv/a%20b/change/` (text PK with a space) and accepted `/admin/..%2Fx`. Answer: both. Keep the listed raw checks and also reject decoded control characters (U+0000-U+001F, U+007F) and `\`, `//` in the raw path, malformed percent escapes, and any decoded `.`/`..` segment; allow decoded whitespace and encoded `%2F`/`%2F%2F` (consistent with decision 029) (2026-10-08; decision 032; auth.md, routes.md authGuard raw path, test-strategy.md).
 - **Q6. Admin 404 page for paths with a decoded LF/CR.** `GET /%0a/evil.example` (and `%0d`, U+2028) matches no Hono route or middleware, so `admin.fetch` returns Hono's plain-text 404 and a mounted app the host's 404, without `Location` and without the admin's security headers (evidence: 2026-10-08-trailing-slash-control-char-bypass). Answer: option (a), accept and document it as a known limitation; no `app.notFound` handler is added (2026-10-08; decision 029; routes.md, test-strategy.md, README.md, project-setup.md README outline).
 - **Whitespace in the trailing-slash allowlist.** Answer: match the implementation; segments also contain no whitespace (`\s`), so `/a%20b` returns 404 rather than 301 (2026-10-08; decision 029; routes.md, test-strategy.md, README.md).
 - **`renderPage` and flash (task 14).** Answer: adopt the task 14 implementation. `renderPage` accepts a ready element or `(flash) => element`; 200/400 pages use the function form so they receive the flash consumed for that request (2026-10-08; decision 027; routes.md, routes-handlers.md, test-strategy.md).
