@@ -351,6 +351,7 @@ describe("FormPage", () => {
     user: null,
     showLogout: false,
     csrfToken: "tok123",
+    currentUrl: "/admin/authors/",
     flash: [],
     breadcrumbs: [{ label: "Home", href: "/admin/" }],
   };
@@ -421,7 +422,7 @@ describe("FormPage", () => {
 
   it("shows the three save buttons only when canSave", () => {
     const names = (doc: ReturnType<typeof render>) =>
-      qsa(doc, { tag: "button" })
+      qsa(qs(doc, { tag: "form", id: "model-form" }) as Element, { tag: "button" })
         .map((b) => attr(b, "name"))
         .filter((n) => n !== null);
     expect(names(render())).toEqual(["_save", "_addanother", "_continue"]);

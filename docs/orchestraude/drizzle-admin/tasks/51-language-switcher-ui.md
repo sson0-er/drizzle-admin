@@ -1,7 +1,7 @@
 ---
 id: 51-language-switcher-ui
 depends_on: [49-i18n-dictionaries-and-request-locale, 50-language-switch-route]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 51: language-switcher-ui
@@ -100,3 +100,12 @@ Follow the conventions in CLAUDE.md (one case per `it.each` row, exact assertion
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Fails-first run (new tests and the fixture `currentUrl` before the source change, on the code after task 50): 21 failures. views.test.ts: the per-locale switch form, per-locale buttons, ` / ` separator, `currentUrl: null` (`div.header-tools` missing), user-tools placement, escaping case (8). admin-css.test.ts: the three rule-presence rows (3). i18n.test.ts, per dialect (5 each, 10): login switcher `next`, login `next` after a failed POST, external 401 switcher, dashboard/list switcher `next`, raw percent-encoded path. Passing on the old code as expected: no script / style / on*, minimal pages (no switcher), CSP, and the CSS order case (trivially, `indexOf` of a missing rule is -1; it pins the order once the rule exists).
+- After the change `scripts/verify.sh` passes (1725 tests passed, 3 skipped).
+- Added beyond the task list: one i18n case that `currentUrl` keeps the raw percent-encoded query (`/admin/authors/?q=%E3%81%82%20b`).
+- No new export or prop besides the design's `PageChrome.currentUrl`.
+- `renderLogin` on a GET without `next` passes `next = ""`, so `currentUrl` is `/admin/login/?next=` (literal `loginRedirectUrl(prefix, next)` per the design); posting it back lands on the login page with an empty target.
+- Manual browser check (JavaScript disabled, focus ring in light and dark): 未確認.
+- Review round 1: high 0, medium 0, low 0. Spec confirmed the login page without next uses /admin/login/?next= per design intent. Manual browser check (JS off, focus ring light/dark) left to the user. Done.

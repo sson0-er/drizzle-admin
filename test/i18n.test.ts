@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { type Locale, MESSAGES } from "../src/messages.js";
+import { SELECT_ALL_SCRIPT_SHA256 } from "../src/static/select-all.js";
 import {
   type Client,
   createClient,
@@ -39,6 +40,14 @@ const htmlLang = (doc: Node): string | null => {
 };
 
 const titleOf = (doc: Node): string => text(qs(doc, { tag: "title" }) as Node);
+
+const switchForm = (doc: Node): Node | null => qs(doc, { tag: "form", cls: "lang-switch" });
+
+const switchNext = (doc: Node): string | null => {
+  const form = switchForm(doc);
+  const input = form && qs(form, { tag: "input", attrs: { name: "next" } });
+  return input === null || input === undefined ? null : attr(input, "value");
+};
 
 const titleSuffix = {
   en: "| Site administration",
@@ -334,6 +343,71 @@ describe.each(dialects)("i18n ($name)", (fixture) => {
     });
   });
 
+  describe("language switcher on the page", () => {
+    const LOGIN_NEXT = "/admin/login/?next=%2Fadmin%2Fauthors%2F";
+
+    it("posts the login page switcher back to the login URL", async () => {
+      const client = await clientFor(a, undefined, false);
+      const doc = await docOf(await client.get(LOGIN_NEXT));
+      expect(switchNext(doc)).toBe(LOGIN_NEXT);
+      const form = switchForm(doc) as Node;
+      const token = attr(qs(form, { tag: "input", attrs: { name: "_csrf" } }) as Node, "value");
+      expect(token).toBe(client.csrf());
+      const res = await client.post("/admin/_lang/", { lang: "ja", next: switchNext(doc) ?? "" });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe(LOGIN_NEXT);
+    });
+
+    it("keeps the login target in the switcher after a failed login", async () => {
+      const client = await clientFor(a, undefined, false);
+      await client.get(LOGIN_NEXT);
+      const res = await client.post("/admin/login/", {
+        username: "nobody",
+        password: "wrong",
+        next: "/admin/authors/",
+      });
+      expect(res.status).toBe(400);
+      expect(switchNext(await docOf(res))).toBe(LOGIN_NEXT);
+    });
+
+    it("offers the switcher on the external 401 page", async () => {
+      const e = await makeAdmin(fixture, { config: { auth: { getUser: async () => null } } });
+      try {
+        const res = await e.client.get("/admin/authors/");
+        expect(res.status).toBe(401);
+        expect(switchNext(await docOf(res))).toBe("/admin/authors/");
+        const posted = await e.client.post("/admin/_lang/", {
+          lang: "ja",
+          next: "/admin/authors/",
+        });
+        expect(posted.status).toBe(303);
+        expect(posted.headers.get("Location")).toBe("/admin/authors/");
+      } finally {
+        await e.close();
+      }
+    });
+
+    it("renders the switcher with the page path and query on a normal page", async () => {
+      const client = await clientFor(a, "ja");
+      const doc = await docOf(await client.get("/admin/authors/?q=x&p=1"));
+      expect(switchNext(doc)).toBe("/admin/authors/?q=x&p=1");
+      expect(switchNext(await docOf(await client.get("/admin/")))).toBe("/admin/");
+    });
+
+    it("keeps the raw percent-encoded path in the switcher", async () => {
+      const client = await clientFor(a);
+      const doc = await docOf(await client.get("/admin/authors/?q=%E3%81%82%20b"));
+      expect(switchNext(doc)).toBe("/admin/authors/?q=%E3%81%82%20b");
+    });
+
+    it("sends the exact builtin CSP on a da_lang=ja page", async () => {
+      const res = await (await clientFor(a, "ja")).get("/admin/");
+      expect(res.headers.get("Content-Security-Policy")).toBe(
+        `default-src 'none'; script-src 'sha256-${SELECT_ALL_SCRIPT_SHA256}'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'`,
+      );
+    });
+  });
+
   describe("minimal pages with da_lang=ja", () => {
     it("shows the Origin check failure in Japanese", async () => {
       const client = await clientFor(a, "ja");
@@ -348,6 +422,7 @@ describe.each(dialects)("i18n ($name)", (fixture) => {
       expect(text(qs(doc, { tag: "p", cls: "error-message" }) as Node)).toBe(
         MESSAGES.ja.csrfFailed,
       );
+      expect(switchForm(doc)).toBeNull();
     });
 
     it("shows a 500 in Japanese and keeps the log prefix in English", async () => {
@@ -359,6 +434,7 @@ describe.each(dialects)("i18n ($name)", (fixture) => {
       expect(text(qs(doc, { tag: "p", cls: "error-message" }) as Node)).toBe(
         MESSAGES.ja.serverError,
       );
+      expect(switchForm(doc)).toBeNull();
       expect(spy.mock.calls.map((call) => call[0])).toEqual(["drizzle-admin:"]);
     });
   });

@@ -61,6 +61,7 @@ export function pageChrome(
 ): PageChrome {
   const { state, session, user, locale, t } = c.var;
   const { prefix, siteTitle } = state.config;
+  const url = new URL(c.req.url);
   return {
     locale,
     t,
@@ -71,6 +72,8 @@ export function pageChrome(
     // Logout exists only with the builtin login.
     showLogout: state.config.authMode === "builtin" && user !== null,
     csrfToken: session.csrf,
+    // The raw percent-encoded path, not `c.req.path`, so the switch redirects to the same URL.
+    currentUrl: url.pathname + url.search,
     flash,
     breadcrumbs: [{ label: t.home, href: `${prefix}/` }, ...trail],
   };
@@ -92,6 +95,7 @@ function minimalChrome(c: AdminContext, title: string): PageChrome {
     user: null,
     showLogout: false,
     csrfToken: "",
+    currentUrl: null,
     flash: [],
     breadcrumbs: [{ label: t.home, href: `${prefix}/` }],
   };

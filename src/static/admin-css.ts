@@ -204,6 +204,9 @@ button:active, .button:active, .object-tools a.addlink:active { background: var(
   text-underline-offset: 3px;
 }
 #header button:hover { background: transparent; color: var(--link-hover); text-decoration-thickness: 3px; }
+.header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.lang-switch { font-size: 14px; line-height: 1.5; color: var(--body-quiet); }
+#header .lang-switch button[aria-current=true]:not(:focus-visible) { color: var(--body-fg); font-weight: 700; text-decoration: none; }
 .submit-row a:not(.deletelink) { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 16px; font-weight: 700; }
 
 #delete-form button[type=submit], form.delete-action button[type=submit] {

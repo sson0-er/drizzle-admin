@@ -231,6 +231,19 @@ describe("ADMIN_CSS focus ring", () => {
     expect(focus).toBeLessThan(ADMIN_CSS.indexOf("@media (max-width: 767px)"));
   });
 
+  it.each([
+    ".header-tools",
+    ".lang-switch",
+    "#header .lang-switch button[aria-current=true]:not(:focus-visible)",
+  ])("contains the language switcher rule %s", (selector) => {
+    expect(ADMIN_CSS).toContain(selector);
+  });
+
+  it("places the language switcher rules before the focus ring", () => {
+    const rule = "#header .lang-switch button[aria-current=true]:not(:focus-visible)";
+    expect(ADMIN_CSS.indexOf(rule)).toBeLessThan(ADMIN_CSS.indexOf(":focus-visible {"));
+  });
+
   it("never removes the outline", () => {
     expect(ADMIN_CSS).not.toMatch(/outline:\s*(none|0)/);
   });

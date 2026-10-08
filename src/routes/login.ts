@@ -1,5 +1,5 @@
 import { jsx } from "hono/jsx";
-import { safeNext } from "../auth/redirect.js";
+import { loginRedirectUrl, safeNext } from "../auth/redirect.js";
 import { clearSession, newSession, writeSession } from "../auth/session.js";
 import { LoginPage } from "../views/login.js";
 import { type AdminContext, cookieOpts, pageChrome, renderPage } from "./context.js";
@@ -44,6 +44,8 @@ function renderLogin(
   return renderPage(c, props.error === undefined ? 200 : 400, (flash) =>
     jsx(LoginPage, {
       ...pageChrome(c, c.var.t.login, [], flash),
+      // Switching language on the login page keeps the post-login target.
+      currentUrl: loginRedirectUrl(prefix, next),
       ...props,
       next,
     }),

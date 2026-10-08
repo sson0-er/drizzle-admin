@@ -14,7 +14,7 @@ import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
 import { LoginPage } from "../src/views/login.js";
 import { sortHref, withQuery } from "../src/views/url.js";
-import { attr, type Element, parse, qs as q1, qsa, text } from "./helpers/html.js";
+import { attr, type Element, type Node, parse, qs as q1, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
 
@@ -172,6 +172,7 @@ const chrome: PageChrome = {
   user: { id: "1", name: "alice" },
   showLogout: true,
   csrfToken: "tok<en",
+  currentUrl: "/admin/authors/",
   flash: [],
   breadcrumbs: [{ label: messages.home, href: "/admin/" }, { label: "Authors" }],
 };
@@ -242,8 +243,84 @@ describe("Layout", () => {
     const csrf = form && q1(form, { tag: "input", attrs: { name: "_csrf" } });
     expect(csrf && attr(csrf, "value")).toBe("tok<en");
 
-    expect(qsa(render({ showLogout: false }), { tag: "form" })).toHaveLength(0);
-    expect(qsa(render({ user: null, showLogout: false }), { tag: "form" })).toHaveLength(0);
+    expect(
+      qsa(render({ showLogout: false }), { tag: "form", attrs: { action: "/admin/logout/" } }),
+    ).toHaveLength(0);
+    expect(
+      qsa(render({ user: null, showLogout: false }), {
+        tag: "form",
+        attrs: { action: "/admin/logout/" },
+      }),
+    ).toHaveLength(0);
+  });
+
+  describe("language switcher", () => {
+    const currentUrl = "/admin/authors/?q=a&o=-id";
+    const switcher = (doc: Node) => q1(doc, { tag: "form", cls: "lang-switch" }) as Element;
+
+    it.each(["en", "ja"] as const)("renders the switch form for %s", (locale) => {
+      const form = switcher(render({ locale, t: MESSAGES[locale], currentUrl }));
+      expect(attr(form, "method")).toBe("post");
+      expect(attr(form, "action")).toBe("/admin/_lang/");
+      expect(attr(form, "aria-label")).toBe(MESSAGES[locale].language);
+      const csrf = q1(form, { tag: "input", attrs: { type: "hidden", name: "_csrf" } });
+      expect(csrf && attr(csrf, "value")).toBe("tok<en");
+      const next = q1(form, { tag: "input", attrs: { type: "hidden", name: "next" } });
+      expect(next && attr(next, "value")).toBe(currentUrl);
+    });
+
+    it.each(["en", "ja"] as const)("renders one button per locale for %s", (locale) => {
+      const buttons = qsa(switcher(render({ locale, t: MESSAGES[locale] })), {
+        tag: "button",
+        attrs: { name: "lang" },
+      });
+      expect(buttons.map((b) => [attr(b, "value"), text(b), attr(b, "lang")])).toEqual([
+        ["en", "English", "en"],
+        ["ja", "日本語", "ja"],
+      ]);
+      expect(buttons.map((b) => attr(b, "aria-current"))).toEqual(
+        locale === "en" ? ["true", null] : [null, "true"],
+      );
+    });
+
+    it("separates the buttons with a slash", () => {
+      expect(text(switcher(render()))).toBe("English / 日本語");
+    });
+
+    it("renders no switch form but keeps div.header-tools when currentUrl is null", () => {
+      const doc = render({ currentUrl: null });
+      expect(qsa(doc, { tag: "form", cls: "lang-switch" })).toHaveLength(0);
+      expect(qsa(doc, { tag: "div", cls: "header-tools" })).toHaveLength(1);
+      expect(qsa(render({ currentUrl: null, user: null }), { cls: "header-tools" })).toHaveLength(
+        1,
+      );
+    });
+
+    it("puts div.user-tools inside div.header-tools after the form", () => {
+      const tools = q1(render(), { tag: "div", cls: "header-tools" }) as Element;
+      const children = tools.childNodes.filter((n): n is Element => "tagName" in n);
+      expect(children.map((n) => [n.tagName, attr(n, "class")])).toEqual([
+        ["form", "lang-switch"],
+        ["div", "user-tools"],
+      ]);
+    });
+
+    it("renders no script, style attribute or on* attribute", () => {
+      const all = qsa(render(), {});
+      expect(all.filter((el) => el.tagName === "script")).toHaveLength(0);
+      const attrNames = all.flatMap((el) => el.attrs.map((a) => a.name));
+      expect(attrNames.filter((n) => n === "style" || n.startsWith("on"))).toEqual([]);
+    });
+
+    it("renders a currentUrl with markup characters as one attribute value", () => {
+      const hostile = '/admin/authors/?q="><script>alert(1)</script>';
+      const doc = render({ currentUrl: hostile });
+      expect(qsa(doc, { tag: "script" })).toHaveLength(0);
+      const form = switcher(doc);
+      expect(qsa(form, { tag: "input" })).toHaveLength(2);
+      const next = q1(form, { tag: "input", attrs: { name: "next" } });
+      expect(next && attr(next, "value")).toBe(hostile);
+    });
   });
 });
 
@@ -546,7 +623,10 @@ describe("LoginPage", () => {
 
   it("renders the hidden next and _csrf inputs", () => {
     const doc = render();
-    const next = q1(doc, { tag: "input", attrs: { type: "hidden", name: "next" } });
+    const next = q1(q1(doc, { tag: "form", id: "login-form" }) as Element, {
+      tag: "input",
+      attrs: { type: "hidden", name: "next" },
+    });
     expect(next && attr(next, "value")).toBe("/admin/authors/?q=a");
     const csrf = q1(doc, { tag: "input", attrs: { type: "hidden", name: "_csrf" } });
     expect(csrf && attr(csrf, "value")).toBe("tok<en");
@@ -757,7 +837,7 @@ describe("icons on pages", () => {
   describe("Layout", () => {
     it("puts the logout icon on the logout button and keeps its text", () => {
       const doc = render(Layout({ ...chrome, children: "" }));
-      const logout = q1(q1(doc, { tag: "header" }) as Element, { tag: "button" });
+      const logout = q1(q1(doc, { tag: "div", cls: "user-tools" }) as Element, { tag: "button" });
       expect(iconsIn(logout)).toEqual(["logout"]);
       expect(logout && text(logout)).toBe(messages.logout);
     });
