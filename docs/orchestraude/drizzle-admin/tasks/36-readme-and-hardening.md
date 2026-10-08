@@ -1,7 +1,7 @@
 ---
 id: 36-readme-and-hardening
 depends_on: [27-fk-ordering-and-example, 28-fk-reference-view-permission, 32-password-no-echo, 34-test-gaps-data-time]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 36: readme-and-hardening
@@ -93,3 +93,7 @@ Covers L049, L050, L087, L051, L082, L045, L046, L004, L080 and decision 038 ite
 - Evidence: docs/orchestraude/evidence/2026-10-07-hono-csrf-and-jsx.md (scope of hono/csrf)
 
 ## History
+- 2026-10-08 implementer: `describeForLog` (src/data/errors.ts) now writes `name` and `code` only when they match `/^[A-Za-z0-9_.-]{1,64}$/`, otherwise `-` (a missing or empty name stays `unknown`; classification still uses the raw code). data.md does not state this rule yet: the orchestrator should update the design.
+- 2026-10-08 implementer: approved scope addition from the orchestrator (task 27 security review): `example/server.ts` uses `process.env.HOST || "127.0.0.1"` so an empty `HOST` falls back to loopback instead of listening on all interfaces; a why-comment was added. The README says an empty `HOST` falls back to `127.0.0.1`. example.md (`hostname = process.env.HOST ?? "127.0.0.1"`) should be updated to `||`.
+- 2026-10-08 implementer: README wording check against hono/csrf: a form-like unsafe request with neither `Sec-Fetch-Site: same-origin` nor a matching `Origin` gets 403 (a missing header does not pass), so the reverse-proxy sentence says "sends neither header, or a different Origin".
+- No exports or props were added.

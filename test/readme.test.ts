@@ -79,6 +79,12 @@ describe("README", () => {
     expect(section?.body).toMatch(/rate limiting/i);
   });
 
+  it("lists the session revocation and request body size limits under Known limitations", () => {
+    const section = sections().find((s) => s.title === "Known limitations");
+    expect(section?.body).toMatch(/revoke/i);
+    expect(section?.body).toMatch(/body size/i);
+  });
+
   it("documents publicOrigin under a 'Deploying behind a reverse proxy' heading", () => {
     const match = /^### Deploying behind a reverse proxy$([\s\S]*?)(?=^#{2,3} |(?![\s\S]))/m.exec(
       readme,
@@ -114,7 +120,8 @@ describe("README", () => {
       "mise install",
       "pnpm install",
       "pnpm example",
-      "http://localhost:3000/admin/",
+      "http://127.0.0.1:3000/admin/",
+      "HOST=0.0.0.0",
     ]) {
       expect(readme).toContain(text);
     }

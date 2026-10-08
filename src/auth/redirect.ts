@@ -14,11 +14,12 @@ function hasControlChar(s: string): boolean {
  * `\` like `/` when parsing a URL, so these are refused rather than normalized.
  *
  * Rules, on top of the same-origin and prefix checks:
- * - raw `next`: no control character, whitespace or backslash, and and no `//` at the start;
+ * - raw `next`: no control character, whitespace or backslash, and it must not start with `//`;
  * - percent-decoded path (what a router or proxy may see): no control character or
  *   backslash, no `.` or `..` segment (so a decoded `..%2F` cannot step out of the prefix),
  *   and valid escapes. Decoded whitespace and `%2F` are fine: they stay encoded in the
  *   returned Location.
+ * - URL-normalized path: `//` anywhere in it is rejected.
  * The query string is not inspected beyond the raw checks; it cannot change the target.
  */
 export function safeNext(next: string | undefined | null, prefix: string): string {

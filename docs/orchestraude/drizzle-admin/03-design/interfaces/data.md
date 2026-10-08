@@ -93,6 +93,7 @@ export function isDbError(err: unknown): boolean;       // decision 022
 Changed 2026-10-07: `isDbError` added for the 500 log policy (decision 022).
 Changed 2026-10-08: the source level of `<name>` / `<code>` in `describeForLog` and the `-` placeholder are specified (decision 033 item 16).
 Changed 2026-10-08: `<name>` and `<code>` are sanitized against log injection before output (decision 033 item 16, L046).
+Changed 2026-10-08: checked against task 36's `src/data/errors.ts` (`logToken` applied to both `<name>` and `<code>`); the placeholder wording is corrected (the placeholders are tested, not skipped).
 
 `isDbError` is true when `err` or one of up to 5 `.cause` levels is `instanceof DrizzleQueryError` (imported from `drizzle-orm`) or has a string `code`. `err.name` is not used, because a `DrizzleQueryError` has `name` "Error" (evidence: 2026-10-07-pg-search-non-text-columns).
 
@@ -101,7 +102,7 @@ Walks `err` and up to 5 `.cause` levels, reading `code` (decision 011). better-s
 
 `describeForLog` returns `"<kind> <name> <code>"` and never the message, SQL or parameters. Walking the same chain (`err` plus up to 5 `.cause` levels), `<name>` and `<code>` come from the first level whose string `code` maps to a kind above; if no code maps, from the first level that has any string `code` (kind `other`); if no level has a string code, `<name>` is the top-level error's name and `<code>` is `-`. A missing or empty `name` is written `unknown`. So a PGlite error logs the cause's name (e.g. `DatabaseError`), not the wrapping `DrizzleQueryError`'s `Error` (decision 033 item 16). Examples: `unique SqliteError SQLITE_CONSTRAINT_UNIQUE`, `other Error -`.
 
-Output sanitization (L046, decision 033 item 16): before the line is built, the selected `<name>` and `<code>` are each tested against `/^[A-Za-z0-9_.-]{1,64}$/`. A value that does not match (newline, space, any other character, or longer than 64 characters) is written as `-`. A missing or empty name is still written `unknown` (it is not tested). Only the output is sanitized: `<kind>` is computed from the raw code, and the choice of level above is unchanged. Examples: name `"Bad\nName"` with code `"23505"` → `unique - 23505`; code `"x".repeat(65)` → `<kind> <name> -`.
+Output sanitization (L046, decision 033 item 16): before the line is built, the selected `<name>` and `<code>` are each tested against `/^[A-Za-z0-9_.-]{1,64}$/`. A value that does not match (newline, space, any other character, or longer than 64 characters) is written as `-`. A missing or empty name is still written `unknown`, and a missing code `-`: these placeholders are tested like any other value but always match, so they pass through unchanged. An empty-string `code` fails the length bound and is written `-`. Only the output is sanitized: `<kind>` is computed from the raw code, and the choice of level above is unchanged. Examples: name `"Bad\nName"` with code `"23505"` → `unique - 23505`; code `"x".repeat(65)` → `<kind> <name> -`.
 
 ## Data formats
 Changed 2026-10-07: date-only representation (decision 019). Date-only strings added (decision 023).

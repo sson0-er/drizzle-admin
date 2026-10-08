@@ -106,4 +106,19 @@ describe("data/errors (synthetic)", () => {
     expect(isDbError(a)).toBe(false);
     expect(describeForLog(undefined)).toBe("other unknown -");
   });
+
+  it.each([
+    ["a code with a newline", { name: "DbError", code: "a\nforged line" }, "other DbError -"],
+    ["a name with a space", { name: "Db Error", code: "23505" }, "unique - 23505"],
+    ["a name with a newline", { name: "Db\nError", code: "23505" }, "unique - 23505"],
+    ["a 65-character code", { name: "DbError", code: "A".repeat(65) }, `other DbError -`],
+    [
+      "a 64-character code of the safe charset",
+      { name: "DbError", code: `${"a1_.-".repeat(12)}Z9_.` },
+      `other DbError ${"a1_.-".repeat(12)}Z9_.`,
+    ],
+    ["an error without a name", { code: "23505" }, "unique unknown 23505"],
+  ])("writes only safe names and codes to the log line: %s", (_label, err, expected) => {
+    expect(describeForLog(err)).toBe(expected);
+  });
 });

@@ -52,6 +52,8 @@ const admin = createAdmin({
   basePath: "/admin",
   secret: process.env.ADMIN_SECRET!, // at least 32 characters
   auth: {
+    // Demo only: a plain string comparison. A real deployment should verify a stored hash
+    // (bcrypt, argon2 or scrypt) or at least compare in constant time. The login has no rate limiting.
     verifyCredentials: async (username, password) =>
       username === "admin" && password === process.env.ADMIN_PASSWORD
         ? { id: "admin", name: "admin" }
@@ -155,7 +157,7 @@ The widget only chooses the HTML element. How a submitted value is parsed and va
 | json | `json` | `json`, `textarea` |
 | other (unsupported) types | none: never editable | none |
 
-A `select` override on a foreign-key column needs the referenced table to be registered and referenced by its primary key, otherwise finalization throws. If the referenced table has more than 200 rows, the `select` falls back to an input plus a link to the referenced list. The `password` widget is an `<input type="password">` that is filled with the current value like any text input; it adds no hashing or special handling.
+A `select` override on a foreign-key column needs the referenced table to be registered and referenced by its primary key, otherwise finalization throws. If the referenced table has more than 200 rows, the `select` falls back to an input plus a link to the referenced list. The `password` widget is an `<input type="password">` that always renders empty, so the stored value is never written into the HTML. Leaving it empty on the change page keeps the stored value, which means a nullable password field cannot be cleared through the form. Read-only fields and list cells show `********`. The widget adds no hashing: whatever is submitted is stored as given.
 
 ### Date and time columns
 
@@ -200,7 +202,7 @@ The list page has an action dropdown for the rows selected with the checkboxes.
   ```
 
 - Custom actions require the model's **`change`** permission, both to be offered in the dropdown and to run (otherwise 403). `view` is not enough.
-- `ids` are the primary keys of the selected rows as strings; convert them yourself (for example `ids.map(Number)` for an integer key).
+- `ids` are the raw `_selected` strings sent by the client. They are untrusted: they may name rows that do not exist, may not parse as keys (for example `Number("abc")` is `NaN`), and may be any number of values. `run` must parse and validate them and scope its queries itself (the example below only converts them and is not a model of validation).
 - `db` is `AdminConfig.db` as given and is typed `unknown`, so cast it to your Drizzle database type:
 
   ```ts
@@ -225,9 +227,9 @@ The list page has an action dropdown for the rows selected with the checkboxes.
 
 ### Authentication modes
 
-**Built-in login** (`verifyCredentials`). The login page is at `<basePath>/login/`; unauthenticated requests are redirected there (302) with a `next` parameter, and after a successful login the user is redirected to `next`. A failed login re-renders the form with status 400. `POST <basePath>/logout/` (the header button) clears the session. A successful login always issues a fresh session and CSRF token.
+**Built-in login** (`verifyCredentials`). The login page is at `<basePath>/login/`; unauthenticated requests are redirected there (302) with a `next` parameter, and after a successful login the user is redirected to `next`. A failed login re-renders the form with status 400. `POST <basePath>/logout/` (the header button) deletes the session cookie in the browser; it does not revoke the session (see "Known limitations"). A successful login always issues a fresh session and CSRF token.
 
-**External authentication** (`getUser`). Your function is called on every request and is the only source of the user, so the admin has no login or logout of its own: `/login/` and `/logout/` return 404 and no logout button is shown. When nobody is logged in, requests are redirected (302) to `loginUrl` with `next=<current path and query>` appended (with `?`, or `&` if `loginUrl` already has a query). Without `loginUrl` the response is a 401 page. If both `getUser` and `verifyCredentials` are set, `getUser` wins.
+**External authentication** (`getUser`). Your function is called on every request and is the only source of the user, so the admin has no login or logout route of its own and no logout button is shown. For a logged-in user `/login/` and `/logout/` return 404. When nobody is logged in, every request, including `/login/` and `/logout/`, is redirected (302) to `loginUrl` with `next=<current path and query>` appended (with `?`, or `&` if `loginUrl` already has a query). Without `loginUrl` the response is a 401 page. If both `getUser` and `verifyCredentials` are set, `getUser` wins.
 
 **`next` handling.** Only same-site targets inside `basePath` are followed; anything else falls back to the dashboard. A target is rejected when it is empty, does not start with a single `/`, contains `\`, control characters, whitespace or `//` in its path, has a malformed percent escape, contains a `.` or `..` path segment after percent-decoding, or leaves `basePath`. Percent-encoded characters that belong in a path (for example `%20` in a text primary key) are accepted and stay encoded.
 
@@ -242,8 +244,8 @@ Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `
 
 ### CSRF and headers
 
-- Every request passes through an Origin check (Hono's `csrf` middleware, which rejects cross-origin form submissions): a request passes if the browser sends `Sec-Fetch-Site: same-origin` or the `Origin` header equals the request URL's origin (or `publicOrigin`, when set). Otherwise it gets a 403 page.
-- Every POST form also carries a hidden `_csrf` token that must equal the session's token (compared in constant time); otherwise 403.
+- Unsafe-method requests (not GET, HEAD or OPTIONS) with a form-like content type (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`, or none) pass through an Origin check (Hono's `csrf` middleware): the request passes if the browser sends `Sec-Fetch-Site: same-origin` or the `Origin` header equals the request URL's origin (or `publicOrigin`, when set). Otherwise it gets a 403 page. GET and HEAD requests and other content types skip this check.
+- Every POST, whatever its content type, must carry the `_csrf` form field equal to the session's token (compared in constant time); otherwise 403. The admin's own forms include it as a hidden field.
 - Responses carry `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and `Cache-Control: no-store` (the stylesheet is cached instead).
 - All output is escaped by Hono's JSX; the library does not use raw HTML insertion.
 - Database errors are shown as fixed messages (duplicate value, related data exists, missing required value, other). The raw error message, which may contain SQL and parameters, is never rendered.
@@ -257,6 +259,8 @@ Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `
 - `add`: the add page and the add button.
 - `change`: saving on the change page, and custom actions.
 - `delete`: the delete page, the delete button and `delete_selected`.
+
+Foreign keys need `view` on the referenced model too. Without it, the foreign-key columns of the list show the raw values without links or labels, the foreign-key filter is not offered, and the foreign-key fields of the forms are plain key inputs instead of a select.
 
 A change page opened with `view` but without `change` shows every field read-only without save buttons, and a POST to it returns 403. Denied pages return a 403 page.
 
@@ -273,22 +277,27 @@ createAdmin({
 
 `publicOrigin` is used for two things: the Origin check compares the request's `Origin` header with it (instead of the request URL's origin), and the session and flash cookies get the `Secure` flag when it starts with `https:`.
 
-Without it, behind such a proxy, form POSTs from browsers that do not send `Sec-Fetch-Site: same-origin` fail with 403, and the cookies lack `Secure`. The library does not trust `X-Forwarded-*` headers. With `publicOrigin` set, only an exactly matching `Origin` (scheme, host and port) or `Sec-Fetch-Site: same-origin` passes, so non-browser clients posting to the internal URL get 403 unless they send that header.
+Without it, behind such a proxy, form POSTs from browsers that do not send `Sec-Fetch-Site: same-origin` fail with 403, and the cookies lack `Secure`. The library does not trust `X-Forwarded-*` headers. With `publicOrigin` set, only an exactly matching `Origin` (scheme, host and port) or `Sec-Fetch-Site: same-origin` passes, so a form-like POST (see "CSRF and headers") to the internal URL from a client that sends neither header, or a different `Origin`, gets 403. POSTs with another content type skip the Origin check, but every POST still needs the `_csrf` token.
+
+The admin reads each form body fully into memory and has no body size limit of its own. Limit the request body size at the proxy (for example `client_max_body_size` in nginx) or in the host application.
 
 ## Behavior notes
 
 - **List page.** Query parameters: `q` (search), `p` (page, 1-based), `o` (ordering) and `f_<column>` (filters). Changing the search, a filter or the ordering resets the page. A page number that is not an integer or is below 1 is page 1; a page beyond the last shows an empty table with the pagination.
 - **Search.** The whole trimmed `q` is one term, matched as a case-insensitive substring in any of the `searchFields` (`ILIKE` on PostgreSQL, `LIKE` on SQLite, with `%`, `_` and `\` escaped). On PostgreSQL every search column is cast to text, so uuid, numeric and enum columns can be searched. SQLite's `LIKE` rules for case folding apply.
-- **Filters.** Boolean columns offer yes/no, enum columns their values, date columns the presets today, past 7 days, this month and this year (computed in `timeZone`), and foreign-key columns the first 200 referenced rows in the referenced model's default ordering.
+- **Filters.** Boolean columns offer yes/no, enum columns their values, date columns the presets today, past 7 days, this month and this year (computed in `timeZone`), and foreign-key columns the first 200 referenced rows in the referenced model's `ordering` (primary key descending when it is not set).
 - **Sorting.** Clicking a column header cycles that column through ascending, descending and unsorted, and drops other sort keys. A hand-written multi-column `o` is honored. Only `listDisplay` columns can be sorted.
 - **Primary keys.** An auto-increment key is omitted on the add page. Other primary keys can be entered when adding and are display-only when changing (a key cannot be renamed).
 - **Saving.** After a successful save the user is redirected (303) to the list, or to the change page with "save and continue", or to the add page with "save and add another", with a flash message. A failed validation re-renders the form with status 400 and the entered values.
 - **Deleting.** The delete page and the bulk-delete confirmation ask first. A foreign-key violation is shown as an error message on the list.
 - **Missing trailing slash.** A path such as `/admin/users` is redirected (301) to `/admin/users/`. Unknown pages render the admin 404 page.
-- **Foreign keys.** Choices are loaded from the referenced model when it is registered and referenced by its primary key; with more than 200 rows the form falls back to a plain input plus a link to the referenced list.
+- **Foreign keys.** Choices are loaded from the referenced model when it is registered and referenced by its primary key; with more than 200 rows the form falls back to a plain input plus a link to the referenced list. Without the `view` permission on the referenced model, the list shows raw values, the filter is not offered and the form field is a plain key input.
+- **Password widget.** The `password` widget never renders the stored value. An empty submission on the change page keeps the stored value; read-only fields and list cells show `********`. No hashing is added.
 
 ## Known limitations
 
+- Logout does not revoke the session. The session is stateless, so a copied `da_session` cookie stays valid until `sessionMaxAgeSec` passes. Changing `secret` invalidates all sessions.
+- No request body size limit inside the library; set one at the reverse proxy or in the host application.
 - No login rate limiting: the built-in login does not throttle or lock out repeated attempts. Put a rate limit in front of it (for example in the reverse proxy) or use external authentication.
 - Composite primary keys are not supported; registering such a table throws. A table without a primary key throws as well.
 - No MySQL; only SQLite and PostgreSQL.
@@ -311,12 +320,13 @@ pnpm test             # vitest run
 pnpm typecheck        # tsc --noEmit over src, test and example
 pnpm lint             # biome check
 pnpm build            # tsc to dist/
-pnpm example          # then open http://localhost:3000/admin/ and log in as admin / admin
+pnpm example          # then open http://127.0.0.1:3000/admin/ and log in as admin / admin
+HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first)
 ```
 
 `scripts/verify.sh` runs test, typecheck, lint and build in order.
 
-The example app (`example/`) is a demo with users, posts and tags on an in-memory SQLite database seeded with sample data. Open `http://localhost:3000/admin/` and log in as `admin` / `admin`. The environment variables `PORT` (default `3000`), `ADMIN_PASSWORD` (default `admin`; a warning is printed when it is not set) and `ADMIN_SECRET` (default: random at startup, so sessions do not survive a restart) configure it.
+The example app (`example/`) is a demo with users, posts and tags on an in-memory SQLite database seeded with sample data. It listens on `127.0.0.1:3000` unless `HOST` or `PORT` are set. Open `http://127.0.0.1:3000/admin/` and log in as `admin` / `admin`. The environment variables `HOST` (default `127.0.0.1`; an empty value also falls back to `127.0.0.1`), `PORT` (default `3000`), `ADMIN_PASSWORD` (default `admin`; a warning is printed when it is not set) and `ADMIN_SECRET` (default: random at startup, so sessions do not survive a restart) configure it.
 
 ## License
 

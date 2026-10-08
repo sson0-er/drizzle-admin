@@ -54,10 +54,16 @@ export function classifyDbError(err: unknown): DbErrorKind {
   return find(err).kind;
 }
 
+// `name` and `code` come from driver or user objects, so only a safe charset reaches the log line
+// (no newline for log forging, no free text). Classification above still uses the raw code.
+const SAFE_LOG_TOKEN = /^[A-Za-z0-9_.-]{1,64}$/;
+
+const logToken = (s: string): string => (SAFE_LOG_TOKEN.test(s) ? s : "-");
+
 /** `"<kind> <name> <code>"` only; never the message, SQL or parameters. */
 export function describeForLog(err: unknown): string {
   const { kind, name, code } = find(err);
-  return `${kind} ${name} ${code}`;
+  return `${kind} ${logToken(name)} ${logToken(code)}`;
 }
 
 /** True for a Drizzle query failure or anything carrying a string `code`. `err.name` is not used. */

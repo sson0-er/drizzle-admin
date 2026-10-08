@@ -92,6 +92,11 @@ export interface AdminAction<T extends Table> {
   name: string;
   label: string;
   confirm?: boolean;
+  /**
+   * `ids` are the client-submitted `_selected` values as strings. They are untrusted: not checked
+   * against the database, and they may name missing rows, be malformed or be numerous, so `run`
+   * must validate them and scope its queries itself.
+   */
   run: (ctx: {
     ids: string[];
     db: unknown;

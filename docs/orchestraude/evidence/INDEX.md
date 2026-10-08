@@ -23,3 +23,4 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-confirm-action-listhref-prop | Which props does the task 21 ConfirmActionPage take, and how does the actions route fill them? | expires 2027-01-06
 - 2026-10-08-safenext-decoded-path | For login `next` validation, how do WHATWG URL parsing, decodeURIComponent and Hono's `c.req.path` treat encoded dot segments, `%2F`, spaces and malformed escapes? | expires 2027-01-06
 - 2026-10-08-hono-head-cookie-body-node-server | How do Hono 4.13.13 and @hono/node-server 2.1.3 treat HEAD (c.req.method), deleteCookie attributes, parseBody size and the listen hostname? | expires 2027-01-06
+- 2026-10-08-node-listen-empty-hostname | What address does the example server listen on when HOST is set but empty? | expires 2027-01-06

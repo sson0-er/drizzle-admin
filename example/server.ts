@@ -6,8 +6,9 @@ const DEFAULT_PASSWORD = "admin";
 const secret = process.env.ADMIN_SECRET ?? randomBytes(32).toString("hex");
 const adminPassword = process.env.ADMIN_PASSWORD ?? DEFAULT_PASSWORD;
 const port = Number(process.env.PORT ?? 3000);
-// Loopback by default: the demo ships a default password (decision 038).
-const hostname = process.env.HOST ?? "127.0.0.1";
+// Loopback by default: the demo ships a default password (decision 038). `||` rather than `??`
+// so that `HOST=""` also falls back; an empty hostname would make the server listen on all interfaces.
+const hostname = process.env.HOST || "127.0.0.1";
 
 if (process.env.ADMIN_PASSWORD === undefined) {
   console.warn(

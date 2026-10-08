@@ -47,6 +47,7 @@ Everything below except the port and environment handling lives here; `server.ts
 
 ### `example/server.ts` (behavior of app.ts + server.ts together)
 Changed 2026-10-08: the server binds to `127.0.0.1` by default, overridable with `HOST` (decision 038).
+Changed 2026-10-08: `hostname = process.env.HOST || "127.0.0.1"`, so an empty `HOST` also falls back to `127.0.0.1` (task 36, decision 038 item 2).
 
 - `new Database(":memory:")`, `PRAGMA foreign_keys = ON`, `createSchema`, `drizzle(sqlite)`, `await seed(db)`.
 - `createAdmin({ db, dialect: "sqlite", basePath: "/admin", siteTitle: "drizzle-admin demo", secret, auth: { verifyCredentials } })`
@@ -56,7 +57,7 @@ Changed 2026-10-08: the server binds to `127.0.0.1` by default, overridable with
   - users: the §5.1 options (listDisplay id/email/isActive/createdAt, searchFields email/name, listFilter isActive and role, ordering `-createdAt`, readonlyFields createdAt, toString email). Action `deactivate` sets `isActive = false` for the ids and has `confirm: true`. Action `activate` does the opposite without confirmation.
   - posts: listDisplay id/title/authorId/status/publishedAt, searchFields title, listFilter status/authorId/publishedAt, listPerPage 20, toString title.
   - tags: defaults only.
-- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` with `serve({ fetch: app.fetch, port, hostname })`, where `port = Number(process.env.PORT ?? 3000)` and `hostname = process.env.HOST ?? "127.0.0.1"`. `serve` passes `hostname` to `server.listen(port, hostname)` (evidence: 2026-10-08-hono-head-cookie-body-node-server), so by default the demo with its default password is reachable only from the local machine. Prints the URL built from `hostname` and `port` (an IPv6 literal in brackets) and the login hint (decision 038).
+- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` with `serve({ fetch: app.fetch, port, hostname })`, where `port = Number(process.env.PORT ?? 3000)` and `hostname = process.env.HOST || "127.0.0.1"` (`||`, not `??`: an unset or empty `HOST` both give `127.0.0.1`). `serve` passes `hostname` to `server.listen(port, hostname)` (evidence: 2026-10-08-hono-head-cookie-body-node-server), and Node listens on all interfaces for an empty hostname (evidence: 2026-10-08-node-listen-empty-hostname), so by default the demo with its default password is reachable only from the local machine. Prints the URL built from `hostname` and `port` (an IPv6 literal in brackets) and the login hint (decision 038).
 
 ## Data formats
 Run instructions (also in the README "Development" section):
