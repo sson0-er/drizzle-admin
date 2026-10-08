@@ -1,7 +1,7 @@
 ---
 id: 31-password-keep-on-empty
 depends_on: [28-fk-reference-view-permission]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 31: password-keep-on-empty

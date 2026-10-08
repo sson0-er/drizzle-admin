@@ -31,6 +31,8 @@ export function buildZodSchema(fields: FormField[], mode: FormMode): z.ZodObject
     let type = baseType(field);
     if (!meta.notNull) type = type.nullable();
     if (mode === "add" && meta.notNull && meta.hasDefault) type = type.optional();
+    // Coercion omits an empty password on change (decision 037).
+    if (mode === "change" && field.widget === "password") type = type.optional();
     shape[field.key] = type;
   }
   return z.object(shape);

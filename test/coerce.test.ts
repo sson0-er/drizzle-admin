@@ -77,6 +77,63 @@ describe("coerceForm: empty values", () => {
   });
 });
 
+describe("coerceForm: password widget", () => {
+  const password = (meta: Partial<FieldMeta>) => field("value", meta, "password");
+
+  it.each<{
+    name: string;
+    meta: Partial<FieldMeta>;
+    mode: FormMode;
+    value: string | undefined;
+    expected: ReturnType<typeof run>;
+  }>([
+    {
+      name: "change + empty",
+      meta: {},
+      mode: "change",
+      value: "",
+      expected: { data: {}, errors: {} },
+    },
+    {
+      name: "change + missing key",
+      meta: {},
+      mode: "change",
+      value: undefined,
+      expected: { data: {}, errors: {} },
+    },
+    {
+      name: "change + empty on a nullable field",
+      meta: { notNull: false },
+      mode: "change",
+      value: "",
+      expected: { data: {}, errors: {} },
+    },
+    {
+      name: "change + new value",
+      meta: {},
+      mode: "change",
+      value: "new",
+      expected: { data: { value: "new" }, errors: {} },
+    },
+    {
+      name: "add + empty on a nullable field",
+      meta: { notNull: false },
+      mode: "add",
+      value: "",
+      expected: { data: { value: null }, errors: {} },
+    },
+    {
+      name: "add + empty on a notNull field without default",
+      meta: {},
+      mode: "add",
+      value: "",
+      expected: { data: {}, errors: { value: messages.required } },
+    },
+  ])("$name", ({ meta, mode, value, expected }) => {
+    expect(run(password(meta), value, mode)).toEqual(expected);
+  });
+});
+
 describe("coerceForm: kinds", () => {
   it("parses finite numbers with surrounding whitespace", () => {
     const f = field("n", { kind: "number" });

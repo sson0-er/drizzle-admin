@@ -156,7 +156,10 @@ export function buildFormGroups(args: {
         meta,
         widget,
         editable: editability === "editable",
-        required: meta.notNull && !(mode === "add" && meta.hasDefault),
+        required:
+          meta.notNull &&
+          !(mode === "add" && meta.hasDefault) &&
+          !(mode === "change" && widget === "password"),
         ...(choices === undefined ? {} : { choices }),
         ...(fkFallbackHref === undefined ? {} : { fkFallbackHref }),
       });

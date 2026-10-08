@@ -44,6 +44,14 @@ describe("buildZodSchema", () => {
     expect(check([f], {}, "change").ok).toBe(false);
   });
 
+  it.each<{ mode: FormMode; ok: boolean }>([
+    { mode: "change", ok: true },
+    { mode: "add", ok: false },
+  ])("a notNull password field accepts {} on $mode: $ok", ({ mode, ok }) => {
+    const f = { ...field("a"), widget: "password" as const };
+    expect(check([f], {}, mode).ok).toBe(ok);
+  });
+
   it("rejects a non-integer on an integer field with invalidValue", () => {
     const f = field("n", { kind: "number", isInteger: true });
     expect(check([f], { n: 1.5 })).toEqual({ ok: false, errors: { n: messages.invalidValue } });

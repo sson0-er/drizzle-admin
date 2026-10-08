@@ -89,6 +89,9 @@ export function coerceForm(
       continue;
     }
     if (raw === undefined || raw === "") {
+      // The one place where data handling depends on the widget (decision 037): the password input
+      // is never pre-filled, so an empty change submission must keep the stored value.
+      if (field.widget === "password" && mode === "change") continue;
       if (!meta.notNull) data[key] = null;
       else if (!(meta.hasDefault && mode === "add")) errors[key] = messages.required;
       continue;

@@ -249,6 +249,16 @@ describe("buildFormGroups: default widgets", () => {
   });
 });
 
+describe("buildFormGroups: password widget", () => {
+  it.each<{ mode: FormMode; required: boolean }>([
+    { mode: "change", required: false },
+    { mode: "add", required: true },
+  ])("marks a notNull password field required=$required on $mode", ({ mode, required }) => {
+    const model = modelOf("sqlite", sqlite.authors, { widgets: { name: "password" } });
+    expect(field(build(model, { mode }), "name").required).toBe(required);
+  });
+});
+
 describe("buildFormGroups: widget overrides and the empty choice", () => {
   it("replaces the default widget with an explicit override", () => {
     const model = modelOf("sqlite", sqlite.authors, {
