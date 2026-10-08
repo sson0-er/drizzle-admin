@@ -42,6 +42,7 @@
 | 36 | readme-and-hardening | 27, 28, 32, 34 | Follow-up: README accuracy (L049, L050, L087, L051, L082, L045; body-size limit and `127.0.0.1`/`HOST`, decision 038; password and FK view notes); `describeForLog` name/code sanitization (L046); `safeNext` comment (L004, L080); `run` JSDoc (L045) |
 | 37 | claude-md | 27-36 | Follow-up: expand CLAUDE.md (overview, commands, layout, design and security principles, where docs live, agent workflow), Conventions section kept verbatim |
 | 38 | ui-icons | 28, 32, 35 | Post-v1 enhancement (decision 039, user-approved): fixed inline SVG icon set `src/views/icons.tsx` (`aria-hidden`, `currentColor`), icons on listed buttons/links/flash items, `BooleanMark` for boolean list cells (`cellBoolean`, `Cell.bool`) and `DisplayValue` booleans, icon CSS without `url(` |
+| 39 | dads-restyle | 38 | Post-v1 enhancement (decision 040): `ADMIN_CSS` rewritten per views-style.md (28 tokens in both schemes, typography, button variants by existing selectors, card flash, black/yellow focus ring), attribution as a TS comment only; new `test/admin-css.test.ts`; no markup, selector, messages or test-hook change |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -90,6 +91,16 @@ Execution order: 37 → 38
   It runs after 37 only because of numeric order. CLAUDE.md is not changed by it.
 - Planner choice: the flash-icon and view-only boolean integration cases go in `test/form.test.ts`. test-strategy.md lists them under its "Integration (`list.test.ts` …)" bullet, but names `form.test.ts` as an option for the view-only case. `form.test.ts` already has the add-then-flash flow and the view-only `authors` setup.
 - Lint gate: the evidence that Biome's `noSvgWithoutTitle` exempts `aria-hidden="true"` SVGs is not confirmed on 2.5.15. If `pnpm lint` rejects the icon `<svg>`, the task is reported blocked. Biome configuration is not relaxed.
+
+### Post-v1 task 39 (decision 040, DADS-inspired restyle)
+Execution order: 38 → 39
+
+- Tasks 01-38 are done and unchanged. Task 39 implements decision 040 from views-style.md (normative for tokens, rules and order), views.md "Static modules" (exports, CSS requirements, verbatim decision 039 icon rules) and test-strategy.md "Restyle (decision 040)".
+- Scope is `src/static/admin-css.ts` (the `ADMIN_CSS` string and the comment above it) and the new `test/admin-css.test.ts`. Every existing test file stays unchanged; the existing CSS cases in `test/views.test.ts` are the regression gate.
+- Dependency: 38 added the icon rules and `--icon-success` / `--icon-warning` to `src/static/admin-css.ts`, which this task keeps verbatim / re-values.
+- If a test-strategy.md check fails against the design values (e.g. a contrast pair), the task is reported blocked; token values, pair lists and thresholds are not changed by the implementer.
+- Open, non-blocking: Q11 (required-field marker) is not part of this task; if the user picks option (b), it becomes a separate task (it needs `src/messages.ts` and `FormPage` changes).
+- Manual browser check (test-strategy.md "Manual") stays 未確認 until the user does it.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes
