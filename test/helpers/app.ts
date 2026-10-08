@@ -29,6 +29,16 @@ export interface Client {
   csrf(): string;
   /** Current value (still URL-encoded) of a cookie in the jar. */
   cookie(name: string): string | undefined;
+  /**
+   * Logs in through the login page: GETs `<prefix>/login/`, then POSTs the credentials and the
+   * page's `_csrf`. Returns the POST response. Defaults to the test user at prefix `/admin`.
+   */
+  login(opts?: {
+    prefix?: string;
+    username?: string;
+    password?: string;
+    next?: string;
+  }): Promise<Response>;
 }
 
 const ORIGIN = "http://localhost";
@@ -61,6 +71,9 @@ export function createClient(fetchFn: Fetch): Client {
     store(res);
     if (res.headers.get("Content-Type")?.startsWith("text/html")) {
       lastHtml = await res.clone().text();
+    } else if (res.headers.getSetCookie().some((line) => line.startsWith("da_session="))) {
+      // A new session (login) makes the last page's token stale; csrf() then reads the cookie.
+      lastHtml = "";
     }
     return res;
   };
@@ -77,7 +90,7 @@ export function createClient(fetchFn: Fetch): Client {
     return payload.csrf;
   };
 
-  return {
+  const client: Client = {
     request,
     get: (path, headers) => request(path, { method: "GET", ...(headers ? { headers } : {}) }),
     post: (path, form = {}, opts = {}) => {
@@ -98,7 +111,17 @@ export function createClient(fetchFn: Fetch): Client {
     },
     csrf,
     cookie: (name) => jar.get(name),
+    login: async (opts = {}) => {
+      const url = `${opts.prefix ?? "/admin"}/login/`;
+      await client.get(url);
+      return client.post(url, {
+        username: opts.username ?? TEST_USER.name,
+        password: opts.password ?? TEST_PASSWORD,
+        ...(opts.next === undefined ? {} : { next: opts.next }),
+      });
+    },
   };
+  return client;
 }
 
 export interface Overrides {
@@ -106,6 +129,8 @@ export interface Overrides {
   config?: Partial<AdminConfig>;
   /** Options per fixture table; `null` leaves the table unregistered. */
   models?: Partial<Record<keyof FixtureSchema, ModelAdminOptions<Table> | null>>;
+  /** Log the client in as the test user (builtin auth only). Default true; false stays logged out. */
+  login?: boolean;
 }
 
 export interface TestAdmin {
@@ -141,9 +166,20 @@ export async function makeAdmin(
     const options = overrides.models?.[name];
     if (table !== undefined && options !== null) admin.register(table, options);
   }
+  const client = createClient((req) => admin.fetch(req));
+  // External auth (`getUser`) has no login page; its user comes from the host's function.
+  if ((overrides.login ?? true) && overrides.config?.auth?.getUser === undefined) {
+    // "/" is normalized to the empty prefix, as in createAdmin.
+    const prefix = (overrides.config?.basePath ?? "/admin").replace(/\/$/, "");
+    const res = await client.login({ prefix });
+    if (res.status !== 303) {
+      await close();
+      throw new Error(`makeAdmin: test login failed with status ${res.status}`);
+    }
+  }
   return {
     admin,
-    client: createClient((req) => admin.fetch(req)),
+    client,
     db,
     schema,
     close,

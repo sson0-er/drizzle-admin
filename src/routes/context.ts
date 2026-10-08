@@ -57,8 +57,8 @@ export function pageChrome(
     prefix,
     title,
     user,
-    // Logout exists only with the builtin login (task 23 enables it).
-    showLogout: false,
+    // Logout exists only with the builtin login.
+    showLogout: state.config.authMode === "builtin" && user !== null,
     csrfToken: session.csrf,
     flash,
     breadcrumbs: [{ label: messages.home, href: `${prefix}/` }, ...trail],

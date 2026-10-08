@@ -344,7 +344,8 @@ describe("finalization", () => {
   });
 
   it("serves requests through fetch, mounted at the prefix", async () => {
-    const admin = sqliteAdmin();
+    // External auth: the point is that fetch works, so no login is needed to reach the fallback.
+    const admin = createAdmin({ ...base, auth: { getUser: async () => ({ id: "1", name: "u" }) } });
     admin.register(authors);
     const response = await admin.fetch(new Request("http://localhost/admin/anything/"));
     // An unknown slashed path reaches the fallback route; the point is that fetch works.

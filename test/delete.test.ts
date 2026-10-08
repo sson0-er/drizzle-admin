@@ -7,6 +7,7 @@ import {
   createClient,
   makeAdmin,
   TEST_SECRET,
+  TEST_USER,
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
@@ -44,17 +45,19 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     return row;
   }
   /** Another admin over the same database, so one PGlite instance serves every configuration. */
-  function adminWith(authors: ModelAdminOptions<Table>): Client {
+  async function adminWith(authors: ModelAdminOptions<Table>): Promise<Client> {
     const admin = createAdmin({
       db: t.db,
       dialect: fixture.dialect,
       basePath: "/admin",
       secret: TEST_SECRET,
-      auth: { verifyCredentials: async () => null },
+      auth: { verifyCredentials: async () => TEST_USER },
     });
     admin.register(table("authors"), authors);
     admin.register(table("articles"), {});
-    return createClient((req) => admin.fetch(req));
+    const c = createClient((req) => admin.fetch(req));
+    await c.login();
+    return c;
   }
   async function flashes(c: Client, res: Response, cls?: string) {
     const doc = await docOf(await c.get(res.headers.get("Location") ?? ""));
@@ -118,7 +121,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
   it("calls beforeDelete once with the row and { mode, user, db }", async () => {
     const author = await addAuthor("hooked");
     const calls: { row: Rec; ctx: Rec }[] = [];
-    const c = adminWith({
+    const c = await adminWith({
       hooks: { beforeDelete: (row, ctx) => void calls.push({ row, ctx: { ...ctx } }) },
     });
     const res = await send(c, `/admin/authors/${String(author.id)}/delete/`);
@@ -136,7 +139,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
 
   it("turns a throwing beforeDelete into an error flash and keeps the row", async () => {
     const author = await addAuthor("protected");
-    const c = adminWith({
+    const c = await adminWith({
       hooks: {
         beforeDelete: () => {
           throw new Error("secret detail");
@@ -196,7 +199,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
       const a = await addAuthor("hook-a");
       const b = await addAuthor("hook-b");
       const calls: { row: Rec; mode: unknown }[] = [];
-      const c = adminWith({
+      const c = await adminWith({
         hooks: { beforeDelete: (row, ctx) => void calls.push({ row, mode: ctx.mode }) },
       });
       const res = await bulk(c, {
@@ -211,7 +214,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
 
     it("keeps every row when a beforeDelete throws", async () => {
       const a = await addAuthor("keep-a");
-      const c = adminWith({
+      const c = await adminWith({
         hooks: {
           beforeDelete: () => {
             throw new Error("secret detail");

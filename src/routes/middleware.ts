@@ -1,16 +1,13 @@
 import type { MiddlewareHandler } from "hono";
 import { CSRF_FIELD, tokensEqual } from "../auth/csrf.js";
+import { externalLoginUrl, loginRedirectUrl } from "../auth/redirect.js";
 import { newSession, readSession, writeSession } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
 import { messages } from "../messages.js";
-import type { AdminState, AdminUser } from "../types.js";
+import type { AdminState } from "../types.js";
 import { type AdminEnv, cookieOpts, errorPage } from "./context.js";
 
 type Mw = MiddlewareHandler<AdminEnv>;
-
-// TEMPORARY, removed in task 23: there is no login before the auth guard exists, but handlers need
-// a non-null user for `can()` and `HookCtx`. Builtin mode falls back to this user.
-export const PRE_AUTH_USER: AdminUser = { id: "pre-auth", name: "pre-auth" };
 
 /** Runs first so that every later middleware, handler and `onError` can read `state` and `repo`. */
 export const initVars =
@@ -50,13 +47,45 @@ export const userMiddleware =
   (state: AdminState): Mw =>
   async (c, next) => {
     const { authMode, auth } = state.config;
-    if (authMode === "external" && auth.getUser !== undefined) {
-      c.set("user", await auth.getUser(c.req.raw));
-    } else {
-      c.set("user", c.var.session.u ?? PRE_AUTH_USER);
-    }
+    // External mode ignores `session.u` (it is always null there); the host decides per request.
+    c.set(
+      "user",
+      authMode === "builtin" ? c.var.session.u : ((await auth.getUser?.(c.req.raw)) ?? null),
+    );
     await next();
   };
+
+/**
+ * Sends anonymous requests to login (or answers 401 for an external setup without a login URL).
+ * Runs before the token check, so a logged-out form post goes to login instead of getting 403.
+ */
+export const authGuard: Mw = async (c, next) => {
+  if (c.var.user !== null) return next();
+  const { authMode, auth, prefix } = c.var.state.config;
+  const { method } = c.req;
+
+  // The login page itself must be reachable while logged out. `c.req.path` is enough here: it is
+  // only compared with a fixed, encoding-free path.
+  const isLogin = c.req.path === `${prefix}/login/`;
+  if (
+    authMode === "builtin" &&
+    isLogin &&
+    (method === "GET" || method === "HEAD" || method === "POST")
+  ) {
+    return next();
+  }
+
+  // The raw pathname keeps percent-escapes (`c.req.path` decodes them, and `safeNext` rejects a
+  // decoded space), so the target survives the login round trip (decision 032).
+  const url = new URL(c.req.url);
+  const target = url.pathname + url.search;
+  if (authMode === "builtin") {
+    // A form post cannot be replayed through a redirect, so the dashboard is the landing page.
+    return c.redirect(loginRedirectUrl(prefix, method === "GET" ? target : `${prefix}/`), 302);
+  }
+  if (auth.loginUrl !== undefined) return c.redirect(externalLoginUrl(auth.loginUrl, target), 302);
+  return errorPage(c, 401, messages.unauthorized);
+};
 
 /** POST only: parses the body once for the handlers and requires the session's CSRF token. */
 export const csrfToken: Mw = async (c, next) => {

@@ -7,6 +7,7 @@ import {
   createClient,
   makeAdmin,
   TEST_SECRET,
+  TEST_USER,
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
@@ -41,17 +42,19 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   ];
 
   /** Another admin over the same database, so one PGlite instance serves every configuration. */
-  function adminWith(authors: ModelAdminOptions<Table>): Client {
+  async function adminWith(authors: ModelAdminOptions<Table>): Promise<Client> {
     const admin = createAdmin({
       db: t.db,
       dialect: fixture.dialect,
       basePath: "/admin",
       secret: TEST_SECRET,
-      auth: { verifyCredentials: async () => null },
+      auth: { verifyCredentials: async () => TEST_USER },
     });
     admin.register(t.schema.authors, authors);
     admin.register(t.schema.articles, {});
-    return createClient((req) => admin.fetch(req));
+    const c = createClient((req) => admin.fetch(req));
+    await c.login();
+    return c;
   }
   /** The first POST needs a session, which any GET issues. */
   async function post(c: Client, path: string, form: Record<string, string | string[]>) {
@@ -182,7 +185,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   });
 
   it("requires change for custom actions and delete for delete_selected (403)", async () => {
-    const noChange = adminWith({
+    const noChange = await adminWith({
       permissions: { change: false },
       actions: [{ name: "tag", label: "Tag", run: record("tag") }],
     });
@@ -196,7 +199,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     });
     expect(del.status).not.toBe(403);
 
-    const noDelete = adminWith({
+    const noDelete = await adminWith({
       permissions: { delete: false },
       actions: [{ name: "tag", label: "Tag", run: record("tag") }],
     });

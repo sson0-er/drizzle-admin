@@ -18,10 +18,20 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
     await t.close();
   });
 
-  const freshClient = () => createClient((req) => t.admin.fetch(req));
+  /** A new cookie jar, logged in unless `loggedIn` is false. */
+  const freshClient = async (loggedIn = true) => {
+    const client = createClient((req) => t.admin.fetch(req));
+    if (loggedIn) await client.login();
+    return client;
+  };
 
   it("serves the dashboard with a session cookie", async () => {
-    const res = await freshClient().get("/admin/");
+    // External auth lets a cookie-less request through, so the response issues the session.
+    const ext = await makeAdmin(dialects[0] as (typeof dialects)[number], {
+      config: { auth: { getUser: async () => ({ id: "ext", name: "external-user" }) } },
+    });
+    const res = await ext.client.get("/admin/");
+    await ext.close();
     expect(res.status).toBe(200);
     expect(res.headers.getSetCookie().some((c) => c.startsWith("da_session="))).toBe(true);
     const doc = parse(await res.text());
@@ -32,7 +42,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("serves the stylesheet with a long-term cache header", async () => {
-    const res = await freshClient().get("/admin/static/admin.css");
+    const res = await (await freshClient(false)).get("/admin/static/admin.css");
     expect(res.status).toBe(200);
     expect(res.headers.get("Content-Type")).toBe("text/css; charset=utf-8");
     expect(res.headers.get("Cache-Control")).toBe("public, max-age=31536000, immutable");
@@ -41,7 +51,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("redirects a path without trailing slash, keeping the query", async () => {
-    const client = freshClient();
+    const client = await freshClient();
     const bare = await client.get("/admin");
     expect(bare.status).toBe(301);
     expect(bare.headers.get("Location")).toBe("/admin/");
@@ -51,7 +61,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("renders unknown slashed paths as a 404 layout page", async () => {
-    const res = await freshClient().get("/admin/a/b/c/");
+    const res = await (await freshClient()).get("/admin/a/b/c/");
     expect(res.status).toBe(404);
     const doc = parse(await res.text());
     expect(qs(doc, { tag: "h1" })).not.toBeNull();
@@ -61,7 +71,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   it("answers unmatched methods with the 404 page when mounted under an outer app", async () => {
     const outer = new Hono().route("/admin", t.admin.app);
     const client = createClient((req) => outer.fetch(req));
-    await client.get("/admin/");
+    await client.login();
 
     // client.post adds the valid session token, so a 404 (not 403) shows the token check passed.
     const post = await client.post("/admin/nope/x/y/");
@@ -82,7 +92,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("rejects a POST without a token with the CSRF 403 page", async () => {
-    const client = freshClient();
+    const client = await freshClient();
     await client.get("/admin/");
     const res = await client.post("/admin/nope/", {}, { withToken: false });
     expect(res.status).toBe(403);
@@ -90,7 +100,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("rejects a wrong token", async () => {
-    const client = freshClient();
+    const client = await freshClient();
     await client.get("/admin/");
     const res = await client.post("/admin/nope/", { _csrf: "wrong" }, { withToken: false });
     expect(res.status).toBe(403);
@@ -98,16 +108,17 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
   });
 
   it("rejects a POST without a session cookie even when a token is sent", async () => {
-    const res = await freshClient().post(
-      "/admin/nope/",
-      { _csrf: "anything" },
-      { withToken: false },
-    );
+    // External auth again: in builtin mode a cookie-less POST is sent to login before the token check.
+    const ext = await makeAdmin(dialects[0] as (typeof dialects)[number], {
+      config: { auth: { getUser: async () => ({ id: "ext", name: "external-user" }) } },
+    });
+    const res = await ext.client.post("/admin/nope/", { _csrf: "anything" }, { withToken: false });
+    await ext.close();
     expect(res.status).toBe(403);
   });
 
   it("rejects a foreign Origin with the layout 403 page even with a valid token", async () => {
-    const client = freshClient();
+    const client = await freshClient();
     await client.get("/admin/");
     const res = await client.post(
       "/admin/nope/",

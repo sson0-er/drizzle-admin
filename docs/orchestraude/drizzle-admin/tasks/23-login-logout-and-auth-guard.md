@@ -1,7 +1,7 @@
 ---
 id: 23-login-logout-and-auth-guard
 depends_on: [21-routes-actions, 22-auth-redirect-and-login-page]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 23: login-logout-and-auth-guard
@@ -48,3 +48,11 @@ Built-in login/logout work, unauthenticated requests are redirected to the login
 - Decisions: docs/orchestraude/decisions/008-session-csrf-flash.md, 013-unspecified-page-behaviors.md (items 8, 9), 014-external-auth-csrf-token.md
 
 ## History
+
+- Attempt 1: implemented login/logout handlers, authGuard (step 6), removed `PRE_AUTH_USER`, `showLogout`; `client.login()` and `makeAdmin` logging in by default (`login: false` stays logged out; skipped for external `getUser` configs). `client.request` forgets the last page's token when a non-HTML response issues a new `da_session` (login rotates it).
+- Existing test files adapted to the login default (setup only; assertions unchanged):
+  - test/form.test.ts, test/actions.test.ts, test/delete.test.ts: `adminOn` / `adminWith` use `verifyCredentials: async () => TEST_USER`, log in before returning (now async; call sites `await` them).
+  - test/pages.test.ts: `freshClient` is async and logs in (`freshClient(false)` for the public stylesheet); the "session cookie on the dashboard" and "POST without a session cookie" tests use an external-auth admin, because a cookie-less request is only let through there.
+  - test/register.test.ts: the `admin.fetch` test uses an external-auth admin so the 404 fallback is reachable without login.
+  - test/example.test.ts: phases 2 and 3 log in (`admin` / `x`) through the cookie-jar client instead of `app.request`.
+- Not adapted, no change needed: test/list.test.ts, test/headers.test.ts.

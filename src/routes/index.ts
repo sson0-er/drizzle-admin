@@ -12,7 +12,9 @@ import { dashboardHandler } from "./dashboard.js";
 import { deleteHandler } from "./delete.js";
 import { addHandler, changeHandler } from "./form.js";
 import { listHandler } from "./list.js";
+import { loginHandler, logoutHandler } from "./login.js";
 import {
+  authGuard,
   csrfToken,
   initVars,
   securityHeaders,
@@ -61,14 +63,19 @@ export function buildApp(state: AdminState): Hono {
       "Cache-Control": "public, max-age=31536000, immutable",
     }),
   );
-  // 3-5, 7. originCheck, session, user, csrfToken (the authGuard goes before csrfToken in task 23).
+  // 3-7. originCheck, session, user, authGuard, csrfToken.
   app.use("*", originCheck(config.publicOrigin));
   app.use("*", sessionMiddleware(state));
   app.use("*", userMiddleware(state));
+  app.use("*", authGuard);
   app.use("*", csrfToken);
 
-  // Routes 2-9 (login, logout, list, action, add, change, delete) are registered here, in table
-  // order, by tasks 15, 19, 20, 21 and 23. They must stay above the catch-all.
+  // Routes 2-9 are registered here, in table order, and must stay above the catch-all. Login and
+  // logout exist only with the builtin login; in external mode they fall through to the 404s.
+  if (config.authMode === "builtin") {
+    app.on(["GET", "POST"], "/login/", loginHandler); // route 2
+    app.post("/logout/", logoutHandler); // route 3
+  }
   app.get("/:model/", listHandler); // route 4
   app.post("/:model/", actionsHandler); // route 5
   app.on(["GET", "POST"], "/:model/add/", addHandler); // route 6

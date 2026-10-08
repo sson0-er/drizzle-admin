@@ -7,6 +7,7 @@ import {
   createClient,
   makeAdmin,
   TEST_SECRET,
+  TEST_USER,
   type TestAdmin,
 } from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
@@ -41,25 +42,27 @@ async function insertRow(t: TestAdmin, name: TableName, values: Rec): Promise<Re
 }
 
 /** Another admin over the same database, so one PGlite instance serves many configurations. */
-function adminOn(
+async function adminOn(
   t: TestAdmin,
   fixture: DialectFixture,
   models: Models,
   config: { timeZone?: string } = {},
-): Client {
+): Promise<Client> {
   const admin = createAdmin({
     db: t.db,
     dialect: fixture.dialect,
     basePath: "/admin",
     secret: TEST_SECRET,
     timeZone: "Asia/Tokyo",
-    auth: { verifyCredentials: async () => null },
+    auth: { verifyCredentials: async () => TEST_USER },
     ...config,
   });
   for (const [name, options] of Object.entries(models)) {
     admin.register(tableOf(t, name as TableName), options);
   }
-  return createClient((req) => admin.fetch(req));
+  const client = createClient((req) => admin.fetch(req));
+  await client.login();
+  return client;
 }
 
 async function send(client: Client, path: string, form: Record<string, string | string[]> = {}) {
@@ -156,7 +159,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
   beforeAll(async () => {
     t = await makeAdmin(fixture, { config: { timeZone: "Asia/Tokyo" } });
-    client = adminOn(t, fixture, models);
+    client = await adminOn(t, fixture, models);
   });
   afterAll(async () => {
     await t.close();
@@ -505,7 +508,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("reports a not-null violation raised by the database", async () => {
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         articles: { hooks: { beforeSave: (data) => ({ ...data, title: null }) } },
       });
       const res = await send(c, "/admin/articles/add/", { title: "x", authorId: "1" });
@@ -514,7 +517,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("shows `validate` errors on a field and on the form", async () => {
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         authors: {
           validate: (data) => ({ name: `bad ${String(data.name)}`, _form: "form-level problem" }),
         },
@@ -553,7 +556,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("does not write readonly fields and omits the auto PK on add", async () => {
-      const c = adminOn(t, fixture, { authors: { readonlyFields: ["email"] } });
+      const c = await adminOn(t, fixture, { authors: { readonlyFields: ["email"] } });
       const add = await c.get("/admin/authors/add/");
       const addDoc = await docOf(add);
       expect(hasRow(addDoc, "email")).toBe(false);
@@ -583,7 +586,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
   describe("hooks", () => {
     it("passes data and { mode, user, db } to beforeSave and lets it modify the data", async () => {
       const calls: { data: Rec; ctx: Rec }[] = [];
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         authors: {
           hooks: {
             beforeSave: (data, ctx) => {
@@ -613,7 +616,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
     it("passes the saved row to afterSave", async () => {
       const calls: { row: Rec; ctx: Rec }[] = [];
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         authors: { hooks: { afterSave: (row, ctx) => void calls.push({ row, ctx: { ...ctx } }) } },
       });
       await send(c, "/admin/authors/add/", { name: "after1" });
@@ -631,7 +634,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("turns a throwing beforeSave into a 400 and writes nothing", async () => {
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         authors: {
           hooks: {
             beforeSave: () => {
@@ -649,7 +652,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("keeps the success when afterSave throws and adds a warning flash", async () => {
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         authors: {
           toString: (row) => String(row.name),
           hooks: {
@@ -670,7 +673,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
     it("answers 404 when the row disappears before the update", async () => {
       await insertRow(t, "kv", { key: "gone", value: "x" });
-      const c = adminOn(t, fixture, {
+      const c = await adminOn(t, fixture, {
         kv: {
           hooks: {
             beforeSave: async (data, ctx) => {
@@ -723,14 +726,16 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
   describe("permissions", () => {
     it("forbids add without the add permission", async () => {
-      const c = adminOn(t, fixture, { authors: { permissions: { add: false } } });
+      const c = await adminOn(t, fixture, { authors: { permissions: { add: false } } });
       expect((await c.get("/admin/authors/add/")).status).toBe(403);
       expect((await send(c, "/admin/authors/add/", { name: "denied" })).status).toBe(403);
       expect((await rowsOf(t, "authors")).some((r) => r.name === "denied")).toBe(false);
     });
 
     it("shows a read-only change page with view only, and forbids the POST", async () => {
-      const c = adminOn(t, fixture, { authors: { permissions: { change: false, delete: false } } });
+      const c = await adminOn(t, fixture, {
+        authors: { permissions: { change: false, delete: false } },
+      });
       const res = await c.get("/admin/authors/1/change/");
       expect(res.status).toBe(200);
       const doc = await docOf(res);
@@ -742,7 +747,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("forbids the change page without view permission", async () => {
-      const c = adminOn(t, fixture, { authors: { permissions: { view: false } } });
+      const c = await adminOn(t, fixture, { authors: { permissions: { view: false } } });
       expect((await c.get("/admin/authors/1/change/")).status).toBe(403);
     });
   });
@@ -779,8 +784,8 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
         };
         const idOf = async (note: string) => String((await rowWhere(t, "events", "note", note)).id);
 
-        beforeAll(() => {
-          client = adminOn(t, fixture, { events: {} }, { timeZone });
+        beforeAll(async () => {
+          client = await adminOn(t, fixture, { events: {} }, { timeZone });
         });
 
         it("stores the calendar day of a date column unshifted", async () => {
