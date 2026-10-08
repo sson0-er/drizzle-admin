@@ -1,7 +1,7 @@
 ---
 id: 26-readme
 depends_on: [25-polish-css-and-fk-fallback]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 26: readme
