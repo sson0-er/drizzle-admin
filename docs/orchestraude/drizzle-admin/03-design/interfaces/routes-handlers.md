@@ -14,7 +14,7 @@ Models where `can(M, "view", U)`, in registration order → `DashboardPage({ mod
 
 ## List (`GET /:model/`)
 Changed 2026-10-07: custom actions gated by `ACTION_PERMISSION` = `change` (decision 016).
-Changed 2026-10-08: FK labels, links and filters require `view` on the referenced model (decision 034); `listDisplayLinks` wins over the FK link and an FK filter value outside the offered choices is accepted (decision 033 items 4, 5); columns and filters carry labels (decision 035); `sort` reflects only an explicit `o` (decision 033 item 8).
+Changed 2026-10-08: FK labels, links and filters require `view` on the referenced model (decision 034); `listDisplayLinks` wins over the FK link and an FK filter value outside the offered choices is accepted (decision 033 items 4, 5); column headers and filter headings stay the raw key (decision 035); `sort` reflects only an explicit `o` (decision 033 item 8).
 
 Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`.
 
@@ -30,7 +30,7 @@ Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug
 5. Filter choices: boolean → all / `1` yes / `0` no; enum → all + values; kind date or `isDateOnly` (incl. PG `date()` string mode; Changed 2026-10-07, decision 023) → all + today/past7/month/year; FK with `refVisible` → all + `repo.options(refModel.meta, { limit: 200, ordering: refModel.ordering, toLabel: refModel.toString })`; FK with `!refVisible` → the filter is omitted (no sidebar section, no query; decision 034).
    The selected choice is the one whose value equals the active `f_<key>`; when none matches, "all" is marked selected. For boolean, enum and date filters a non-matching value is also ignored by `buildFilters`, so "all" is accurate. For an FK filter, a valid key that is not among the 200 offered choices still filters the rows while "all" is marked selected; this is accepted (decision 033 item 5). Code comments must not claim that the repository ignores such FK values.
 6. Actions offered: `delete_selected` if `can(M, "delete", U)`, plus custom actions if `can(M, ACTION_PERMISSION, U)` (`"change"`, decision 016). Rendered as a dropdown only if there is at least one.
-7. `ListPage(...)`, 200. `columns[i] = { key, label: fieldLabel(key), sort, sortHref }` and `filters[i].label = fieldLabel(key)` (forms.md, decision 035). `sort` is `asc`/`desc` only for keys in the explicit `o` parameter; with the default ordering every column is `none` (decision 033 item 8). The action form posts to `list URL + current search string` so the redirect can return to the same state.
+7. `ListPage(...)`, 200. `columns[i] = { key, sort, sortHref }`; headers and filter headings show the key (decision 035). `sort` is `asc`/`desc` only for keys in the explicit `o` parameter; with the default ordering every column is `none` (decision 033 item 8). The action form posts to `list URL + current search string` so the redirect can return to the same state.
 
 ## Actions (`POST /:model/`)
 Changed 2026-10-07: custom actions require `change` (decision 016).

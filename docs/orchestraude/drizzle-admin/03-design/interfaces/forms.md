@@ -12,13 +12,13 @@ Inputs: `ResolvedModel` ([admin.md](admin.md)), `FieldMeta` ([introspect.md](int
 ## API
 
 ### `fields.ts`
-Changed 2026-10-08: `fieldLabel` added and `FormField.label` uses it (decision 035); `fkChoices` gains the `"noView"` marker (decision 034); the `tooMany` link is limited to the default and `select` widgets (decision 036); the `?? []` fallback for a missing `fkChoices` entry is intended (decision 033 item 6); `required` is false for a `password` widget in change mode (decision 037).
+Changed 2026-10-08: `FormField.label` stays the raw key (decision 035); `fkChoices` gains the `"noView"` marker (decision 034); the `tooMany` link is limited to the default and `select` widgets (decision 036); the `?? []` fallback for a missing `fkChoices` entry is intended (decision 033 item 6); `required` is false for a `password` widget in change mode (decision 037).
 
 ```ts
 export type FormMode = "add" | "change";
 export type Choice = { value: string; label: string };
 export interface FormField {
-  key: string; label: string;            // label = fieldLabel(key) (decision 035; no verbose-name option in v1)
+  key: string; label: string;            // label = key (no verbose names in v1; decision 035)
   meta: FieldMeta;
   widget: WidgetType;
   editable: boolean;                     // false → rendered display-only, never read from the body
@@ -36,10 +36,7 @@ export function buildFormGroups(args: {
   refSlugOf: (key: string) => string | undefined;
 }): FormGroup[];
 export function editableFields(groups: FormGroup[]): FormField[];
-export function fieldLabel(key: string): string;   // decision 035
 ```
-`fieldLabel(key)` is the single source of a field's UI label (form labels here, list column headers and filter headings in routes/views). In order: (1) insert a space between a lowercase ASCII letter or digit and a following uppercase ASCII letter; (2) replace `_` and `-` with a space; (3) collapse runs of spaces and trim; (4) lowercase everything, then uppercase the first character; (5) an empty result returns `key` unchanged. Examples: `authorId` → `Author id`, `created_at` → `Created at`, `isActive` → `Is active`, `id` → `Id`, `_` → `_`.
-
 A missing `fkChoices` entry for an FK field with `foreignKey.slug` is treated as an empty list (`?? []`). This is intended for fields the route does not query (display-only fields); routes supply an entry for every editable FK field with a slug (decision 033 item 6).
 Changed 2026-10-07: `allowedWidgets` added (decision 021).
 Changed 2026-10-07: row for date-only strings (PG `date()` string mode) added (decision 023).

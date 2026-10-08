@@ -1,36 +1,25 @@
-# 035: Human field labels from the humanized field key
+# 035: Field labels stay the raw field key in v1
 
 - Date: 2026-10-08
-- Status: accepted (choice confirmed by the user, 2026-10-08)
+- Status: accepted. Changed by the user on 2026-10-08: the first version (humanized labels such as `authorId` → "Author id") was superseded before any code was written.
 
 ## Context
-Low finding L067: list column headers and filter headings show raw field keys such as `authorId`. The user approved that `ListPage` `columns` and `filters` carry a human `label` filled in by the route from field metadata, and asked the designer to choose a sensible label source. The design has no verbose-name mechanism: forms.md sets `FormField.label = key` ("no verbose names in v1").
+Low finding L067: list column headers and filter headings show raw field keys such as `authorId`. The triage asked whether `ListPage` `columns` and `filters` should carry a human `label` filled by the route from field metadata. The design has no verbose-name mechanism: forms.md sets `FormField.label = key` ("no verbose names in v1").
+
+First version (2026-10-08, superseded): add `fieldLabel(key)` to `src/forms/fields.ts`, which humanizes the key (split camelCase, `_` and `-` into words, lowercase, capitalize the first letter). Use it for list column headers, filter headings and `FormField.label`.
 
 ## Decision
-Add one label function, used everywhere a field is named in the UI:
-```ts
-// src/forms/fields.ts
-export function fieldLabel(key: string): string;
-```
-Algorithm, in order: (1) insert a space between a lowercase ASCII letter or digit and a following uppercase ASCII letter (`authorId` → `author Id`); (2) replace `_` and `-` with a space; (3) collapse runs of spaces and trim; (4) lowercase everything, then uppercase the first character; (5) if the result is empty, return `key` unchanged.
-Examples: `authorId` → `Author id`, `created_at` → `Created at`, `isActive` → `Is active`, `id` → `Id`, `big` → `Big`, `_` → `_`.
-
-Used by:
-- `ListPage` `columns[].label` and `filters[].label` (routes fill them with `fieldLabel(key)`); headers and filter headings show the label, while `data-key` / `data-filter` keep the key.
-- `FormField.label` (forms.md) changes from `key` to `fieldLabel(key)`, so the list and the forms name a field the same way.
-
-Changed 2026-10-08: the user confirmed this choice as is: the humanized key for list headers, filter headings and form labels, and no new `labels` option.
+User decision (2026-10-08, changed after first approving the humanized version). List column headers, filter headings and form labels keep showing the raw field key (e.g. `authorId`), as the current code does. `ListPage` `columns` and `filters` get no `label` prop, `FormField.label` stays `key`, and v1 has no `labels` option. L067 is closed as accepted behavior.
 
 ## Alternatives considered
-- Keep `label = key` (the existing form mechanism): does not fix L067.
-- Use the DB column name (`meta.fields[].name`, e.g. `author_id`): still a raw identifier, and it differs from the key users write in options.
-- Add a public `labels` / verbose-name option to `ModelAdminOptions`: a public API addition the requirements do not ask for; it can be added later compatibly, with `fieldLabel` as its default.
-- Apply the humanized label only to the list and keep keys on forms: two naming schemes for the same field on adjacent pages.
+- Humanized key (`fieldLabel`, the first version): rejected by the user. Auto-generated English labels such as "Author id" clash with the Japanese UI and add little in a developer-facing admin.
+- Public `labels` / verbose-name option on `ModelAdminOptions`: the requirements do not ask for it in v1. It can be added later without breaking anything, and the raw key stays the default.
+- DB column name (`author_id`): still a raw identifier, and it differs from the keys used in options.
 
 ## Rationale
-Django derives a field's default verbose name from the field name with underscores replaced by spaces and shows it with the first letter capitalized (unverified against current Django docs; the behavior is well known). Drizzle keys are usually camelCase, so camelCase splitting is added. The function is pure and needs no new configuration. Labels are escaped by Hono JSX like any text.
+User decision. The admin's users are developers and operators who know the schema keys. A raw key is unambiguous and matches the `ModelAdminOptions` keys. A half-translated label would not.
 
 ## Consequences
-- forms.md (`fieldLabel`, `FormField.label`), views.md (`ListPage` props), routes-handlers.md (List step 7).
-- Changing `FormField.label` alters the visible form labels (e.g. `authorId` → `Author id`); tests that match label text update accordingly. The `div.form-row[data-field=<key>]` selector is unchanged.
-- Follow-up code change in `src/forms/fields.ts`, `src/routes/list.ts`, `src/views/list.tsx`.
+- No interface change: views.md `ListPage` props and routes-handlers.md List step 7 stay as before, forms.md keeps `label = key`, and test-strategy.md has no label cases.
+- No follow-up code change for L067.
+- A later `labels` option is a possible extension, not planned.

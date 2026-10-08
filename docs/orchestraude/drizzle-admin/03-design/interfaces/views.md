@@ -27,12 +27,12 @@ Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
 ### Pages (all take `PageChrome` plus the listed props)
 Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `displayRow` split described (decision 030).
 Changed 2026-10-08: `ConfirmActionPage` gains the required `listHref` prop (decision 031).
-Changed 2026-10-08: `ListPage` `columns` and `filters` carry a `label` shown in headers and filter headings (decision 035); `data-sort` reflects only an explicit `o` (decision 033 item 8); display-only hidden-widget fields keep their row and display-only `password` fields are masked (decisions 033 item 9, 037).
+Changed 2026-10-08: headers and filter headings keep showing the raw field key; `ListPage` gets no `label` prop (decision 035); `data-sort` reflects only an explicit `o` (decision 033 item 8); display-only hidden-widget fields keep their row and display-only `password` fields are masked (decisions 033 item 9, 037).
 
 | Component | Extra props | Stable selectors used by tests |
 |---|---|---|
 | `DashboardPage` | `models: { slug; label; canAdd }[]` | `table#dashboard`, row `tr[data-model=<slug>]` with `a.changelink` (list) and `a.addlink` (add, only if canAdd) |
-| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` (heading = the filter `label`) containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` (text = the column `label`) and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
+| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` (heading = the field key) containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` (text = the field key, decision 035) and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
 | `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?; timeZone` (see below) | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
 | `DeletePage` | `modelLabel; objectLabel; cancelHref` | `form#delete-form`, `p.confirm-text`, `button[type=submit]` |
 | `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; listHref: string; backQuery: string` (`listHref` = list URL `${prefix}/${slug}/`, required because `PageChrome` has no model slug; `backQuery` = query string with leading `?`, or `""`) | `form#action-confirm` (POST to `listHref + backQuery`) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li`; the cancel link points to `listHref + backQuery` |
@@ -42,21 +42,19 @@ Changed 2026-10-08: `ListPage` `columns` and `filters` carry a `label` shown in 
 `ListPage` props:
 ```ts
 {
-  model: { slug; label };
-  columns: { key: string; label: string; sort: "asc" | "desc" | "none"; sortHref: string }[];
-  // label = fieldLabel(key) (forms.md, decision 035); sort reflects only an explicit `o` parameter:
+  model: { slug; label }; columns: { key; sort: "asc" | "desc" | "none"; sortHref: string }[];
+  // header text = key (decision 035); sort reflects only an explicit `o` parameter:
   // with the default ordering (M.ordering or -pk) every column is "none" (decision 033 item 8)
   rows: { pk: string; cells: Cell[] }[];
   // Cell = { text: string; href?: string } ; href for listDisplayLinks (change page) or FK links
   //   (listDisplayLinks wins when both apply, decision 033 item 4)
   q?: string | null;  // null → hide the search box
-  filters: { key: string; label: string; choices: { label: string; href: string; selected: boolean }[] }[];
-  // filters[].label = fieldLabel(key), shown as the filter heading (decision 035)
+  filters: { key: string; choices: { label: string; href: string; selected: boolean }[] }[];
+  // filter heading = key (decision 035)
   actions: { name: string; label: string }[]; canAdd: boolean;
   page: number; pages: number; total: number; pageHref: (n: number) => string; backQuery: string;
 }
 ```
-Column headers and filter headings render `label`, never the raw key; `data-key` / `data-filter` keep the key (decision 035).
 Pagination shows previous/next (the glyphs `‹` / `›`, exempt from the messages rule, decision 033 item 11) and up to 5 numbers around the current page, plus `messages.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
 
 `FormPage` props (decision 030):
