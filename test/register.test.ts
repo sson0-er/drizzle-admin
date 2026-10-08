@@ -84,6 +84,18 @@ describe("register: slugs", () => {
     expect(registerError(authors, { slug })).toContain(`slug "${slug}" is reserved`);
   });
 
+  it("rejects the reserved slug _lang with the exact message", () => {
+    expect(registerError(authors, { slug: "_lang" })).toBe(
+      'drizzle-admin: authors: slug "_lang" is reserved',
+    );
+  });
+
+  it("accepts the slug lang", () => {
+    const admin = sqliteAdmin();
+    admin.register(kv, { slug: "lang" });
+    expect([...resolvedModels(admin).keys()]).toEqual(["lang"]);
+  });
+
   it.each(["a b", "a/b", "ä", "a.b", ""])("rejects the invalid slug %j", (slug) => {
     expect(registerError(authors, { slug })).toContain("may contain only letters, digits");
   });

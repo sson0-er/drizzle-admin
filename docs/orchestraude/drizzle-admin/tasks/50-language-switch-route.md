@@ -1,7 +1,7 @@
 ---
 id: 50-language-switch-route
 depends_on: [49-i18n-dictionaries-and-request-locale]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 50: language-switch-route
@@ -92,3 +92,11 @@ Follow the conventions in CLAUDE.md (one case per `it.each` row, exact status an
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Fails-first (tests written before the source change, run on the code after task 49): the four `writeLocale` rows failed (function missing); `_lang` registered instead of throwing; every POST `/admin/_lang/` case failed (404 when logged in, 302 to login when logged out, no `da_lang` cookie). The CSRF 403 cases, `GET /admin/_lang/` cases and the slug `lang` case passed on the old code, as expected (they pin existing behavior).
+- After the change: all new cases pass on both dialects; `scripts/verify.sh` passes.
+- The "Logout keeps the language" case is planner-added (decision 050 point 5), not listed in test-strategy.md.
+- The only removed test line is the `locale.test.ts` import, which gained `writeLocale` (biome's organize-imports rejects a second import from the same module).
+- Exports: only the expected `LOCALE_MAX_AGE_SEC`, `writeLocale`, `langHandler`; none other added.
+- Review round 1: high 0, medium 0, low 5 (quality: unused LOCALE_MAX_AGE_SEC export, langHandler not using asString; spec: sync vs async signature; tests: cookie presence by length, partly duplicate redirect checks). Done.

@@ -100,6 +100,9 @@ export const authGuard: Mw = async (c, next) => {
     return next();
   }
 
+  // The language switch needs no login, in either auth mode; only POST is exempt.
+  if (method === "POST" && c.req.path === `${prefix}/_lang/`) return next();
+
   // The raw pathname keeps percent-escapes (`c.req.path` decodes them, and `safeNext` rejects a
   // decoded space), so the target survives the login round trip (decision 032).
   const url = new URL(c.req.url);

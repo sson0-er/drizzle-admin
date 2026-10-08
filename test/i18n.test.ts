@@ -190,6 +190,150 @@ describe.each(dialects)("i18n ($name)", (fixture) => {
     });
   });
 
+  describe("language switch (POST /admin/_lang/)", () => {
+    const NEXT = "/admin/authors/?q=x";
+
+    it("writes the cookie, redirects to next and switches the rendered language back and forth", async () => {
+      const client = await clientFor(a);
+      await client.get(NEXT);
+      const res = await client.post("/admin/_lang/", { lang: "ja", next: NEXT });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe(NEXT);
+      expect(sets(res)).toEqual([
+        "da_lang=ja; Max-Age=31536000; Path=/admin; HttpOnly; SameSite=Lax",
+      ]);
+      expect(htmlLang(await docOf(await client.get(NEXT)))).toBe("ja");
+
+      const back = await client.post("/admin/_lang/", { lang: "en", next: NEXT });
+      expect(back.status).toBe(303);
+      expect(sets(back)).toEqual([
+        "da_lang=en; Max-Age=31536000; Path=/admin; HttpOnly; SameSite=Lax",
+      ]);
+      expect(htmlLang(await docOf(await client.get(NEXT)))).toBe("en");
+    });
+
+    const redirects: {
+      name: string;
+      body: Record<string, string | string[]>;
+      to: string;
+      cookie?: boolean;
+    }[] = [
+      { name: "next //evil.example", body: { lang: "ja", next: "//evil.example" }, to: "/admin/" },
+      {
+        name: "next https://evil.example/",
+        body: { lang: "ja", next: "https://evil.example/" },
+        to: "/admin/",
+      },
+      { name: "next /other/", body: { lang: "ja", next: "/other/" }, to: "/admin/" },
+      { name: "next /admin/../x", body: { lang: "ja", next: "/admin/../x" }, to: "/admin/" },
+      { name: "next /admin/..%2Fx", body: { lang: "ja", next: "/admin/..%2Fx" }, to: "/admin/" },
+      { name: "no next", body: { lang: "ja" }, to: "/admin/" },
+      { name: "an unknown lang", body: { lang: "fr", next: NEXT }, to: NEXT, cookie: false },
+      { name: "an upper-case lang", body: { lang: "JA", next: NEXT }, to: NEXT, cookie: false },
+      {
+        name: "a repeated lang field",
+        body: { lang: ["ja", "en"], next: NEXT },
+        to: NEXT,
+        cookie: false,
+      },
+    ];
+
+    it.each(redirects)("redirects to $to for $name", async ({ body, to, cookie = true }) => {
+      const client = await clientFor(a);
+      await client.get("/admin/");
+      const res = await client.post("/admin/_lang/", body);
+      expect(res.status).toBe(303);
+      const location = res.headers.get("Location") ?? "";
+      expect(location).toBe(to);
+      expect(location.startsWith("/admin/") && !location.startsWith("//")).toBe(true);
+      // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is excluded
+      expect(/[\\\s\x00-\x1f\x7f]/.test(location)).toBe(false);
+      expect(sets(res).length > 0).toBe(cookie);
+    });
+
+    const rejections: {
+      name: string;
+      form: Record<string, string>;
+      withToken: boolean;
+      headers: Record<string, string>;
+    }[] = [
+      { name: "no token", form: {}, withToken: false, headers: {} },
+      { name: "a wrong token", form: { _csrf: "wrong" }, withToken: false, headers: {} },
+      {
+        name: "a foreign Origin",
+        form: {},
+        withToken: true,
+        headers: { Origin: "http://evil.example" },
+      },
+    ];
+
+    it.each(rejections)(
+      "answers 403 and sets no cookie with $name",
+      async ({ form, withToken, headers }) => {
+        const client = await clientFor(a);
+        await client.get("/admin/");
+        const res = await client.post(
+          "/admin/_lang/",
+          { lang: "ja", next: NEXT, ...form },
+          { withToken, headers },
+        );
+        expect(res.status).toBe(403);
+        expect(sets(res)).toEqual([]);
+      },
+    );
+
+    it("redirects to next from the login page when logged out", async () => {
+      const client = await clientFor(a, undefined, false);
+      const next = "/admin/login/?next=%2Fadmin%2Fauthors%2F";
+      await client.get(next);
+      const res = await client.post("/admin/_lang/", { lang: "ja", next });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe(next);
+      expect(sets(res)).toEqual([
+        "da_lang=ja; Max-Age=31536000; Path=/admin; HttpOnly; SameSite=Lax",
+      ]);
+    });
+
+    it.each([
+      { name: "logged in", loggedIn: true, status: 404, location: null },
+      {
+        name: "logged out",
+        loggedIn: false,
+        status: 302,
+        location: "/admin/login/?next=%2Fadmin%2F_lang%2F",
+      },
+    ])("answers GET /admin/_lang/ $status when $name", async ({ loggedIn, status, location }) => {
+      const res = await (await clientFor(a, undefined, loggedIn)).get("/admin/_lang/");
+      expect(res.status).toBe(status);
+      expect(res.headers.get("Location")).toBe(location);
+    });
+
+    it("keeps the language after logout", async () => {
+      const client = await clientFor(a);
+      await client.get("/admin/");
+      await client.post("/admin/_lang/", { lang: "ja", next: "/admin/" });
+      await client.get("/admin/");
+      const res = await client.post("/admin/logout/");
+      expect(res.status).toBe(303);
+      expect(sets(res)).toEqual([]);
+      expect(htmlLang(await docOf(await client.get("/admin/login/")))).toBe("ja");
+    });
+
+    it("still serves a model registered with the slug lang", async () => {
+      const l = await makeAdmin(fixture, { models: { authors: { slug: "lang" } } });
+      try {
+        expect((await l.client.get("/admin/lang/")).status).toBe(200);
+        const res = await l.client.post("/admin/lang/", {
+          action: "delete_selected",
+          _selected: "1",
+        });
+        expect(res.status).toBe(200);
+      } finally {
+        await l.close();
+      }
+    });
+  });
+
   describe("minimal pages with da_lang=ja", () => {
     it("shows the Origin check failure in Japanese", async () => {
       const client = await clientFor(a, "ja");

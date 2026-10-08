@@ -94,7 +94,7 @@ export function resolveConfig(config: AdminConfig): AdminState["config"] {
 }
 
 const SLUG_PATTERN = /^[A-Za-z0-9_-]+$/;
-const RESERVED_SLUGS = new Set(["login", "logout", "static"]);
+const RESERVED_SLUGS = new Set(["login", "logout", "static", "_lang"]);
 const DEFAULT_LIST_DISPLAY_EXTRA = 4;
 
 /** Options after the column-name generics are widened to plain strings. */

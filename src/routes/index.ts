@@ -12,6 +12,7 @@ import { type AdminContext, type AdminEnv, type AdminVars, errorPage } from "./c
 import { dashboardHandler } from "./dashboard.js";
 import { deleteHandler } from "./delete.js";
 import { addHandler, changeHandler } from "./form.js";
+import { langHandler } from "./lang.js";
 import { listHandler } from "./list.js";
 import { loginHandler, logoutHandler } from "./login.js";
 import {
@@ -85,6 +86,7 @@ export function buildApp(state: AdminState): Hono {
     app.on(["GET", "POST"], "/login/", loginHandler); // route 2
     app.post("/logout/", logoutHandler); // route 3
   }
+  app.post("/_lang/", langHandler); // route 3a, both auth modes
   app.get("/:model/", listHandler); // route 4
   app.post("/:model/", actionsHandler); // route 5
   app.on(["GET", "POST"], "/:model/add/", addHandler); // route 6
