@@ -43,6 +43,8 @@
 | 37 | claude-md | 27-36 | Follow-up: expand CLAUDE.md (overview, commands, layout, design and security principles, where docs live, agent workflow), Conventions section kept verbatim |
 | 38 | ui-icons | 28, 32, 35 | Post-v1 enhancement (decision 039, user-approved): fixed inline SVG icon set `src/views/icons.tsx` (`aria-hidden`, `currentColor`), icons on listed buttons/links/flash items, `BooleanMark` for boolean list cells (`cellBoolean`, `Cell.bool`) and `DisplayValue` booleans, icon CSS without `url(` |
 | 39 | dads-restyle | 38 | Post-v1 enhancement (decision 040): `ADMIN_CSS` rewritten per views-style.md (28 tokens in both schemes, typography, button variants by existing selectors, card flash, black/yellow focus ring), attribution as a TS comment only; new `test/admin-css.test.ts`; no markup, selector, messages or test-hook change |
+| 40 | password-hardening-and-cleanup | 36, 38 | Follow-up (decision 037 points 6-7): `password`-widget list columns not sortable (`sortHref: null`, `?o=` drops the key) and no FK link on masked cells (L011, L010); `register()` rejects `password` on the PK / in `searchFields` / in `ordering` (Q12); README external-mode wording (L014) and password notes; shared rule 0-3 precedence helper for `formatCell` / `cellBoolean` (L001); `Icon` guard kept with a why-comment (L007) |
+| 41 | test-precision | 33, 40 | Follow-up, tests only: denied add POST creates no row (L008/L019), unique 403-matrix titles (L012), flash XSS text kept (L022), aria-hidden check per render (L017), one case per `DisplayValue` row (L020), no `?? doc` fallback (L023), 64/65-char name in `describeForLog` (L026) |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -101,6 +103,24 @@ Execution order: 38 → 39
 - If a test-strategy.md check fails against the design values (e.g. a contrast pair), the task is reported blocked; token values, pair lists and thresholds are not changed by the implementer.
 - Open, non-blocking: Q11 (required-field marker) is not part of this task; if the user picks option (b), it becomes a separate task (it needs `src/messages.ts` and `FormPage` changes).
 - Manual browser check (test-strategy.md "Manual") stays 未確認 until the user does it.
+
+### Follow-up tasks 40-41 (follow-up low-findings triage, decisions 037 points 6-7 and 041)
+Execution order: 39 → 40 → 41
+
+- Tasks 01-39 are done and unchanged. The source is `06-low-findings-followup-triage.md`: its A items, and its B items as answered in decision 037 point 6 (L011, L010) and decision 041 (L013). Q12 is answered in decision 037 point 7. The triage's follow-up candidates 1-3 are batched into task 40 and candidates 4-5 into task 41, as requested.
+- Task 40 touches 10 files (6 source/docs and 4 test files, adding cases only), above the usual 1-5. The orchestrator asked for this batching, and each change is small.
+- Dependencies come from shared files:
+  - 36 → 40: `README.md` (external-mode and password notes);
+  - 38 → 40: `src/views/format.ts` (`cellBoolean`), `src/views/icons.tsx`, `src/views/list.tsx`, `src/routes/list.ts`, `test/views.test.ts`, `test/format.test.ts`;
+  - 40 → 41: `test/views.test.ts` (40 adds a `ListPage` case, 41 restructures the "icons on pages" describe);
+  - 33 → 41: `test/auth.test.ts` (the 403 matrix).
+  Behavior change first (40), then the test-only task (41), as in the 27-36 round.
+- Planner decisions:
+  - **L007**: keep the `Object.hasOwn` guard in `Icon` and rewrite only its comment. CLAUDE.md says not to keep guards that the types already rule out, but views.md "Icons" requires `null` for a non-own key, and test/icons.test.ts pins `"nope"` and the inherited `"toString"`. Removing the guard would depart from the design, which needs a decision record first (CLAUDE.md "Workflow for agents"). The guard is therefore treated as a real cast boundary.
+  - **L001**: the shared helper must not call the user formatter from `cellBoolean`. A naive "compute the rule-0-3 text" helper would run the formatter twice per cell. Task 40 pins this with a spy test. The exported signatures and the route call site stay unchanged.
+  - **L014**: the `getUser` row of the README configuration table has the same "every request" inaccuracy as line 232, so task 40 fixes both.
+  - **L010**: no test, because test-strategy.md states that the masked-cell FK-link rule has no reachable integration case (`register()` rejects `password` on FK columns). The shared rule "every new or changed behavior has a test" is waived for this one condition by the design. The DoD checks it in the code instead.
+- Decision 041 applies to both DoDs' test-diff rules: editing an existing import line only to add names is allowed.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes
