@@ -28,3 +28,9 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-biome-no-svg-without-title | For decision 039, does Biome's recommended noSvgWithoutTitle reject inline SVG, and are aria-hidden SVGs exempt? | expires 2027-01-06
 - 2026-10-08-css-mask-image-support | For decision 039, how widely is CSS mask-image supported, and does a page CSP affect it? | expires 2027-01-06
 - 2026-10-08-icon-color-contrast | For decision 039, do the proposed icon colors reach 3:1 contrast in light and dark mode? | expires 2027-01-06
+- 2026-10-08-dads-license-notices | What licenses and attribution rules apply to the DADS content, Figma data, code snippets, Noto Sans and Material Symbols? | expires 2027-01-06
+- 2026-10-08-dads-html-snippets-repo | What is the DADS HTML example components repo built from, how is it maintained, and which components/JS does it have? | expires 2027-01-06
+- 2026-10-08-dads-design-tokens-package | What does @digital-go-jp/design-tokens contain (color, font, radius, spacing, dark mode) and what are its version/license? | expires 2027-01-06
+- 2026-10-08-dads-a11y-focus-contrast | What focus, forced-colors, reduced-motion and contrast conventions do the DADS snippets use? | expires 2027-01-06
+- 2026-10-08-dads-icon-terms | Does DADS define an icon set, and under what license? | expires 2027-01-06
+- 2026-10-08-dads-restyle-palette-contrast | For decision 040, which DADS primitives does the restyle palette use and do all light/dark pairs meet WCAG 4.5:1 / 3:1? | expires 2027-01-06

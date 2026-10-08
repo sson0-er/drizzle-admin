@@ -15,8 +15,9 @@ Changed 2026-10-08: L067 answer changed by the user: labels stay the raw field k
 Changed 2026-10-08: two section-A fixes approved in the low-findings triage (L083 FK choice ordering, L046 `describeForLog` sanitization) added to Resolved questions.
 Changed 2026-10-08: Q8-Q10 added while designing the post-v1 icons (decision 039). None blocks implementation: the design proceeds with the stated default unless the user answers otherwise.
 Changed 2026-10-08: Q8-Q10 answered by the user and moved to Resolved questions (decision 039).
+Changed 2026-10-08: Q11 added while designing the DADS-inspired restyle (decision 040). It does not block implementation; the design proceeds without the marker unless the user answers otherwise.
 
-(None.)
+- **Q11. Required-field marker (proposal, post-v1 restyle).** DADS form labels show a "※必須" requirement marker. `FormPage` already renders `class="required"` on the label of a required field (`src/views/form.tsx`), but nothing is shown. Showing the marker would add UI text, which must come from `src/messages.ts` (a new key such as `messages.required`), and a small markup change in `FormPage` (a `span` after the label text), because CSS `content` text would bypass the messages rule. That goes beyond the requested "look and feel only, keep our markup" scope, so decision 040 does not include it. Options: (a) leave it out (design default); (b) add it as a separate small task after the restyle. Does the user want (b)?
 
 ## Resolved questions
 (Question, answer, date. Move items here once the user has decided.)

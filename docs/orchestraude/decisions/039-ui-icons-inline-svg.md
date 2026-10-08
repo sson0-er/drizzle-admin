@@ -7,6 +7,7 @@
 After v1 the user asked for icons to make pages easier to scan. Scope chosen by the user: buttons and links (add, change, delete, save, search, logout and similar), flash messages per level, boolean list cells (colored icons instead of plain `✓` / `✗`) and the dashboard model list. Constraints (§11, §1): no external fonts or CDNs; core features work without JavaScript; server-rendered Hono JSX only; all UI text in `src/messages.ts`; works in light and dark mode (`prefers-color-scheme`) and at narrow widths. Further requirements from the request: icons are static constants, never built from user data (XSS); decorative icons are `aria-hidden`; boolean cells keep an accessible text equivalent; small CSS; `currentColor` theming; no change to existing selectors or test hooks.
 
 ## Decision
+Changed 2026-10-08: point 6 colors superseded by decision 040 (DADS-inspired restyle); the icon markup and rules are unchanged.
 Changed 2026-10-08: user answers to Q8-Q10 applied: point 5 extended to read-only boolean form fields (Q9, changed from the first default); Q8 and Q10 confirmed as designed.
 
 1. **Mechanism: inline SVG.** A new module `src/views/icons.tsx` exports an `Icon({ name })` JSX component that renders one `<svg>` with one `<path>` from a frozen internal table `ICON_PATHS: Readonly<Record<IconName, string>>`. `IconName` is a closed string union. Icons are not part of the public API (not exported from `src/index.ts`) and cannot be configured.

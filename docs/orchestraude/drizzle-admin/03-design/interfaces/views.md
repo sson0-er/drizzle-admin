@@ -1,12 +1,12 @@
 # Interface: views
 
 Files: `src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx`, `src/views/format.ts`, `src/views/url.ts`, `src/static/admin-css.ts`, `src/static/select-all.ts`.
-All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes only from Hono JSX: `raw()` and `dangerouslySetInnerHTML` are forbidden (Biome rule, decision 004). Texts come from `messages` ([support.md](support.md)). Widgets come from [forms.md](forms.md).
+All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes only from Hono JSX: `raw()` and `dangerouslySetInnerHTML` are forbidden (Biome rule, decision 004). Texts come from `messages` ([support.md](support.md)). Widgets come from [forms.md](forms.md). The stylesheet (`ADMIN_CSS`) is specified in [views-style.md](views-style.md).
 
 ## Responsibilities
 - Render every page from plain props (no DB access, no Context).
 - Format list cell values.
-- Provide the stylesheet string and the select-all script.
+- Provide the stylesheet string (rules in [views-style.md](views-style.md), decision 040) and the select-all script.
 - Render the fixed set of decorative icons (decision 039).
 
 ## API
@@ -138,6 +138,7 @@ Security rule: icon names are passed only as literals (or via `FLASH_ICONS`, who
 The path data is a reference drawing (not render-checked); the implementer may refine the geometry inside the 16×16 box without changing names, placement or the character rule. No other control gets an icon: the action `run` button, the login button, paginator, filter, breadcrumb and cell links stay text-only (Q10). `BooleanMark` is used in two places: boolean list cells (`Cell.bool`) and read-only boolean form fields, through `DisplayValue` (forms.md; Q9). Because icons contain no text nodes, the text content of every existing link, button and flash item is unchanged. Only boolean values change their text, from `✓` / `✗` to `messages.yes` / `messages.no` (the visually hidden span), both in list cells and in `span.readonly` on the form page. Flash levels stay `success` / `warning` / `error`; there is no `info` level (Q8).
 
 ### Static modules
+Changed 2026-10-08: `ADMIN_CSS` restyled after DADS values (decision 040); the rules moved to [views-style.md](views-style.md); the exports are unchanged.
 ```ts
 // src/static/admin-css.ts
 export const ADMIN_CSS: string;
@@ -149,8 +150,11 @@ The script goes inside `ListPage` as `<script>{SELECT_ALL_SCRIPT}</script>`. Exa
 ``const t = document.getElementById(`action-toggle`); if (t) { t.hidden = false; t.addEventListener(`change`, function () { for (const c of document.querySelectorAll(`input[name=_selected]`)) { c.checked = t.checked } }) }``
 `#action-toggle` is rendered with the `hidden` attribute, and the script removes it (`t.hidden = false`), so without JS the checkbox does not appear.
 
-CSS requirements (§11): no external fonts or URLs; system font stack; a Django-like palette defined as CSS custom properties on `:root`, overridden in `@media (prefers-color-scheme: dark)`; header, breadcrumbs and content areas; the filter sidebar on the right (`#changelist-filter`), moved above the table at `max-width: 767px`; the table wrapped in `.results { overflow-x: auto }`; visible styles for `.errornote`, `.errorlist`, `.messagelist .success/.warning/.error`.
-Changed 2026-10-08: icon rules (decision 039). Two new custom properties in both `:root` blocks: `--icon-success` (light `#2e7d32`, dark `#81c784`) and `--icon-warning` (light `#8a6d00`, dark `#f5dd5d`); all reach at least 4.7:1 on the page, row, selected and message backgrounds (evidence: 2026-10-08-icon-color-contrast). Rules (exact selectors; values may be tuned):
+Changed 2026-10-08: the Django-like palette and look are replaced by the DADS-inspired restyle in [views-style.md](views-style.md) (decision 040), which is normative for tokens, rules and focus ring. The structural requirements in the next paragraph still hold.
+
+CSS requirements (§11): no external fonts or URLs; system font stack; a palette defined as CSS custom properties on `:root`, overridden in `@media (prefers-color-scheme: dark)`; header, breadcrumbs and content areas; the filter sidebar on the right (`#changelist-filter`), moved above the table at `max-width: 767px`; the table wrapped in `.results { overflow-x: auto }`; visible styles for `.errornote`, `.errorlist`, `.messagelist .success/.warning/.error`.
+Changed 2026-10-08: icon rules (decision 039). Two new custom properties in both `:root` blocks: `--icon-success` and `--icon-warning`.
+Changed 2026-10-08: their values (first light `#2e7d32` / `#8a6d00`, dark `#81c784` / `#f5dd5d`, evidence: 2026-10-08-icon-color-contrast) are replaced by the DADS-derived values in [views-style.md](views-style.md) (light `#197a4b` / `#927200`, dark `#71c598` / `#ffc700`; evidence: 2026-10-08-dads-restyle-palette-contrast; decision 040). The rules below stay verbatim; flash items additionally get a 24px icon (views-style.md). Rules (exact selectors; values may be tuned):
 ```css
 .icon { display: inline-block; width: 1em; height: 1em; vertical-align: -0.125em; margin-inline-end: 0.35em; flex-shrink: 0; }
 .boolean-mark .icon { margin-inline-end: 0; }

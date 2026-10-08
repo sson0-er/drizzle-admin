@@ -45,3 +45,47 @@
 - 2026-10-07-drizzle-column-introspection
 - 2026-10-07-hono-csrf-and-jsx
 - 2026-10-07-toolchain-versions
+
+## Post-v1: Digital Agency design system
+
+Scope (user, narrowed): make the existing UI feel closer to DADS (look and feel). Keep our own markup, selectors, single stylesheet (`src/static/admin-css.ts`), inline SVG icons (decision 039), `prefers-color-scheme` dark mode, no external fonts, no JS. Not adopting DADS components, class names, or JS.
+
+### License and attribution
+- Snippets repo and `@digital-go-jp/design-tokens` are MIT (Copyright Digital Agency); copying their CSS/tokens into an MIT package is permitted if the MIT notice is kept when copied substantially (evidence: 2026-10-08-dads-license-notices).
+- The notices page says edited/processed snippet-derived UI used on the user's own site needs no attribution; only unmodified published use requires a citation. Guidelines text itself (design system body) requires a source credit, and processed content must not appear to be made by the Digital Agency (evidence: 2026-10-08-dads-license-notices).
+- Color hex, px sizes and ratios are plain values; writing our own CSS "inspired by" them copies no code. Whether bare values are copyrightable is a legal question, not answered (unverified). Safe course: write our own CSS using the values; if any CSS block is pasted verbatim, add the MIT notice to the package's third-party notices. Do not use DA logos/branding.
+- Font: Noto Sans is OFL 1.1; bundling would need the license text and font must not be sold alone (evidence: 2026-10-08-dads-license-notices). Irrelevant if we do not ship the font.
+
+### Traits that give the DADS feel (all values from evidence: 2026-10-08-dads-design-tokens-package, 2026-10-08-dads-html-snippets-repo)
+- Primary (key) blue: blue-900 #0017c1 (buttons, links; hover blue-1000 #00118f, active blue-1200 #000060); tints blue-50 #e8f1fe, -100 #d9e6ff, -200 #c5d7fb, -300 #9db7f9. Links: blue-1000 underlined (1px, 3px on hover, offset 3px); visited magenta-900 #8b008b; active orange-800 #c74700.
+- Neutrals: text gray-800 #333333, strong text gray-900 #1a1a1a, input border gray-600 #666666, table border/disabled gray-420 #949494, muted gray-536 #767676, disabled bg gray-50 #f2f2f2, gray-100 #e6e6e6, gray-300 #b3b3b3; white page/background.
+- Semantic: error red-800 #ec0000 (hover/dark red-900 #ce0000, red-1000 #a90000); success green-800 #197a4b (green-600 #259d63); warning yellow-900 #927200 with chip yellow-400 #ffc700; orange-800 #c74700; info blue-900 or gray-536.
+- Typography: Noto Sans JP, weights 400/700 only; body 16px, line-height 1.7, letter-spacing 0.02em; dense/table 14-16px, line-height 1.2-1.3; headings bold, 1.5 line-height, sizes 20/22/24/26/28/32/36px (letter-spacing 0.02em up to 20-26px, 0.01em at 28-36px); page text is larger and airier than our current 14px.
+- Radius: 4, 6, 8 (buttons/inputs), 12 (notifications), 16 px. Elevation shadows exist (e.g. `0 2px 8px 1px rgba(0,0,0,.1), 0 1px 5px rgba(0,0,0,.3)`), used sparingly; the look is flat with strong borders.
+- Spacing: no spacing tokens; components use a 4px-based set: 4, 8, 12, 16, 20, 24, 32 px. Control heights: input 40/48/56, button 28/36/48/56 px; min touch area 44px.
+- Focus ring: 4px solid black outline, 2px offset, 4px radius, plus 2px #ffd43d (yellow-300) halo; text buttons also fill yellow (evidence: 2026-10-08-dads-a11y-focus-contrast).
+- Buttons: solid fill (blue-900, white bold text, 4px double transparent border, underline on hover), outline (1px currentcolor border, white bg, blue text; hover bg blue-200), text (underlined, no border). Radius 8px at md/lg. No red/danger variant exists in DADS snippets, so destructive styling must be our own (e.g. red-800/900 with the same shape) (unverified fit; not in DADS).
+- Inputs: white bg, 1px gray-600 border, 8px radius, 16px text, black border on hover, invalid = red-800 border plus red error text below; read-only = dashed border; labels with a "※必須" requirement marker.
+- Tables: borderless-ish, 1px gray-420 row dividers, cell padding 20/16px (dense 12/16px), bold header cells, optional zebra stripe; no heavy header fill.
+- Notifications: white card, 3px border in semantic color, 12px radius, left-aligned semantic icon (24-44px), bold 17px heading; color-chip variant has a thick left inset bar (8px mobile, 16px desktop).
+- Contrast of these pairs on white: blue-900 11.1:1, red-800 4.6, red-900 5.79, green-800 5.35, yellow-900 4.54, gray-600 5.74, gray-800 12.63; gray-420 borders are only 3.03:1 (OK for non-text 3:1) (evidence: 2026-10-08-dads-a11y-focus-contrast).
+
+### Fonts
+- DADS declares `'Noto Sans JP', -apple-system, BlinkMacSystemFont, sans-serif` and its examples load Noto Sans JP from Google Fonts; there is no self-hosted file and no official system fallback beyond that (evidence: 2026-10-08-dads-html-snippets-repo, 2026-10-08-dads-design-tokens-package). Requirement §11 forbids external fonts, so we can only reference `"Noto Sans JP"` as a locally installed name and must keep our system-ui stack with Japanese system fonts (e.g. "Hiragino Sans", "Yu Gothic", Meiryo) as the effective face; exact stack is a design decision. Glyph metrics differ from Noto Sans JP, so line-height 1.7 may need review (unverified).
+
+### Dark mode
+- DADS defines no dark-mode colors: no dark tokens in the tokens package, no `prefers-color-scheme` in the snippets (only `color-scheme` on modal backdrops) (evidence: 2026-10-08-dads-design-tokens-package). The website guideline pages were not checked for a written policy (unverified). We must derive our own dark palette: e.g. keep the same hue family, use light tints (blue-200/300) for links and primary, red-300/400 for errors, and verify contrast ourselves; the DADS yellow/black focus ring needs a dark-mode variant.
+
+### Risks and constraints
+- DADS is beta (site v2.18.0, snippets tagged weekly), so values may drift; copying values freezes a snapshot (evidence: 2026-10-08-dads-html-snippets-repo).
+- Their palette is light-only; blue-900 on dark backgrounds fails contrast, so our dark mode is original work.
+- Larger text (16px/1.7) and 40-48px controls enlarge tables/forms; interacts with the <768px responsive rules and the density of list/tables.
+- Underlined links and black+yellow focus ring change the visual identity noticeably; decision 039 icons use stroke-based inline SVG and are unaffected, but icon colors need re-checking against the new palette (3:1).
+- No DADS red button, sidebar, header, or numbered pagination exists to copy; those parts follow our own design.
+
+### Evidence referenced
+- 2026-10-08-dads-license-notices
+- 2026-10-08-dads-html-snippets-repo
+- 2026-10-08-dads-design-tokens-package
+- 2026-10-08-dads-a11y-focus-contrast
+- 2026-10-08-dads-icon-terms (icons: DADS has no icon font/sprite; its inline SVGs use `currentcolor` and `aria-hidden`, matching decision 039; Figma icons are partly Material Symbols, Apache 2.0)

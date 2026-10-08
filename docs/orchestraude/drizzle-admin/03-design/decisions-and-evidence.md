@@ -16,6 +16,7 @@ Changed 2026-10-08: added 033-038 (user answers to the low-findings triage secti
 Changed 2026-10-08: 037 extended to list cells (Q7 option (b)); 035 rewritten after the user changed the L067 answer (labels stay the raw key).
 Changed 2026-10-08: 038 item 2 amended after task 36: the example uses `HOST || "127.0.0.1"`, so an empty `HOST` also falls back to loopback; evidence 2026-10-08-node-listen-empty-hostname added.
 Changed 2026-10-08: added 039 (post-v1 user request: UI icons as static inline SVG; Q8-Q10 answers applied, Q9 extends it to `DisplayValue`); evidence 2026-10-08-hono-jsx-inline-svg, -biome-no-svg-without-title, -css-mask-image-support, -icon-color-contrast added.
+Changed 2026-10-08: added 040 (post-v1 user request: DADS-inspired restyle of `ADMIN_CSS`, own dark palette and focus ring); 039 point 6 colors superseded; evidence 2026-10-08-dads-restyle-palette-contrast added.
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -57,11 +58,13 @@ Changed 2026-10-08: added 039 (post-v1 user request: UI icons as static inline S
 - 037-password-widget-no-echo: the `password` input renders empty; empty on change keeps the stored value (zod optional, not required); display-only password fields and list cells masked as `********` (Q7 option (b)); amends 013 item 11 and 021.
 - 038-body-size-and-example-bind: no in-library body limit in v1, README tells deployers to limit it at the proxy; the example binds to `127.0.0.1` unless `HOST` is set to a non-empty value (`HOST || "127.0.0.1"`).
 - 039-ui-icons-inline-svg: post-v1 icons as static inline SVG (`src/views/icons.tsx`, 9 fixed icons, `aria-hidden`, `currentColor`); boolean list cells and read-only boolean form fields (`DisplayValue`, Q9) get a colored mark with visually hidden `messages.yes` / `messages.no`; no `info` flash level (Q8); CSS mask-image, sprite and glyph alternatives rejected.
+- 040-dads-inspired-restyle: post-v1 restyle using DADS token values with our own CSS, selectors and markup; 28 color tokens in both schemes (own dark palette from DADS hues, contrast verified), black/yellow focus ring swapped in dark mode, 16px/1.7 body and 48px controls, denser 14px table, solid/outline/text/danger button mapping via existing selectors, card flash; attribution only as a source comment (views-style.md).
 
 ## Evidence referenced
 Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
 Changed 2026-10-08: 2026-10-08-node-listen-empty-hostname added (decision 038 amendment).
 Changed 2026-10-08: four entries for decision 039 (icons) added; they expire 2027-01-06.
+Changed 2026-10-08: DADS research entries (2026-10-08-dads-*) and 2026-10-08-dads-restyle-palette-contrast added for decision 040; they expire 2027-01-06.
 - 2026-10-07-drizzle-orm-release-lines (research)
 - 2026-10-07-drizzle-column-introspection (research)
 - 2026-10-07-hono-csrf-and-jsx (research)
@@ -88,5 +91,11 @@ Changed 2026-10-08: four entries for decision 039 (icons) added; they expire 202
 - 2026-10-08-biome-no-svg-without-title (design, decision 039): `noSvgWithoutTitle` is recommended and ignores SVGs with `aria-hidden="true"`; to be confirmed by `pnpm lint` on 2.5.15.
 - 2026-10-08-css-mask-image-support (design, decision 039): `mask-image` Baseline since 2023-12 but older Chrome/Safari need `-webkit-`; whether CSP `img-src` blocks data: masks is unconfirmed.
 - 2026-10-08-icon-color-contrast (design, decision 039): proposed icon colors reach 4.74:1 or more on all listed light/dark backgrounds.
+- 2026-10-08-dads-license-notices (research, decision 040): snippets and tokens are MIT; edited snippet-derived UI needs no attribution; processed content must not look made by the Digital Agency; Noto Sans is OFL.
+- 2026-10-08-dads-html-snippets-repo (research, decision 040): button solid/outline/text with 8px radius, input 1px gray-600 / 8px, notification 3px border / 12px radius, table padding 20/16 (dense 12/16); no danger button, header, sidebar or numbered pagination; examples load Noto Sans JP from Google Fonts.
+- 2026-10-08-dads-design-tokens-package (research, decision 040): token values (blue-900 #0017c1 etc.), 16px/1.7/0.02em body, radius 4-16px, no dark tokens, no spacing tokens.
+- 2026-10-08-dads-a11y-focus-contrast (research, decision 040): focus ring 4px black outline, 2px offset, 2px yellow-300 halo; link underline 1px/3px, offset 3px; contrast of DADS colors on white.
+- 2026-10-08-dads-icon-terms (research): DADS has no icon font; inline SVGs use `currentcolor` and `aria-hidden`, consistent with decision 039.
+- 2026-10-08-dads-restyle-palette-contrast (design, decision 040): DADS primitives used by the restyle; every light/dark text pair >= 4.5:1 and non-text pair >= 3:1; dark black ring 1.21:1 and red-800 on gray-50 4.11:1 (rejected options).
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.
