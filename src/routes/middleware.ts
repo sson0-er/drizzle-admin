@@ -1,9 +1,10 @@
 import type { MiddlewareHandler } from "hono";
 import { CSRF_FIELD, tokensEqual } from "../auth/csrf.js";
+import { readLocale } from "../auth/locale.js";
 import { externalLoginUrl, loginRedirectUrl, safeNext } from "../auth/redirect.js";
 import { newSession, readSession, writeSession } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
-import { messages } from "../messages.js";
+import { MESSAGES } from "../messages.js";
 import { SELECT_ALL_SCRIPT_SHA256 } from "../static/select-all.js";
 import type { AdminState } from "../types.js";
 import { type AdminEnv, type AdminVars, cookieOpts, errorPage } from "./context.js";
@@ -17,6 +18,9 @@ export const initVars =
     c.set("state", state);
     c.set("repo", repo);
     c.set("body", null);
+    const locale = readLocale(c);
+    c.set("locale", locale);
+    c.set("t", MESSAGES[locale]);
     await next();
   };
 
@@ -108,7 +112,7 @@ export const authGuard: Mw = async (c, next) => {
   if (auth.loginUrl !== undefined) {
     return c.redirect(externalLoginUrl(auth.loginUrl, safeNext(target, prefix)), 302);
   }
-  return errorPage(c, 401, messages.unauthorized);
+  return errorPage(c, 401, c.var.t.unauthorized);
 };
 
 /** POST only: parses the body once for the handlers and requires the session's CSRF token. */
@@ -118,7 +122,7 @@ export const csrfToken: Mw = async (c, next) => {
     c.set("body", body);
     const token = body[CSRF_FIELD];
     if (typeof token !== "string" || !tokensEqual(token, c.var.session.csrf)) {
-      return errorPage(c, 403, messages.csrfFailed);
+      return errorPage(c, 403, c.var.t.csrfFailed);
     }
   }
   await next();

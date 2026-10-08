@@ -1,9 +1,11 @@
 import { jsx } from "hono/jsx";
 import { describe, expect, it } from "vitest";
 import type { FlashLevel } from "../src/auth/flash.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import { BooleanMark, FLASH_ICONS, ICON_PATHS, Icon, type IconName } from "../src/views/icons.js";
 import { attr, type Element, parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 const NAMES = Object.keys(ICON_PATHS) as IconName[];
 
@@ -92,7 +94,7 @@ describe("BooleanMark", () => {
     { value: true, icon: "check", message: messages.yes },
     { value: false, icon: "x", message: messages.no },
   ])("renders $value as $icon with the hidden text", ({ value, icon, message }) => {
-    const mark = qs(parse(String(BooleanMark({ value }))), {
+    const mark = qs(parse(String(BooleanMark({ value, t: messages }))), {
       tag: "span",
       cls: "boolean-mark",
       attrs: { "data-bool": String(value) },

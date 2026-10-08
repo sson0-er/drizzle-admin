@@ -1,3 +1,4 @@
+import type { Messages } from "../messages.js";
 import type { ResolvedModel } from "../types.js";
 import { coerceForm, type FormBody, rawValues } from "./coerce.js";
 import type { FormField, FormMode } from "./fields.js";
@@ -18,8 +19,9 @@ export async function validateSubmission(args: {
   body: FormBody;
   mode: FormMode;
   timeZone: string;
+  t: Messages;
 }): Promise<ValidationResult> {
-  const { model, fields, body, mode, timeZone } = args;
+  const { model, fields, body, mode, timeZone, t } = args;
   const fail = (fieldErrors: Record<string, string>, formErrors: string[] = []) => ({
     ok: false as const,
     fieldErrors,
@@ -27,10 +29,10 @@ export async function validateSubmission(args: {
     values: rawValues(fields, body),
   });
 
-  const coerced = coerceForm(fields, body, mode, timeZone);
+  const coerced = coerceForm(fields, body, mode, timeZone, t);
   if (Object.keys(coerced.errors).length > 0) return fail(coerced.errors);
 
-  const parsed = parseWithSchema(buildZodSchema(fields, mode), coerced.data);
+  const parsed = parseWithSchema(buildZodSchema(fields, mode), coerced.data, t);
   if (!parsed.ok) return fail(parsed.errors);
 
   // A throwing `validate` is a programming error and is deliberately not caught (-> 500).

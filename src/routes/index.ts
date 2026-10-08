@@ -5,7 +5,6 @@ import { FLASH_COOKIE } from "../auth/flash.js";
 import { deriveCookieKey, SESSION_COOKIE } from "../auth/session.js";
 import { describeForLog, isDbError } from "../data/errors.js";
 import { createRepository } from "../data/repository.js";
-import { messages } from "../messages.js";
 import { ADMIN_CSS } from "../static/admin-css.js";
 import type { AdminState } from "../types.js";
 import { actionsHandler } from "./actions.js";
@@ -28,7 +27,7 @@ import {
 // biome-ignore lint/suspicious/noControlCharactersInRegex: control characters are what is excluded
 const SAFE_REST = /^(?:\/[^/\\\s\x00-\x1f\x7f]+)+$/;
 
-const notFound = (c: AdminContext): Response => errorPage(c, 404, messages.notFound);
+const notFound = (c: AdminContext): Response => errorPage(c, 404, c.var.t.notFound);
 
 /** Route 10: the dashboard, the trailing-slash redirect, or 404. */
 function catchAll(prefix: string) {
@@ -98,12 +97,12 @@ export function buildApp(state: AdminState): Hono {
   app.onError((err, c) => {
     // Minimal pages: the error may predate the session and user middleware (decision 022).
     if (err instanceof HTTPException) {
-      const message = err.status === 403 ? messages.csrfFailed : messages.serverError;
+      const message = err.status === 403 ? c.var.t.csrfFailed : c.var.t.serverError;
       return errorPage(c, err.status, message, { minimal: true });
     }
     // DB errors can carry SQL and bound parameters, so only their classification is logged.
     console.error("drizzle-admin:", isDbError(err) ? describeForLog(err) : err);
-    return errorPage(c, 500, messages.serverError, { minimal: true });
+    return errorPage(c, 500, c.var.t.serverError, { minimal: true });
   });
 
   // `Admin.app` is a plain `Hono`; the variables are internal to this app, so widen on the way out.

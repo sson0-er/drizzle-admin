@@ -1,11 +1,13 @@
 import type { Child } from "hono/jsx";
 import type { FlashMessage } from "../auth/flash.js";
-import { messages } from "../messages.js";
+import type { Locale, Messages } from "../messages.js";
 import { ADMIN_CSS_VERSION } from "../static/admin-css.js";
 import type { AdminUser } from "../types.js";
 import { FLASH_ICONS, Icon } from "./icons.js";
 
 export interface PageChrome {
+  locale: Locale;
+  t: Messages;
   siteTitle: string;
   prefix: string;
   title: string;
@@ -19,9 +21,10 @@ export interface PageChrome {
 }
 
 export function Layout(props: PageChrome & { children?: Child }) {
-  const { siteTitle, prefix, title, user, showLogout, csrfToken, flash, breadcrumbs } = props;
+  const { locale, t, siteTitle, prefix, title, user, showLogout, csrfToken, flash, breadcrumbs } =
+    props;
   return (
-    <html lang="ja">
+    <html lang={locale}>
       <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -43,7 +46,7 @@ export function Layout(props: PageChrome & { children?: Child }) {
                   <input type="hidden" name="_csrf" value={csrfToken} />
                   <button type="submit">
                     <Icon name="logout" />
-                    {messages.logout}
+                    {t.logout}
                   </button>
                 </form>
               ) : null}

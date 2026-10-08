@@ -1,5 +1,5 @@
 import type { FlashLevel } from "../auth/flash.js";
-import { messages } from "../messages.js";
+import type { Messages } from "../messages.js";
 
 export type IconName =
   | "plus"
@@ -59,12 +59,12 @@ export function Icon(props: { name: IconName }) {
 }
 
 /** Colored check / x with the answer as visually hidden text (decision 039). */
-export function BooleanMark(props: { value: boolean }) {
-  const { value } = props;
+export function BooleanMark(props: { value: boolean; t: Messages }) {
+  const { value, t } = props;
   return (
     <span class="boolean-mark" data-bool={value ? "true" : "false"}>
       <Icon name={value ? "check" : "x"} />
-      <span class="visually-hidden">{value ? messages.yes : messages.no}</span>
+      <span class="visually-hidden">{value ? t.yes : t.no}</span>
     </span>
   );
 }

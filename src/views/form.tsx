@@ -1,6 +1,5 @@
 import type { FormGroup } from "../forms/fields.js";
 import { DisplayValue, Widget } from "../forms/widgets.js";
-import { messages } from "../messages.js";
 import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
@@ -22,7 +21,7 @@ export interface FormPageProps {
 }
 
 export function FormPage(props: PageChrome & FormPageProps) {
-  const { csrfToken, groups, values, fieldErrors, formErrors, canSave, deleteHref, displayRow } =
+  const { t, csrfToken, groups, values, fieldErrors, formErrors, canSave, deleteHref, displayRow } =
     props;
   const hasErrors = formErrors.length > 0 || Object.keys(fieldErrors).length > 0;
   return (
@@ -30,7 +29,7 @@ export function FormPage(props: PageChrome & FormPageProps) {
       <h1>{props.title}</h1>
       <form id="model-form" method="post">
         <input type="hidden" name="_csrf" value={csrfToken} />
-        {hasErrors ? <p class="errornote">{messages.formHasErrors}</p> : null}
+        {hasErrors ? <p class="errornote">{t.formHasErrors}</p> : null}
         {formErrors.length > 0 ? (
           <ul class="errorlist nonfield">
             {formErrors.map((e) => (
@@ -47,6 +46,7 @@ export function FormPage(props: PageChrome & FormPageProps) {
                   field={field}
                   value={values[field.key] ?? ""}
                   error={fieldErrors[field.key]}
+                  t={t}
                 />
               ) : (
                 <div class="form-row" data-field={field.key}>
@@ -58,12 +58,14 @@ export function FormPage(props: PageChrome & FormPageProps) {
                       field={field}
                       value={values[field.key] ?? ""}
                       error={fieldErrors[field.key]}
+                      t={t}
                     />
                   ) : (
                     <DisplayValue
                       field={field}
                       value={displayRow?.[field.key]}
                       timeZone={props.timeZone}
+                      t={t}
                     />
                   )}
                 </div>
@@ -76,22 +78,22 @@ export function FormPage(props: PageChrome & FormPageProps) {
             <>
               <button type="submit" name="_save">
                 <Icon name="check" />
-                {messages.save}
+                {t.save}
               </button>
               <button type="submit" name="_addanother">
                 <Icon name="plus" />
-                {messages.saveAndAddAnother}
+                {t.saveAndAddAnother}
               </button>
               <button type="submit" name="_continue">
                 <Icon name="pencil" />
-                {messages.saveAndContinue}
+                {t.saveAndContinue}
               </button>
             </>
           ) : null}
           {deleteHref === undefined ? null : (
             <a class="deletelink" href={deleteHref}>
               <Icon name="trash" />
-              {messages.delete}
+              {t.delete}
             </a>
           )}
         </div>

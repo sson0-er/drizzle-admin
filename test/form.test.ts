@@ -1,7 +1,7 @@
 import { type Column, eq, getTableColumns, sql, type Table } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import {
   type Client,
   createClient,
@@ -12,6 +12,8 @@ import {
 } from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
 import { attr, type Element, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 type Rec = Record<string, unknown>;
 type RawDb = {

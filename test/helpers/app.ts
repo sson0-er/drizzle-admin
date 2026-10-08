@@ -29,6 +29,8 @@ export interface Client {
   csrf(): string;
   /** Current value (still URL-encoded) of a cookie in the jar. */
   cookie(name: string): string | undefined;
+  /** Puts a cookie into the jar, e.g. to pick a UI locale without the switch route. */
+  setCookie(name: string, value: string): void;
   /**
    * Logs in through the login page: GETs `<prefix>/login/`, then POSTs the credentials and the
    * page's `_csrf`. Returns the POST response. Defaults to the test user at prefix `/admin`.
@@ -111,6 +113,9 @@ export function createClient(fetchFn: Fetch): Client {
     },
     csrf,
     cookie: (name) => jar.get(name),
+    setCookie: (name, value) => {
+      jar.set(name, value);
+    },
     login: async (opts = {}) => {
       const url = `${opts.prefix ?? "/admin"}/login/`;
       await client.get(url);

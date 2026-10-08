@@ -2,7 +2,6 @@ import { jsx } from "hono/jsx";
 import { ACTION_PERMISSION, can } from "../auth/permissions.js";
 import type { DbRow } from "../data/repository.js";
 import type { FieldMeta } from "../introspect/index.js";
-import { messages } from "../messages.js";
 import type { AdminUser, ResolvedModel } from "../types.js";
 import { cellBoolean, formatCell } from "../views/format.js";
 import { type Cell, ListPage, type ListPageProps } from "../views/list.js";
@@ -19,11 +18,12 @@ import {
 
 const FK_FILTER_LIMIT = 200;
 const SEARCH_MAX_LENGTH = 200;
+// Labels are message keys, looked up in the request's dictionary.
 const DATE_PRESETS = [
-  { value: "today", label: messages.today },
-  { value: "past7", label: messages.past7 },
-  { value: "month", label: messages.thisMonth },
-  { value: "year", label: messages.thisYear },
+  { value: "today", label: "today" },
+  { value: "past7", label: "past7" },
+  { value: "month", label: "thisMonth" },
+  { value: "year", label: "thisYear" },
 ] as const;
 
 const enc = (pk: unknown): string => encodeURIComponent(String(pk));
@@ -94,11 +94,12 @@ async function loadFkLabels(
 type Choice = { label: string; value: string };
 
 async function filterChoices(c: AdminContext, field: FieldMeta): Promise<Choice[] | null> {
-  if (isDateFilter(field)) return DATE_PRESETS.map((p) => ({ label: p.label, value: p.value }));
+  const { t } = c.var;
+  if (isDateFilter(field)) return DATE_PRESETS.map((p) => ({ label: t[p.label], value: p.value }));
   if (field.kind === "boolean") {
     return [
-      { label: messages.yes, value: "1" },
-      { label: messages.no, value: "0" },
+      { label: t.yes, value: "1" },
+      { label: t.no, value: "0" },
     ];
   }
   if (field.kind === "enum") return (field.enumValues ?? []).map((v) => ({ label: v, value: v }));
@@ -119,9 +120,9 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   if (found instanceof Response) return found;
   const model = found;
   const user = requireUser(c);
-  if (!can(model, "view", user)) return errorPage(c, 403, messages.forbidden);
+  const { repo, state, t } = c.var;
+  if (!can(model, "view", user)) return errorPage(c, 403, t.forbidden);
 
-  const { repo, state } = c.var;
   const { prefix, timeZone } = state.config;
   const listUrl = `${prefix}/${model.slug}/`;
   const url = new URL(c.req.url);
@@ -176,6 +177,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
         value,
         row,
         tz: timeZone,
+        t,
         masked: masked.has(key),
         ...(formatter === undefined ? {} : { formatter }),
         ...(fkLabel === undefined ? {} : { fkLabel }),
@@ -220,7 +222,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
     const param = `f_${key}`;
     filterProps.push({
       key,
-      choices: [{ label: messages.all, value: null }, ...choices].map((ch) => ({
+      choices: [{ label: t.all, value: null }, ...choices].map((ch) => ({
         label: ch.label,
         href: withQuery(listUrl, params, { [param]: ch.value }),
         selected: ch.value === active,
@@ -230,7 +232,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
 
   const actions: ListPageProps["actions"] = [];
   if (can(model, "delete", user)) {
-    actions.push({ name: "delete_selected", label: messages.deleteSelected });
+    actions.push({ name: "delete_selected", label: t.deleteSelected });
   }
   if (can(model, ACTION_PERMISSION, user)) {
     for (const a of model.actions) actions.push({ name: a.name, label: a.label });

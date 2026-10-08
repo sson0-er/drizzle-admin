@@ -1,7 +1,6 @@
 import { jsx } from "hono/jsx";
 import { ACTION_PERMISSION, can } from "../auth/permissions.js";
 import { classifyDbError, isDbError } from "../data/errors.js";
-import { messages } from "../messages.js";
 import type { HookCtx, ResolvedModel } from "../types.js";
 import { ConfirmActionPage } from "../views/confirm-action.js";
 import {
@@ -31,7 +30,7 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
   if (found instanceof Response) return found;
   const model: ResolvedModel = found;
   const user = requireUser(c);
-  const { repo, state } = c.var;
+  const { repo, state, t } = c.var;
   const body = c.var.body ?? {};
 
   const listUrl = `${state.config.prefix}/${model.slug}/`;
@@ -41,9 +40,9 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
     redirectWithFlash(c, back, [{ level, text }]);
 
   const ids = selectedIds(body);
-  if (ids.length === 0) return flashBack("warning", messages.noSelection);
+  if (ids.length === 0) return flashBack("warning", t.noSelection);
   if (ids.length > MAX_SELECTED) {
-    return flashBack("warning", messages.tooManySelected(MAX_SELECTED));
+    return flashBack("warning", t.tooManySelected(MAX_SELECTED));
   }
 
   const action = typeof body.action === "string" ? body.action : "";
@@ -69,50 +68,47 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
   };
 
   if (action === DELETE_ACTION) {
-    if (!can(model, "delete", user)) return errorPage(c, 403, messages.forbidden);
+    if (!can(model, "delete", user)) return errorPage(c, 403, t.forbidden);
     const rows = await repo.getMany(model.meta, ids);
     // Every selected row vanished meanwhile: nothing to confirm or delete.
-    if (rows.length === 0) return flashBack("warning", messages.noSelection);
-    if (!confirmed) return confirmPage(messages.deleteSelected, true, rows);
+    if (rows.length === 0) return flashBack("warning", t.noSelection);
+    if (!confirmed) return confirmPage(t.deleteSelected, true, rows);
 
     const ctx: HookCtx = { mode: "delete", user, db: state.config.db };
     try {
       for (const row of rows) await model.hooks.beforeDelete?.(row, ctx);
     } catch {
       // The message is never shown (decision 013 item 10).
-      return flashBack("error", messages.hookFailed);
+      return flashBack("error", t.hookFailed);
     }
     try {
       const n = await repo.delete(
         model.meta,
         rows.map((r) => String(r[model.meta.pk.key])),
       );
-      return flashBack("success", messages.deletedMany(n));
+      return flashBack("success", t.deletedMany(n));
     } catch (err) {
       // Anything that is not a database error is a bug and goes to onError.
       if (!isDbError(err)) throw err;
-      return flashBack(
-        "error",
-        classifyDbError(err) === "foreignKey" ? messages.dbForeignKey : messages.dbOther,
-      );
+      return flashBack("error", classifyDbError(err) === "foreignKey" ? t.dbForeignKey : t.dbOther);
     }
   }
 
   const custom = model.actions.find((a) => a.name === action);
-  if (custom === undefined) return flashBack("error", messages.unknownAction);
-  if (!can(model, ACTION_PERMISSION, user)) return errorPage(c, 403, messages.forbidden);
+  if (custom === undefined) return flashBack("error", t.unknownAction);
+  if (!can(model, ACTION_PERMISSION, user)) return errorPage(c, 403, t.forbidden);
 
   if (custom.confirm === true && !confirmed) {
     const rows = await repo.getMany(model.meta, ids);
     // Every selected row vanished meanwhile: nothing to confirm.
-    if (rows.length === 0) return flashBack("warning", messages.noSelection);
+    if (rows.length === 0) return flashBack("warning", t.noSelection);
     return confirmPage(custom.label, false, rows);
   }
   try {
     const result = await custom.run({ ids, db: state.config.db, user });
-    return flashBack("success", result?.message ?? messages.actionDone);
+    return flashBack("success", result?.message ?? t.actionDone);
   } catch {
     // The message is never shown (decision 013 item 10).
-    return flashBack("error", messages.actionFailed);
+    return flashBack("error", t.actionFailed);
   }
 }

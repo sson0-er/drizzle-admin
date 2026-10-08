@@ -1,9 +1,11 @@
 import { Hono } from "hono";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import { createClient, makeAdmin, type TestAdmin } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
 import { parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 afterEach(() => {
   vi.restoreAllMocks();

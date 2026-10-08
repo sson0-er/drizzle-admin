@@ -2,7 +2,6 @@ import type { Table } from "drizzle-orm";
 import { Hono } from "hono";
 import { allowedWidgets } from "./forms/fields.js";
 import { type FieldMeta, introspectTable } from "./introspect/index.js";
-import { messages } from "./messages.js";
 import { MAX_SELECTED } from "./routes/actions.js";
 import { buildApp } from "./routes/index.js";
 import { resolveTimeZone } from "./time.js";
@@ -82,7 +81,7 @@ export function resolveConfig(config: AdminConfig): AdminState["config"] {
     db,
     dialect,
     prefix,
-    siteTitle: config.siteTitle ?? messages.defaultSiteTitle,
+    siteTitle: config.siteTitle ?? null,
     secret,
     sessionMaxAgeSec: sessionMaxAgeSec ?? 28800,
     timeZone: resolveTimeZone(config.timeZone),

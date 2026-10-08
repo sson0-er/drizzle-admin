@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { FormField } from "../src/forms/fields.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import { ADMIN_CSS, ADMIN_CSS_VERSION } from "../src/static/admin-css.js";
 import { SELECT_ALL_SCRIPT, SELECT_ALL_SCRIPT_SHA256 } from "../src/static/select-all.js";
 import { ConfirmActionPage } from "../src/views/confirm-action.js";
@@ -9,12 +9,14 @@ import { DashboardPage } from "../src/views/dashboard.js";
 import { DeletePage } from "../src/views/delete.js";
 import { ErrorPage } from "../src/views/error.js";
 import { FormPage, type FormPageProps } from "../src/views/form.js";
-import { FLASH_ICONS, type IconName } from "../src/views/icons.js";
+import { BooleanMark, FLASH_ICONS, type IconName } from "../src/views/icons.js";
 import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
 import { LoginPage } from "../src/views/login.js";
 import { sortHref, withQuery } from "../src/views/url.js";
 import { attr, type Element, parse, qs as q1, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 const BASE = "/admin/authors/";
 const qs = (s: string) => new URLSearchParams(s);
@@ -162,6 +164,8 @@ describe("static modules", () => {
 });
 
 const chrome: PageChrome = {
+  locale: "en",
+  t: messages,
   siteTitle: "Site",
   prefix: "/admin",
   title: "Authors",
@@ -178,13 +182,18 @@ describe("Layout", () => {
 
   it("renders the document skeleton and stylesheet link", () => {
     const doc = render();
-    expect(qsa(doc, { tag: "html", attrs: { lang: "ja" } })).toHaveLength(1);
+    expect(qsa(doc, { tag: "html", attrs: { lang: "en" } })).toHaveLength(1);
     const link = q1(doc, { tag: "link", attrs: { rel: "stylesheet" } });
     expect(link && attr(link, "href")).toBe(`/admin/static/admin.css?v=${ADMIN_CSS_VERSION}`);
     const title = q1(doc, { tag: "title" });
     expect(title && text(title)).toBe("Authors | Site");
     expect(qsa(doc, { tag: "header", id: "header" })).toHaveLength(1);
     expect(qsa(doc, { tag: "main", id: "content" })).toHaveLength(1);
+  });
+
+  it.each(["en", "ja"] as const)("sets html lang to %s", (locale) => {
+    const doc = render({ locale, t: MESSAGES[locale] });
+    expect(qsa(doc, { tag: "html", attrs: { lang: locale } })).toHaveLength(1);
   });
 
   it("renders breadcrumbs with Home first", () => {
@@ -692,6 +701,35 @@ describe("icons on pages", () => {
     expect(iconsIn(cancel)).toEqual(["x"]);
     expect(cancel && text(cancel)).toBe(messages.cancel);
   });
+
+  it.each(["en", "ja"] as const)("shows the %s delete confirmation text", (locale) => {
+    const doc = render(
+      DeletePage({
+        ...chrome,
+        locale,
+        t: MESSAGES[locale],
+        modelLabel: "Author",
+        objectLabel: "Ann",
+        cancelHref: "/c/",
+      }),
+    );
+    const confirm = q1(doc, { tag: "p", cls: "confirm-text" });
+    expect(confirm && text(confirm)).toBe(MESSAGES[locale].confirmDelete("Ann"));
+  });
+
+  it.each([
+    { value: true, expected: "はい" },
+    { value: false, expected: "いいえ" },
+  ])(
+    "renders the hidden text of a boolean mark from MESSAGES.ja for $value",
+    ({ value, expected }) => {
+      const mark = q1(render(BooleanMark({ value, t: MESSAGES.ja })), {
+        tag: "span",
+        cls: "visually-hidden",
+      });
+      expect(mark && text(mark)).toBe(expected);
+    },
+  );
 
   it.each([
     { isDelete: true, icon: "trash" },

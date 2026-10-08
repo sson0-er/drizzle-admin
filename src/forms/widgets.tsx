@@ -1,4 +1,4 @@
-import { messages } from "../messages.js";
+import type { Messages } from "../messages.js";
 import { toDateOnly, toDatetimeLocal } from "../time.js";
 import { formatValue } from "../views/format.js";
 import { BooleanMark } from "../views/icons.js";
@@ -35,16 +35,21 @@ export function toFormValue(field: FormField, value: unknown, timeZone: string):
 // Glyph-only literal, not a message (decision 033 item 11).
 const PASSWORD_MASK = "********";
 
-export function DisplayValue(props: { field: FormField; value: unknown; timeZone: string }) {
-  const { field, value, timeZone } = props;
+export function DisplayValue(props: {
+  field: FormField;
+  value: unknown;
+  timeZone: string;
+  t: Messages;
+}) {
+  const { field, value, timeZone, t } = props;
   // The mask comes first so a password value never reaches the HTML (decision 037).
   const shown =
     field.widget === "password" ? (
       PASSWORD_MASK
     ) : typeof value === "boolean" ? (
-      <BooleanMark value={value} />
+      <BooleanMark value={value} t={t} />
     ) : (
-      formatValue(field.meta, value, timeZone)
+      formatValue(field.meta, value, timeZone, t)
     );
   return <span class="readonly">{shown}</span>;
 }
@@ -103,8 +108,8 @@ function Input(props: { field: FormField; value: string }) {
   }
 }
 
-export function Widget(props: { field: FormField; value: string; error?: string }) {
-  const { field, value, error } = props;
+export function Widget(props: { field: FormField; value: string; error?: string; t: Messages }) {
+  const { field, value, error, t } = props;
   return (
     <>
       {error === undefined ? null : (
@@ -116,8 +121,8 @@ export function Widget(props: { field: FormField; value: string; error?: string 
       {field.fkFallbackHref === undefined ? null : (
         <>
           {" "}
-          <a href={field.fkFallbackHref}>{messages.openRelated}</a>
-          <p class="help">{messages.fkTooMany}</p>
+          <a href={field.fkFallbackHref}>{t.openRelated}</a>
+          <p class="help">{t.fkTooMany}</p>
         </>
       )}
     </>

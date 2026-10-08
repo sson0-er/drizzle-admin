@@ -1,4 +1,3 @@
-import { messages } from "../messages.js";
 import { Layout, type PageChrome } from "./layout.js";
 
 export interface LoginPageProps {
@@ -9,7 +8,7 @@ export interface LoginPageProps {
 }
 
 export function LoginPage(props: PageChrome & LoginPageProps) {
-  const { prefix, csrfToken, next, username, error } = props;
+  const { t, prefix, csrfToken, next, username, error } = props;
   return (
     <Layout {...props}>
       <h1>{props.title}</h1>
@@ -18,7 +17,7 @@ export function LoginPage(props: PageChrome & LoginPageProps) {
         <input type="hidden" name="next" value={next} />
         {error === undefined ? null : <p class="errornote">{error}</p>}
         <div class="form-row">
-          <label for="id_username">{messages.username}</label>
+          <label for="id_username">{t.username}</label>
           <input
             type="text"
             id="id_username"
@@ -29,7 +28,7 @@ export function LoginPage(props: PageChrome & LoginPageProps) {
           />
         </div>
         <div class="form-row">
-          <label for="id_password">{messages.password}</label>
+          <label for="id_password">{t.password}</label>
           {/* Never echo the password back, even after a failed attempt. */}
           <input
             type="password"
@@ -40,7 +39,7 @@ export function LoginPage(props: PageChrome & LoginPageProps) {
           />
         </div>
         <div class="submit-row">
-          <button type="submit">{messages.login}</button>
+          <button type="submit">{t.login}</button>
         </div>
       </form>
     </Layout>

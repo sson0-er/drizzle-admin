@@ -1,4 +1,3 @@
-import { messages } from "../messages.js";
 import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
@@ -17,7 +16,7 @@ export interface ConfirmActionPageProps {
 }
 
 export function ConfirmActionPage(props: PageChrome & ConfirmActionPageProps) {
-  const { action, actionLabel, isDelete, items, listHref, backQuery, csrfToken } = props;
+  const { t, action, actionLabel, isDelete, items, listHref, backQuery, csrfToken } = props;
   return (
     <Layout {...props}>
       <h1>{props.title}</h1>
@@ -33,7 +32,7 @@ export function ConfirmActionPage(props: PageChrome & ConfirmActionPageProps) {
         {items.map((item) => (
           <input type="hidden" name="_selected" value={item.pk} />
         ))}
-        <p class="confirm-text">{messages.confirmAction(actionLabel)}</p>
+        <p class="confirm-text">{t.confirmAction(actionLabel)}</p>
         <ul class="objects">
           {items.map((item) => (
             <li>{item.label}</li>
@@ -42,11 +41,11 @@ export function ConfirmActionPage(props: PageChrome & ConfirmActionPageProps) {
         <div class="submit-row">
           <button type="submit">
             <Icon name={isDelete ? "trash" : "check"} />
-            {messages.confirmYes}
+            {t.confirmYes}
           </button>
           <a href={`${listHref}${backQuery}`}>
             <Icon name="x" />
-            {messages.cancel}
+            {t.cancel}
           </a>
         </div>
       </form>

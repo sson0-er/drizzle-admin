@@ -1,6 +1,7 @@
 // List cell formatting. Returned strings are plain text; escaping is left to Hono JSX.
 import type { DbRow } from "../data/repository.js";
 import type { FieldMeta } from "../introspect/index.js";
+import type { Messages } from "../messages.js";
 import { formatDate, formatDateTime } from "../time.js";
 
 export const TRUNCATE_AT = 100;
@@ -23,7 +24,7 @@ function jsonText(value: unknown): string {
 }
 
 // Rules 2 and 4-10 of the format order (views.md); rules 1 and 3 need caller-supplied inputs.
-export function formatValue(field: FieldMeta, value: unknown, tz: string): string {
+export function formatValue(field: FieldMeta, value: unknown, tz: string, t: Messages): string {
   if (value === null || value === undefined) return "-";
   if (typeof value === "boolean") return value ? "✓" : "✗";
   // A date-only string is not a Date and falls through to the default rule unchanged (decision 023).
@@ -32,7 +33,7 @@ export function formatValue(field: FieldMeta, value: unknown, tz: string): strin
   }
   if (field.kind === "json") return truncate(jsonText(value));
   if (typeof value === "bigint" || typeof value === "number") return String(value);
-  if (value instanceof Uint8Array) return "[binary]";
+  if (value instanceof Uint8Array) return t.binary;
   return truncate(stringify(value));
 }
 
@@ -44,6 +45,7 @@ interface CellArgs {
   value: unknown;
   row: DbRow;
   tz: string;
+  t: Messages;
   formatter?: (v: unknown, row: DbRow) => string;
   fkLabel?: string;
   /** Password-widget field: the value must never reach the HTML (decision 037). */
@@ -65,7 +67,7 @@ function leadingRule({ value, formatter, fkLabel, masked }: CellArgs): Leading |
 }
 
 export function formatCell(args: CellArgs): string {
-  const { field, value, row, tz } = args;
+  const { field, value, row, tz, t } = args;
   const leading = leadingRule(args);
   switch (leading?.rule) {
     case "masked":
@@ -77,7 +79,7 @@ export function formatCell(args: CellArgs): string {
     case "fkLabel":
       return leading.fkLabel;
     case undefined:
-      return formatValue(field, value, tz);
+      return formatValue(field, value, tz, t);
   }
 }
 

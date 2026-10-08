@@ -4,7 +4,7 @@ import { serializeSigned } from "hono/utils/cookie";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { deriveCookieKey } from "../src/auth/session.js";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import type { AdminUser } from "../src/types.js";
 import {
   type Client,
@@ -17,6 +17,8 @@ import {
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
 import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 const sqlite = dialects[0] as (typeof dialects)[number];
 

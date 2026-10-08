@@ -1,7 +1,6 @@
 import { jsx } from "hono/jsx";
 import { safeNext } from "../auth/redirect.js";
 import { clearSession, newSession, writeSession } from "../auth/session.js";
-import { messages } from "../messages.js";
 import { LoginPage } from "../views/login.js";
 import { type AdminContext, cookieOpts, pageChrome, renderPage } from "./context.js";
 
@@ -9,7 +8,7 @@ const asString = (v: unknown): string => (typeof v === "string" ? v : "");
 
 /** `GET|POST ${prefix}/login/` (builtin mode only; the route is not registered otherwise). */
 export async function loginHandler(c: AdminContext): Promise<Response> {
-  const { state, user } = c.var;
+  const { state, user, t } = c.var;
   const { prefix, auth } = state.config;
 
   if (c.req.method !== "POST") {
@@ -24,7 +23,7 @@ export async function loginHandler(c: AdminContext): Promise<Response> {
   const next = asString(body.next);
   // `verifyCredentials` is guaranteed in builtin mode (createAdmin rejects a config without it).
   const verified = await auth.verifyCredentials?.(username, password);
-  if (verified == null) return renderLogin(c, { next, username, error: messages.loginFailed });
+  if (verified == null) return renderLogin(c, { next, username, error: t.loginFailed });
 
   // A fresh session (new CSRF token) on every login, so a pre-login token cannot be reused.
   await writeSession(
@@ -44,7 +43,7 @@ function renderLogin(
   const next = props.next === "" ? "" : safeNext(props.next, prefix);
   return renderPage(c, props.error === undefined ? 200 : 400, (flash) =>
     jsx(LoginPage, {
-      ...pageChrome(c, messages.login, [], flash),
+      ...pageChrome(c, c.var.t.login, [], flash),
       ...props,
       next,
     }),

@@ -1,5 +1,5 @@
 import { parseFieldValue } from "../data/query.js";
-import { messages } from "../messages.js";
+import type { Messages } from "../messages.js";
 import { parseDateOnly, parseDatetimeLocal } from "../time.js";
 import type { FormBody } from "../types.js";
 import type { FormField, FormMode } from "./fields.js";
@@ -27,42 +27,42 @@ function isChecked(raw: string | undefined): boolean {
 
 type Parsed = { value: unknown } | { error: string };
 
-function parseByKind(field: FormField, raw: string, timeZone: string): Parsed {
+function parseByKind(field: FormField, raw: string, timeZone: string, t: Messages): Parsed {
   const { meta } = field;
   switch (meta.kind) {
     case "number": {
       const trimmed = raw.trim();
       // Number("") is 0, so a whitespace-only input must be rejected explicitly.
       const n = trimmed === "" ? Number.NaN : Number(trimmed);
-      if (!Number.isFinite(n)) return { error: messages.invalidNumber };
+      if (!Number.isFinite(n)) return { error: t.invalidNumber };
       if (!meta.isInteger) return { value: n };
       const value = parseFieldValue(meta, trimmed);
-      return value === null ? { error: messages.invalidInteger } : { value };
+      return value === null ? { error: t.invalidInteger } : { value };
     }
     case "bigint": {
       const value = parseFieldValue(meta, raw.trim());
-      return value === null ? { error: messages.invalidInteger } : { value };
+      return value === null ? { error: t.invalidInteger } : { value };
     }
     case "date": {
       // Date-only columns are UTC calendar dates; applying the time zone would shift the stored day.
       const date = meta.isDateOnly
         ? parseDateOnly(raw.trim())
         : parseDatetimeLocal(raw.trim(), timeZone);
-      return date === null ? { error: messages.invalidDate } : { value: date };
+      return date === null ? { error: t.invalidDate } : { value: date };
     }
     case "json":
       try {
         return { value: JSON.parse(raw) };
       } catch {
-        return { error: messages.invalidJson };
+        return { error: t.invalidJson };
       }
     case "enum":
-      return meta.enumValues?.includes(raw) ? { value: raw } : { error: messages.invalidChoice };
+      return meta.enumValues?.includes(raw) ? { value: raw } : { error: t.invalidChoice };
     case "string": {
       if (!meta.isDateOnly) return { value: raw };
       // PG would only reject impossible dates with a generic DB error and accept other formats.
       const v = raw.trim();
-      return parseDateOnly(v) === null ? { error: messages.invalidDate } : { value: v };
+      return parseDateOnly(v) === null ? { error: t.invalidDate } : { value: v };
     }
     default:
       return { value: raw };
@@ -74,6 +74,7 @@ export function coerceForm(
   body: FormBody,
   mode: FormMode,
   timeZone: string,
+  t: Messages,
 ): { data: Record<string, unknown>; errors: Record<string, string> } {
   const data: Record<string, unknown> = {};
   const errors: Record<string, string> = {};
@@ -91,10 +92,10 @@ export function coerceForm(
       // is never pre-filled, so an empty change submission must keep the stored value.
       if (field.widget === "password" && mode === "change") continue;
       if (!meta.notNull) data[key] = null;
-      else if (!(meta.hasDefault && mode === "add")) errors[key] = messages.required;
+      else if (!(meta.hasDefault && mode === "add")) errors[key] = t.required;
       continue;
     }
-    const parsed = parseByKind(field, raw, timeZone);
+    const parsed = parseByKind(field, raw, timeZone, t);
     if ("error" in parsed) errors[key] = parsed.error;
     else data[key] = parsed.value;
   }

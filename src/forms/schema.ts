@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { messages } from "../messages.js";
+import type { Messages } from "../messages.js";
 import type { FormField, FormMode } from "./fields.js";
 
 function baseType(field: FormField): z.ZodType {
@@ -38,10 +38,11 @@ export function buildZodSchema(fields: FormField[], mode: FormMode): z.ZodObject
   return z.object(shape);
 }
 
-/** Parses `data`; failures map to `messages.invalidValue`, first issue per field. */
+/** Parses `data`; failures map to `t.invalidValue`, first issue per field. */
 export function parseWithSchema(
   schema: z.ZodObject<z.ZodRawShape>,
   data: Record<string, unknown>,
+  t: Messages,
 ): { ok: true; data: Record<string, unknown> } | { ok: false; errors: Record<string, string> } {
   const result = schema.safeParse(data);
   if (result.success) return { ok: true, data: result.data };
@@ -49,7 +50,7 @@ export function parseWithSchema(
   for (const issue of result.error.issues) {
     const key = issue.path[0];
     // zod's own messages are never shown.
-    if (typeof key === "string" && !(key in errors)) errors[key] = messages.invalidValue;
+    if (typeof key === "string" && !(key in errors)) errors[key] = t.invalidValue;
   }
   return { ok: false, errors };
 }

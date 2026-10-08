@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import type { FieldMeta } from "../src/introspect/index.js";
+import { MESSAGES } from "../src/messages.js";
 import { cellBoolean, formatCell, formatValue, TRUNCATE_AT } from "../src/views/format.js";
 
 const TOKYO = "Asia/Tokyo";
@@ -23,7 +24,7 @@ function field(overrides: Partial<FieldMeta> = {}): FieldMeta {
 }
 
 const cell = (args: Partial<Parameters<typeof formatCell>[0]> & { value: unknown }) =>
-  formatCell({ field: field(), row: {}, tz: TOKYO, ...args });
+  formatCell({ field: field(), row: {}, tz: TOKYO, t: MESSAGES.en, ...args });
 
 describe("formatCell masked", () => {
   it.each([
@@ -95,6 +96,11 @@ describe("formatCell rule order", () => {
     expect(cell({ value: Buffer.from("ab") })).toBe("[binary]");
   });
 
+  it("9: the binary placeholder comes from the given dictionary", () => {
+    expect(cell({ value: new Uint8Array([1, 2]), t: MESSAGES.ja })).toBe(MESSAGES.ja.binary);
+    expect(MESSAGES.ja.binary).toBe("[バイナリ]");
+  });
+
   it("10: a date-only string is shown as stored", () => {
     const f = field({ kind: "string", isDateOnly: true });
     expect(cell({ field: f, value: "2026-10-07" })).toBe("2026-10-07");
@@ -108,7 +114,7 @@ describe("formatCell rule order", () => {
 
 describe("truncation", () => {
   it("cuts a 101-char string to 100 chars plus an ellipsis", () => {
-    const out = formatValue(field(), "a".repeat(TRUNCATE_AT + 1), TOKYO);
+    const out = formatValue(field(), "a".repeat(TRUNCATE_AT + 1), TOKYO, MESSAGES.en);
     expect(out).toBe(`${"a".repeat(TRUNCATE_AT)}…`);
     expect(out).toHaveLength(TRUNCATE_AT + 1);
   });
@@ -117,14 +123,14 @@ describe("truncation", () => {
     const value = { text: "d".repeat(TRUNCATE_AT) };
     const json = JSON.stringify(value);
     expect(json.length).toBeGreaterThan(TRUNCATE_AT);
-    expect(formatValue(field({ kind: "json" }), value, TOKYO)).toBe(
+    expect(formatValue(field({ kind: "json" }), value, TOKYO, MESSAGES.en)).toBe(
       `${json.slice(0, TRUNCATE_AT)}…`,
     );
   });
 
   it("keeps a 100-char string intact", () => {
     const text = "b".repeat(TRUNCATE_AT);
-    expect(formatValue(field(), text, TOKYO)).toBe(text);
+    expect(formatValue(field(), text, TOKYO, MESSAGES.en)).toBe(text);
   });
 
   it("does not truncate formatter output", () => {
@@ -135,16 +141,16 @@ describe("truncation", () => {
 
 describe("formatValue", () => {
   it("applies rules 2 and 4-10", () => {
-    expect(formatValue(field(), null, TOKYO)).toBe("-");
-    expect(formatValue(field(), true, TOKYO)).toBe("✓");
-    expect(formatValue(field({ kind: "json" }), [1], TOKYO)).toBe("[1]");
-    expect(formatValue(field(), 3, TOKYO)).toBe("3");
+    expect(formatValue(field(), null, TOKYO, MESSAGES.en)).toBe("-");
+    expect(formatValue(field(), true, TOKYO, MESSAGES.en)).toBe("✓");
+    expect(formatValue(field({ kind: "json" }), [1], TOKYO, MESSAGES.en)).toBe("[1]");
+    expect(formatValue(field(), 3, TOKYO, MESSAGES.en)).toBe("3");
   });
 });
 
 describe("cellBoolean", () => {
   const bool = (args: Partial<Parameters<typeof formatCell>[0]> & { value: unknown }) =>
-    cellBoolean({ field: field(), row: {}, tz: TOKYO, ...args });
+    cellBoolean({ field: field(), row: {}, tz: TOKYO, t: MESSAGES.en, ...args });
 
   it.each([
     { name: "true", value: true },
@@ -170,7 +176,7 @@ describe("formatter calls", () => {
   it("cellBoolean never calls the formatter", () => {
     const formatter = vi.fn(() => "x");
     expect(
-      cellBoolean({ field: field(), row: {}, tz: TOKYO, value: true, formatter }),
+      cellBoolean({ field: field(), row: {}, tz: TOKYO, t: MESSAGES.en, value: true, formatter }),
     ).toBeUndefined();
     expect(formatter).not.toHaveBeenCalled();
   });

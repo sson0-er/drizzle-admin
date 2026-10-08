@@ -1,4 +1,4 @@
-import { messages } from "../messages.js";
+import type { Messages } from "../messages.js";
 import { SELECT_ALL_SCRIPT } from "../static/select-all.js";
 import { BooleanMark, Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
@@ -43,8 +43,10 @@ function pageWindow(page: number, pages: number): number[] {
   return numbers;
 }
 
-function Paginator(props: Pick<ListPageProps, "page" | "pages" | "total" | "pageHref">) {
-  const { page, pages, total, pageHref } = props;
+function Paginator(
+  props: Pick<ListPageProps, "page" | "pages" | "total" | "pageHref"> & { t: Messages },
+) {
+  const { page, pages, total, pageHref, t } = props;
   return (
     <p class="paginator">
       {page > 1 && pages >= 1 ? (
@@ -64,13 +66,14 @@ function Paginator(props: Pick<ListPageProps, "page" | "pages" | "total" | "page
           ›
         </a>
       ) : null}
-      <span class="result-count">{messages.resultCount(total)}</span>
+      <span class="result-count">{t.resultCount(total)}</span>
     </p>
   );
 }
 
 export function ListPage(props: PageChrome & ListPageProps) {
-  const { prefix, csrfToken, model, columns, rows, q, filters, actions, canAdd, backQuery } = props;
+  const { t, prefix, csrfToken, model, columns, rows, q, filters, actions, canAdd, backQuery } =
+    props;
   const listUrl = `${prefix}/${model.slug}/`;
   return (
     <Layout {...props}>
@@ -80,7 +83,7 @@ export function ListPage(props: PageChrome & ListPageProps) {
           <li>
             <a class="addlink" href={`${listUrl}add/`}>
               <Icon name="plus" />
-              {messages.add}
+              {t.add}
             </a>
           </li>
         </ul>
@@ -89,15 +92,10 @@ export function ListPage(props: PageChrome & ListPageProps) {
         <div class="changelist-form-container">
           {q === null ? null : (
             <form id="changelist-search" method="get" action={listUrl}>
-              <input
-                type="text"
-                name="q"
-                value={q ?? ""}
-                placeholder={messages.searchPlaceholder}
-              />
+              <input type="text" name="q" value={q ?? ""} placeholder={t.searchPlaceholder} />
               <button type="submit">
                 <Icon name="search" />
-                {messages.search}
+                {t.search}
               </button>
             </form>
           )}
@@ -106,13 +104,13 @@ export function ListPage(props: PageChrome & ListPageProps) {
             {actions.length > 0 ? (
               <div class="actions">
                 <select name="action">
-                  <option value="">{messages.action}</option>
+                  <option value="">{t.action}</option>
                   {actions.map((a) => (
                     <option value={a.name}>{a.label}</option>
                   ))}
                 </select>
                 <button type="submit" name="index" value="0">
-                  {messages.run}
+                  {t.run}
                 </button>
               </div>
             ) : null}
@@ -121,12 +119,7 @@ export function ListPage(props: PageChrome & ListPageProps) {
                 <thead>
                   <tr>
                     <th class="action-checkbox-column">
-                      <input
-                        type="checkbox"
-                        id="action-toggle"
-                        aria-label={messages.selectAll}
-                        hidden
-                      />
+                      <input type="checkbox" id="action-toggle" aria-label={t.selectAll} hidden />
                     </th>
                     {columns.map((c) => (
                       <th data-key={c.key} data-sort={c.sort}>
@@ -149,7 +142,11 @@ export function ListPage(props: PageChrome & ListPageProps) {
                       </td>
                       {row.cells.map((cell) => {
                         const content =
-                          cell.bool === undefined ? cell.text : <BooleanMark value={cell.bool} />;
+                          cell.bool === undefined ? (
+                            cell.text
+                          ) : (
+                            <BooleanMark value={cell.bool} t={t} />
+                          );
                         return (
                           <td>
                             {cell.href === undefined ? content : <a href={cell.href}>{content}</a>}
@@ -167,11 +164,12 @@ export function ListPage(props: PageChrome & ListPageProps) {
             pages={props.pages}
             total={props.total}
             pageHref={props.pageHref}
+            t={t}
           />
         </div>
         {filters.length > 0 ? (
           <aside id="changelist-filter">
-            <h2>{messages.filter}</h2>
+            <h2>{t.filter}</h2>
             {filters.map((f) => (
               <div data-filter={f.key}>
                 <h3>{f.key}</h3>

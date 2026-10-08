@@ -150,7 +150,7 @@ export interface AdminState {
     db: unknown;
     dialect: Dialect;
     prefix: string;
-    siteTitle: string;
+    siteTitle: string | null;
     secret: string;
     sessionMaxAgeSec: number;
     timeZone: string;

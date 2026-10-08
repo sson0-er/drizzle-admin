@@ -5,7 +5,7 @@ import { addFlash, consumeFlash, type FlashMessage, type FlashOpts } from "../au
 import { canAny } from "../auth/permissions.js";
 import type { CookieOpts, Session } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
-import { messages } from "../messages.js";
+import type { Locale, Messages } from "../messages.js";
 import type { AdminState, AdminUser, FormBody, ResolvedModel } from "../types.js";
 import { ErrorPage } from "../views/error.js";
 import type { PageChrome } from "../views/layout.js";
@@ -21,6 +21,10 @@ export interface AdminVars {
   cookieKeys: { session: ArrayBuffer; flash: ArrayBuffer };
   /** Parsed once by the csrfToken middleware for POST; null otherwise. */
   body: FormBody | null;
+  /** From the `da_lang` cookie; set first of all, so even the minimal error pages have it. */
+  locale: Locale;
+  /** The dictionary of `locale`: every text a handler, view or form function shows comes from here. */
+  t: Messages;
 }
 
 export type AdminEnv = { Variables: AdminVars };
@@ -55,10 +59,12 @@ export function pageChrome(
   trail: PageChrome["breadcrumbs"] = [],
   flash: FlashMessage[] = [],
 ): PageChrome {
-  const { state, session, user } = c.var;
+  const { state, session, user, locale, t } = c.var;
   const { prefix, siteTitle } = state.config;
   return {
-    siteTitle,
+    locale,
+    t,
+    siteTitle: siteTitle ?? t.defaultSiteTitle,
     prefix,
     title,
     user,
@@ -66,7 +72,7 @@ export function pageChrome(
     showLogout: state.config.authMode === "builtin" && user !== null,
     csrfToken: session.csrf,
     flash,
-    breadcrumbs: [{ label: messages.home, href: `${prefix}/` }, ...trail],
+    breadcrumbs: [{ label: t.home, href: `${prefix}/` }, ...trail],
   };
 }
 
@@ -74,17 +80,20 @@ export function pageChrome(
  * Error page that assumes nothing about the middleware chain: the Origin check runs before the
  * session, so an error raised there has no session, user or flash (decision 022).
  */
-function minimalChrome(state: AdminState, title: string): PageChrome {
+function minimalChrome(c: AdminContext, title: string): PageChrome {
+  const { state, locale, t } = c.var;
   const { prefix, siteTitle } = state.config;
   return {
-    siteTitle,
+    locale,
+    t,
+    siteTitle: siteTitle ?? t.defaultSiteTitle,
     prefix,
     title,
     user: null,
     showLogout: false,
     csrfToken: "",
     flash: [],
-    breadcrumbs: [{ label: messages.home, href: `${prefix}/` }],
+    breadcrumbs: [{ label: t.home, href: `${prefix}/` }],
   };
 }
 
@@ -99,7 +108,7 @@ export function errorPage(
   opts?: { minimal?: boolean },
 ): Response {
   const title = String(status);
-  const chrome = opts?.minimal ? minimalChrome(c.var.state, title) : pageChrome(c, title);
+  const chrome = opts?.minimal ? minimalChrome(c, title) : pageChrome(c, title);
   return html(c, status, jsx(ErrorPage, { ...chrome, status, message }));
 }
 
@@ -112,7 +121,7 @@ export function modelOr404(c: AdminContext, slug: string): ResolvedModel | Respo
   const model = c.var.state.models.get(slug);
   // A model the user holds no permission on answers like an unknown slug (decision 043).
   if (model === undefined || !canAny(model, requireUser(c))) {
-    return errorPage(c, 404, messages.notFound);
+    return errorPage(c, 404, c.var.t.notFound);
   }
   return model;
 }

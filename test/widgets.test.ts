@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 import type { FormField } from "../src/forms/fields.js";
 import { DisplayValue, toFormValue, Widget } from "../src/forms/widgets.js";
 import type { FieldMeta } from "../src/introspect/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import type { WidgetType } from "../src/types.js";
 import { FormPage, type FormPageProps } from "../src/views/form.js";
 import type { PageChrome } from "../src/views/layout.js";
 import { attr, type Element, parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 const meta = (over: Partial<FieldMeta> = {}): FieldMeta => ({
   key: "f",
@@ -38,7 +40,7 @@ const field = (
 });
 
 const renderWidget = (f: FormField, value: string, error?: string) =>
-  String(Widget({ field: f, value, error }));
+  String(Widget({ field: f, value, error, t: messages }));
 
 /** Parses a fragment and returns the single form control with name `f`. */
 function control(html: string, tag: string): Element {
@@ -176,6 +178,14 @@ describe("Widget", () => {
     expect(text(doc)).toContain(messages.fkTooMany);
     expect(qs(parse(renderWidget(field("number"), "3")), { tag: "a" })).toBeNull();
   });
+
+  it("takes the fallback texts from the given dictionary", () => {
+    const f = field("number", { kind: "number" }, { fkFallbackHref: "/admin/authors/" });
+    const doc = parse(String(Widget({ field: f, value: "3", t: MESSAGES.ja })));
+    const a = qs(doc, { tag: "a" });
+    expect(a === null ? null : text(a)).toBe(MESSAGES.ja.openRelated);
+    expect(text(doc)).toContain(MESSAGES.ja.fkTooMany);
+  });
 });
 
 describe("toFormValue", () => {
@@ -239,7 +249,7 @@ describe("toFormValue", () => {
 
 describe("DisplayValue", () => {
   const render = (f: FormField, value: unknown) =>
-    text(parse(String(DisplayValue({ field: f, value, timeZone: "Asia/Tokyo" }))));
+    text(parse(String(DisplayValue({ field: f, value, timeZone: "Asia/Tokyo", t: messages }))));
 
   it("renders formatted text", () => {
     expect(render(field("text"), "abc")).toBe("abc");
@@ -276,12 +286,14 @@ describe("DisplayValue", () => {
       expected: '{"a":1}',
     },
   ])("shows a $name the same in $zone", ({ zone, field: f, value, expected }) => {
-    expect(text(parse(String(DisplayValue({ field: f, value, timeZone: zone }))))).toBe(expected);
+    expect(
+      text(parse(String(DisplayValue({ field: f, value, timeZone: zone, t: messages })))),
+    ).toBe(expected);
   });
 
   it("masks a password-widget field", () => {
     const html = String(
-      DisplayValue({ field: field("password"), value: "stored", timeZone: "UTC" }),
+      DisplayValue({ field: field("password"), value: "stored", timeZone: "UTC", t: messages }),
     );
     expect(text(parse(html))).toBe("********");
     expect(html).not.toContain("stored");
@@ -289,7 +301,7 @@ describe("DisplayValue", () => {
 
   const boolean = field("checkbox", { kind: "boolean" });
   const html = (f: FormField, value: unknown) =>
-    parse(String(DisplayValue({ field: f, value, timeZone: "UTC" })));
+    parse(String(DisplayValue({ field: f, value, timeZone: "UTC", t: messages })));
 
   it.each([
     { value: true, icon: "check", message: messages.yes },
@@ -317,13 +329,22 @@ describe("DisplayValue", () => {
   });
 
   it("escapes markup", () => {
-    const html = String(DisplayValue({ field: field("text"), value: "<b>x</b>", timeZone: "UTC" }));
+    const html = String(
+      DisplayValue({
+        field: field("text"),
+        value: "<b>x</b>",
+        timeZone: "UTC",
+        t: messages,
+      }),
+    );
     expect(html).not.toContain("<b>");
   });
 });
 
 describe("FormPage", () => {
   const chrome: PageChrome = {
+    locale: "en",
+    t: messages,
     siteTitle: "Site",
     prefix: "/admin",
     title: "Add author",

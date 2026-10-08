@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { coerceForm, type FormBody, rawValues } from "../src/forms/coerce.js";
 import type { FormField, FormMode } from "../src/forms/fields.js";
 import type { FieldMeta } from "../src/introspect/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
+
+const messages = MESSAGES.en;
 
 const TOKYO = "Asia/Tokyo";
 
@@ -38,7 +40,7 @@ function run(
   tz = TOKYO,
 ) {
   const body: FormBody = value === undefined ? {} : { [f.key]: value };
-  return coerceForm([f], body, mode, tz);
+  return coerceForm([f], body, mode, tz, messages);
 }
 
 describe("coerceForm: boolean", () => {
@@ -281,10 +283,18 @@ describe("coerceForm: date-only", () => {
   });
 });
 
+describe("coerceForm: dictionary", () => {
+  it("takes the error text from the given dictionary", () => {
+    expect(coerceForm([field("n")], { n: "" }, "add", TOKYO, MESSAGES.ja).errors).toEqual({
+      n: MESSAGES.ja.required,
+    });
+  });
+});
+
 describe("coerceForm: body handling", () => {
   it("ignores body keys that are not editable fields", () => {
     const f = field("name");
-    const { data } = coerceForm([f], { name: "x", id: "1", unknown: "y" }, "add", TOKYO);
+    const { data } = coerceForm([f], { name: "x", id: "1", unknown: "y" }, "add", TOKYO, messages);
     expect(data).toEqual({ name: "x" });
     expect("id" in data).toBe(false);
     expect("unknown" in data).toBe(false);
@@ -292,7 +302,10 @@ describe("coerceForm: body handling", () => {
 
   it("does not read a non-editable field", () => {
     const f = { ...field("name"), editable: false };
-    expect(coerceForm([f], { name: "x" }, "change", TOKYO)).toEqual({ data: {}, errors: {} });
+    expect(coerceForm([f], { name: "x" }, "change", TOKYO, messages)).toEqual({
+      data: {},
+      errors: {},
+    });
   });
 
   it("uses the last value of a multi-valued key", () => {

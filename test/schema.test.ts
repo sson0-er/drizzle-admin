@@ -4,8 +4,10 @@ import type { FormField, FormMode } from "../src/forms/fields.js";
 import { buildZodSchema, parseWithSchema } from "../src/forms/schema.js";
 import { validateSubmission } from "../src/forms/validate.js";
 import type { FieldMeta } from "../src/introspect/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import type { ResolvedModel } from "../src/types.js";
+
+const messages = MESSAGES.en;
 
 function field(key: string, meta: Partial<FieldMeta> = {}): FormField {
   const full: FieldMeta = {
@@ -26,7 +28,7 @@ function field(key: string, meta: Partial<FieldMeta> = {}): FormField {
 }
 
 function check(fields: FormField[], data: Record<string, unknown>, mode: FormMode = "add") {
-  return parseWithSchema(buildZodSchema(fields, mode), data);
+  return parseWithSchema(buildZodSchema(fields, mode), data, messages);
 }
 
 describe("buildZodSchema", () => {
@@ -35,6 +37,13 @@ describe("buildZodSchema", () => {
     expect(check([field("a")], { a: null })).toEqual({
       ok: false,
       errors: { a: messages.invalidValue },
+    });
+  });
+
+  it("takes the error text from the given dictionary", () => {
+    expect(parseWithSchema(buildZodSchema([field("a")], "add"), { a: null }, MESSAGES.ja)).toEqual({
+      ok: false,
+      errors: { a: MESSAGES.ja.invalidValue },
     });
   });
 
@@ -93,7 +102,14 @@ async function submit(
   validate?: ResolvedModel["validate"],
   mode: FormMode = "add",
 ) {
-  return validateSubmission({ model: model(validate), fields, body, mode, timeZone: "Asia/Tokyo" });
+  return validateSubmission({
+    model: model(validate),
+    fields,
+    body,
+    mode,
+    timeZone: "Asia/Tokyo",
+    t: messages,
+  });
 }
 
 describe("validateSubmission", () => {

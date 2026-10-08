@@ -1,7 +1,7 @@
 ---
 id: 49-i18n-dictionaries-and-request-locale
 depends_on: [48-example-host-guard-and-docs]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 49: i18n-dictionaries-and-request-locale
@@ -117,3 +117,11 @@ Follow the conventions in CLAUDE.md (one case per `it.each` row, exact assertion
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Implemented per the design: `en` / `ja` dictionaries behind `MESSAGES` (src/messages.ts), `readLocale` (src/auth/locale.ts), `initVars` sets `c.var.locale` / `c.var.t`, every route, form function and view takes `t`, `<html lang>` follows the locale, `AdminState.config.siteTitle` is `string | null` (chrome uses `siteTitle ?? t.defaultSiteTitle`). `minimalChrome` now takes `c` and reads `c.var.locale` / `c.var.t`. `DATE_PRESETS` (list.ts) and `DB_MESSAGES` (form.ts) hold message keys looked up in `t`.
+- Fails-first: the new and changed tests were run against the old `src/` (`git stash push -- src`, then popped). All eight files (messages, locale, i18n, views, format, coerce, schema, widgets tests) failed at once, because they import the missing `MESSAGES` / `readLocale` or call the changed signatures, so single cases such as the "Default" and `da_lang=fr` integration rows could not be observed failing separately on the old code (41 failed tests in 8 failed files; several files failed at import). The `da_lang=ja` rows guard against texts frozen in English at module level; they are expected to pass on the old Japanese UI and could not be run separately.
+- `ja` key check: removing `binary` from `ja` made `pnpm typecheck` fail with `src/messages.ts(80,7): error TS2741: Property 'binary' is missing in type ...`; reverted afterwards.
+- Additions not in the design: `Client.setCookie(name, value)` in test/helpers/app.ts (puts a value into the cookie jar so tests can choose a locale before task 50). No other new export or prop beyond the design list.
+- Test diff notes: test/config.test.ts no longer uses `messages` after edits 6 and 7, so its `MESSAGES` import and the `const messages = MESSAGES.en;` line were dropped (an unused import would fail lint). test/messages.test.ts is restructured (edit 8). The `BooleanMark` ja case is in test/views.test.ts.
+- Review round 1: high 0, medium 0, low 3 (spec: coerce.ts local named trimmed not s; readLocale row count 8 cases + LOCALE_COOKIE check; tests: redundant typeof check in messages.test.ts). Removal of the unused MESSAGES import in test/config.test.ts accepted by spec review. Done.

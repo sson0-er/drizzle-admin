@@ -12,7 +12,6 @@ import {
 } from "../forms/fields.js";
 import { validateSubmission } from "../forms/validate.js";
 import { toFormValue } from "../forms/widgets.js";
-import { messages } from "../messages.js";
 import type { HookCtx, ResolvedModel } from "../types.js";
 import { FormPage } from "../views/form.js";
 import {
@@ -31,11 +30,12 @@ const FK_CHOICE_LIMIT = 200;
 
 const enc = (pk: unknown): string => encodeURIComponent(String(pk));
 
+// Message keys, looked up in the request's dictionary.
 const DB_MESSAGES = {
-  unique: messages.dbUnique,
-  foreignKey: messages.dbForeignKey,
-  notNull: messages.dbNotNull,
-  other: messages.dbOther,
+  unique: "dbUnique",
+  foreignKey: "dbForeignKey",
+  notNull: "dbNotNull",
+  other: "dbOther",
 } as const;
 
 /** What a failed submission puts back on the form. */
@@ -136,7 +136,7 @@ async function save(
   groups: FormGroup[],
   pk: string | null,
 ): Promise<{ row: DbRow | null; afterSaveFailed: boolean } | FormErrors> {
-  const { repo, state } = c.var;
+  const { repo, state, t } = c.var;
   const fields = editableFields(groups);
   const body = c.var.body ?? {};
   const validated = await validateSubmission({
@@ -145,6 +145,7 @@ async function save(
     body,
     mode,
     timeZone: state.config.timeZone,
+    t,
   });
   if (!validated.ok) return validated;
 
@@ -161,7 +162,7 @@ async function save(
       data = await model.hooks.beforeSave(data, ctx);
     } catch {
       // The message is never shown (decision 013 item 10).
-      return failure(messages.hookFailed);
+      return failure(t.hookFailed);
     }
   }
 
@@ -172,7 +173,7 @@ async function save(
   } catch (err) {
     // Anything that is not a database error is a bug and goes to onError.
     if (!isDbError(err)) throw err;
-    return failure(DB_MESSAGES[classifyDbError(err)]);
+    return failure(t[DB_MESSAGES[classifyDbError(err)]]);
   }
   if (row === null) return { row, afterSaveFailed: false };
 
@@ -197,8 +198,9 @@ function redirectAfterSave(
 ): Promise<Response> {
   const base = `${c.var.state.config.prefix}/${model.slug}/`;
   const body = c.var.body ?? {};
+  const { t } = c.var;
   const label = model.toString(row);
-  const success = mode === "add" ? messages.added(label) : messages.changed(label);
+  const success = mode === "add" ? t.added(label) : t.changed(label);
   const changeUrl = `${base}${enc(row[model.meta.pk.key])}/change/`;
   let location = base;
   if (mode === "add") {
@@ -211,7 +213,7 @@ function redirectAfterSave(
   }
   return redirectWithFlash(c, location, [
     { level: "success", text: success },
-    ...(afterSaveFailed ? [{ level: "warning" as const, text: messages.afterSaveFailed }] : []),
+    ...(afterSaveFailed ? [{ level: "warning" as const, text: t.afterSaveFailed }] : []),
   ]);
 }
 
@@ -221,10 +223,11 @@ export async function addHandler(c: AdminContext): Promise<Response> {
   if (found instanceof Response) return found;
   const model = found;
   const user = requireUser(c);
-  if (!can(model, "add", user)) return errorPage(c, 403, messages.forbidden);
+  const { t } = c.var;
+  if (!can(model, "add", user)) return errorPage(c, 403, t.forbidden);
 
   const groups = await loadGroups(c, model, "add", true);
-  const title = `${messages.add}: ${model.label}`;
+  const title = `${t.add}: ${model.label}`;
   const page = { model, mode: "add", groups, title, canSave: true } as const;
 
   if (c.req.method !== "POST") return renderForm(c, { ...page, status: 200, values: {} });
@@ -241,17 +244,18 @@ export async function changeHandler(c: AdminContext): Promise<Response> {
   if (found instanceof Response) return found;
   const model = found;
   const user = requireUser(c);
+  const { t } = c.var;
   const isPost = c.req.method === "POST";
-  if (!can(model, isPost ? "change" : "view", user)) return errorPage(c, 403, messages.forbidden);
+  if (!can(model, isPost ? "change" : "view", user)) return errorPage(c, 403, t.forbidden);
 
   const pk = c.req.param("pk") ?? "";
   const row = await c.var.repo.get(model.meta, pk);
-  if (row === null) return errorPage(c, 404, messages.notFound);
+  if (row === null) return errorPage(c, 404, t.notFound);
 
   const { prefix, timeZone } = c.var.state.config;
   const canChange = can(model, "change", user);
   const groups = await loadGroups(c, model, "change", canChange);
-  const title = `${messages.change}: ${model.toString(row)}`;
+  const title = `${t.change}: ${model.toString(row)}`;
   const page = {
     model,
     mode: "change",
@@ -274,6 +278,6 @@ export async function changeHandler(c: AdminContext): Promise<Response> {
 
   const result = await save(c, model, "change", groups, pk);
   if (isFailure(result)) return renderForm(c, { ...page, status: 400, ...result });
-  if (result.row === null) return errorPage(c, 404, messages.notFound);
+  if (result.row === null) return errorPage(c, 404, t.notFound);
   return redirectAfterSave(c, model, "change", result.row, result.afterSaveFailed);
 }

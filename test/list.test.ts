@@ -1,7 +1,7 @@
 import { sql, type Table } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
-import { messages } from "../src/messages.js";
+import { MESSAGES } from "../src/messages.js";
 import { calendarPresetRange, toDateOnly } from "../src/time.js";
 import {
   createClient,
@@ -13,6 +13,8 @@ import {
 } from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
 import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+
+const messages = MESSAGES.en;
 
 afterEach(() => {
   vi.restoreAllMocks();

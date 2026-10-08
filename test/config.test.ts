@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { createAdmin, resolveConfig } from "../src/admin.js";
-import { messages } from "../src/messages.js";
 import type { AdminConfig } from "../src/types.js";
 
 const base: AdminConfig = {
@@ -112,8 +111,8 @@ describe("createAdmin", () => {
   });
 
   describe("siteTitle", () => {
-    it("defaults to messages.defaultSiteTitle and keeps a given title", () => {
-      expect(resolved().siteTitle).toBe(messages.defaultSiteTitle);
+    it("is null when absent and keeps a given title", () => {
+      expect(resolved().siteTitle).toBeNull();
       expect(resolved({ siteTitle: "My Admin" }).siteTitle).toBe("My Admin");
     });
   });
@@ -154,7 +153,7 @@ describe("createAdmin", () => {
       db,
       dialect: "sqlite",
       prefix: "/x",
-      siteTitle: messages.defaultSiteTitle,
+      siteTitle: null,
       secret: base.secret,
       sessionMaxAgeSec: 28800,
       timeZone: new Intl.DateTimeFormat().resolvedOptions().timeZone,
