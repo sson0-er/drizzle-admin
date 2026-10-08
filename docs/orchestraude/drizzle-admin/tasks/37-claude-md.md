@@ -1,7 +1,7 @@
 ---
 id: 37-claude-md
 depends_on: [27-fk-ordering-and-example, 28-fk-reference-view-permission, 29-vanished-rows-warnings, 30-cookie-deletion-and-head-guard, 31-password-keep-on-empty, 32-password-no-echo, 33-security-test-fixes, 34-test-gaps-data-time, 35-test-gaps-forms-views-auth, 36-readme-and-hardening]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 37: claude-md
@@ -81,3 +81,7 @@ The existing "Conventions" section stays word for word.
 - Decisions: docs/orchestraude/decisions/033-low-findings-recorded-behaviors.md (item 11), docs/orchestraude/decisions/034-fk-reference-view-permission.md, docs/orchestraude/decisions/037-password-widget-no-echo.md
 
 ## History
+- Rewrote CLAUDE.md (55 lines); the `## Conventions` section is unchanged. Only the intro sentence above it was reworded.
+- Paths checked: docs/orchestraude/drizzle-admin/03-design/, docs/orchestraude/decisions/, docs/orchestraude/evidence/, docs/orchestraude/review-policy.md, docs/orchestraude/drizzle-admin/tasks/, scripts/verify.sh, mise.toml, example/server.ts, src/{introspect,data,forms,auth,routes,views,static}/, src/{messages,time,types,admin,index}.ts, test/helpers/, test/fixtures/, example/, dist (build output).
+- Security rule note: `Location` is path-only except the configured `auth.loginUrl` redirect (`externalLoginUrl` in src/routes/middleware.ts); CLAUDE.md says so.
+- No exports or props added.
