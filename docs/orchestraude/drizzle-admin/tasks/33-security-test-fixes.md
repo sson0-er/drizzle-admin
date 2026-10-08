@@ -1,7 +1,7 @@
 ---
 id: 33-security-test-fixes
 depends_on: [28-fk-reference-view-permission, 30-cookie-deletion-and-head-guard]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 33: security-test-fixes
@@ -59,3 +59,12 @@ Covers L044, L089, L096, L053, L086, L092, L091. Test-only task.
 - Findings: docs/orchestraude/drizzle-admin/05-low-findings.md (L044, L053, L086, L089, L091, L092, L096 details)
 
 ## History
+
+- Implemented (test-only; src, helpers and fixtures untouched).
+- 403 matrix: every case now creates its own author without articles (`deletable-<n>`) and the add/change forms use unique names (`added-<id>`, `changed-<id>`). The allowed change-POST therefore no longer writes `authorForm` to author 1. Each case asserts the stored row is unchanged after the denied request, and the control asserts the exact status (200 for GET pages and `delete_selected` without `_confirm`, 303 for add/change/delete POSTs).
+- "leaves the data alone when delete is refused": two fresh authors, denied delete page POST and denied `delete_selected` with `_confirm=1` (both 403), both rows asserted by DB query.
+- XSS: `it.each` over `<script>alert(1)</script>` and `"><script>alert(1)</script>`; no `script` in `form#model-form`, field value equals the payload (input `value` attribute or textarea text, as before, since pglite renders text as a textarea).
+- Guard lists: added the requested paths. `%7f` behaves like the other control-free paths: 404 with `text/html` and an `h1`, no `Location`. Only `%0a`/`%0d` stay in the status-and-Location-only `plain` lists.
+- 301 cases: skipped `/users?a=1` with basePath `/` (already asserted by "still redirects an ordinary unslashed path with basePath /"); added `/authors?x=1`, `/admin/users?a=1`, `/admin?a=1`.
+- L091: both external-auth cases in "app shell pages" use `fixture`.
+- No exports or props added. verify.sh passes.

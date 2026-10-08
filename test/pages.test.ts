@@ -27,7 +27,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
 
   it("serves the dashboard with a session cookie", async () => {
     // External auth lets a cookie-less request through, so the response issues the session.
-    const ext = await makeAdmin(dialects[0] as (typeof dialects)[number], {
+    const ext = await makeAdmin(fixture, {
       config: { auth: { getUser: async () => ({ id: "ext", name: "external-user" }) } },
     });
     const res = await ext.client.get("/admin/");
@@ -109,7 +109,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
 
   it("rejects a POST without a session cookie even when a token is sent", async () => {
     // External auth again: in builtin mode a cookie-less POST is sent to login before the token check.
-    const ext = await makeAdmin(dialects[0] as (typeof dialects)[number], {
+    const ext = await makeAdmin(fixture, {
       config: { auth: { getUser: async () => ({ id: "ext", name: "external-user" }) } },
     });
     const res = await ext.client.post("/admin/nope/", { _csrf: "anything" }, { withToken: false });
@@ -135,9 +135,11 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
 describe("trailing-slash redirect guard", () => {
   const sqlite = dialects[0] as (typeof dialects)[number];
 
+  // `plain` paths carry a control character that Hono rejects before the layout 404 can render.
   describe.each([
     {
       basePath: "/",
+      plain: ["/%0a/evil.example", "/%0d/evil.example"],
       paths: [
         "//evil.example",
         "///evil.example",
@@ -145,22 +147,26 @@ describe("trailing-slash redirect guard", () => {
         "/%09/evil.example",
         "/%09%09/evil.example",
         "/%5C%09evil.example",
-        "/%0a/evil.example",
-        "/%0d/evil.example",
+        "/%20/evil.example",
+        "/%7f/evil.example",
+        "/a%20b",
       ],
     },
     {
       basePath: "/admin",
+      plain: ["/admin/%0a/evil.example", "/admin/%0d/evil.example"],
       paths: [
         "/admin//evil.example",
+        "/admin///evil.example",
         "/admin/%5Cevil.example",
         "/admin/%09/evil.example",
-        "/admin/%0a/evil.example",
-        "/admin/%0d/evil.example",
+        "/admin/%20/evil.example",
+        "/admin/%7f/evil.example",
+        "/admin/a%20b",
       ],
     },
-  ])("basePath $basePath", ({ basePath, paths }) => {
-    it.each(paths)("never redirects %s", async (path) => {
+  ])("basePath $basePath", ({ basePath, plain, paths }) => {
+    it.each(plain)("never redirects %s", async (path) => {
       const t = await makeAdmin(sqlite, { config: { basePath } });
       try {
         const res = await t.client.get(path);
@@ -170,6 +176,35 @@ describe("trailing-slash redirect guard", () => {
         await t.close();
       }
     });
+
+    it.each(paths)("never redirects %s and answers with the layout 404", async (path) => {
+      const t = await makeAdmin(sqlite, { config: { basePath } });
+      try {
+        const res = await t.client.get(path);
+        expect(res.status).toBe(404);
+        expect(res.headers.get("Location")).toBeNull();
+        expect(res.headers.get("Content-Type")).toContain("text/html");
+        expect(qs(parse(await res.text()), { tag: "h1" })).not.toBeNull();
+      } finally {
+        await t.close();
+      }
+    });
+  });
+
+  // `/users?a=1` with basePath "/" is already asserted by "still redirects an ordinary unslashed path".
+  it.each([
+    { basePath: "/", path: "/authors?x=1", to: "/authors/?x=1" },
+    { basePath: "/admin", path: "/admin/users?a=1", to: "/admin/users/?a=1" },
+    { basePath: "/admin", path: "/admin?a=1", to: "/admin/?a=1" },
+  ])("redirects $path to $to with basePath $basePath", async ({ basePath, path, to }) => {
+    const t = await makeAdmin(sqlite, { config: { basePath } });
+    try {
+      const res = await t.client.get(path);
+      expect(res.status).toBe(301);
+      expect(res.headers.get("Location")).toBe(to);
+    } finally {
+      await t.close();
+    }
   });
 
   it("serves the dashboard at / with basePath /", async () => {

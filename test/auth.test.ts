@@ -1,4 +1,4 @@
-import type { Table } from "drizzle-orm";
+import { eq, getTableColumns, type Table } from "drizzle-orm";
 import { serializeSigned } from "hono/utils/cookie";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
@@ -441,6 +441,29 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
   }
   const without = (perm: Perm): Permissions => ({ [perm]: false });
 
+  type Rec = Record<string, unknown>;
+  const raw = () =>
+    t.db as {
+      insert(table: Table): { values(row: Rec): { returning(): PromiseLike<Rec[]> } };
+      select(): { from(table: Table): { where(condition: unknown): PromiseLike<Rec[]> } };
+    };
+  const authors = (): Table => t.schema.authors as Table;
+  let inserted = 0;
+  /** A new author without articles, so only the permission gate (not an FK) can protect it. */
+  async function addAuthor(): Promise<string> {
+    inserted += 1;
+    const [row] = await raw()
+      .insert(authors())
+      .values({ name: `deletable-${inserted}`, email: `deletable-${inserted}@example.com` })
+      .returning();
+    return String((row as Rec).id);
+  }
+  const rowsOf = (id: string) =>
+    raw()
+      .select()
+      .from(authors())
+      .where(eq(getTableColumns(authors()).id as never, Number(id)));
+
   beforeAll(async () => {
     t = await makeAdmin(fixture, { login: false });
   });
@@ -449,43 +472,75 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
   });
 
   describe("403 for each missing permission", () => {
+    // Every case runs against its own author, so a control that mutates or deletes touches no
+    // row another test reads. `ok` is the status of the control request with every permission.
     const cases: {
       perm: Perm;
       method: "GET" | "POST";
-      path: string;
-      form?: Record<string, string>;
+      path: (id: string) => string;
+      form?: (id: string) => Record<string, string>;
+      ok: number;
     }[] = [
-      { perm: "view", method: "GET", path: "/admin/authors/" },
-      { perm: "view", method: "GET", path: "/admin/authors/1/change/" },
-      { perm: "add", method: "GET", path: "/admin/authors/add/" },
-      { perm: "add", method: "POST", path: "/admin/authors/add/", form: authorForm },
-      { perm: "change", method: "POST", path: "/admin/authors/1/change/", form: authorForm },
-      { perm: "delete", method: "GET", path: "/admin/authors/1/delete/" },
-      { perm: "delete", method: "POST", path: "/admin/authors/1/delete/" },
+      { perm: "view", method: "GET", path: () => "/admin/authors/", ok: 200 },
+      { perm: "view", method: "GET", path: (id) => `/admin/authors/${id}/change/`, ok: 200 },
+      { perm: "add", method: "GET", path: () => "/admin/authors/add/", ok: 200 },
+      {
+        perm: "add",
+        method: "POST",
+        path: () => "/admin/authors/add/",
+        form: (id) => ({ ...authorForm, name: `added-${id}` }),
+        ok: 303,
+      },
+      {
+        perm: "change",
+        method: "POST",
+        path: (id) => `/admin/authors/${id}/change/`,
+        form: (id) => ({ ...authorForm, name: `changed-${id}` }),
+        ok: 303,
+      },
+      { perm: "delete", method: "GET", path: (id) => `/admin/authors/${id}/delete/`, ok: 200 },
+      { perm: "delete", method: "POST", path: (id) => `/admin/authors/${id}/delete/`, ok: 303 },
       {
         perm: "delete",
         method: "POST",
-        path: "/admin/authors/",
-        form: { action: "delete_selected", _selected: "1" },
+        path: () => "/admin/authors/",
+        form: (id) => ({ action: "delete_selected", _selected: id }),
+        // Without `_confirm` the action only renders the confirmation page.
+        ok: 200,
       },
     ];
 
-    it.each(cases)("$perm false: $method $path -> 403", async ({ perm, method, path, form }) => {
-      const denied = await clientWith(without(perm));
-      const res = method === "GET" ? await denied.get(path) : await denied.post(path, form);
-      expect(res.status).toBe(403);
+    it.each(cases)(
+      "$perm false: $method $path -> 403, allowed -> $ok",
+      async ({ perm, method, path, form, ok }) => {
+        const id = await addAuthor();
+        const send = (client: Client) =>
+          method === "GET" ? client.get(path(id)) : client.post(path(id), form?.(id));
 
-      // Control: with every permission the same request is not refused, so the 403 is the gate.
-      const allowed = await clientWith({});
-      const ok = method === "GET" ? await allowed.get(path) : await allowed.post(path, form);
-      expect(ok.status).not.toBe(403);
-    });
+        const before = await rowsOf(id);
+        const denied = await send(await clientWith(without(perm)));
+        expect(denied.status).toBe(403);
+        expect(await rowsOf(id)).toEqual(before);
+
+        // Control: with every permission the same request succeeds, so the 403 is the gate.
+        const allowed = await send(await clientWith({}));
+        expect(allowed.status).toBe(ok);
+      },
+    );
 
     it("leaves the data alone when delete is refused", async () => {
+      const viaDeletePage = await addAuthor();
+      const viaAction = await addAuthor();
       const denied = await clientWith(without("delete"));
-      await denied.post("/admin/authors/1/delete/");
-      await denied.post("/admin/authors/", { action: "delete_selected", _selected: "1" });
-      expect((await (await clientWith({})).get("/admin/authors/1/change/")).status).toBe(200);
+      expect((await denied.post(`/admin/authors/${viaDeletePage}/delete/`)).status).toBe(403);
+      const res = await denied.post("/admin/authors/", {
+        action: "delete_selected",
+        _selected: viaAction,
+        _confirm: "1",
+      });
+      expect(res.status).toBe(403);
+      expect(await rowsOf(viaDeletePage)).toHaveLength(1);
+      expect(await rowsOf(viaAction)).toHaveLength(1);
     });
   });
 
@@ -585,8 +640,10 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
 
 describe.each(dialects)("XSS escaping ($name)", (fixture) => {
   const SCRIPT = "<script>alert(1)</script>";
+  // The second payload also tries to close the `value` attribute and the input tag.
+  const BREAKOUT = `">${SCRIPT}`;
   let t: TestAdmin;
-  let id: string;
+  const ids = new Map<string, string>();
 
   beforeAll(async () => {
     t = await makeAdmin(fixture, {
@@ -599,13 +656,16 @@ describe.each(dialects)("XSS escaping ($name)", (fixture) => {
     });
     const db = t.db as {
       insert(table: Table): {
-        values(v: object): PromiseLike<unknown>;
+        values(v: object): { returning(): PromiseLike<{ id: unknown }[]> };
       };
     };
-    await db.insert(t.schema.authors).values({ name: SCRIPT, email: "x@example.com" });
-    const list = await docOf(await t.client.get("/admin/authors/?q=script"));
-    const link = qsa(list, { tag: "a" }).find((a) => (attr(a, "href") ?? "").includes("/change/"));
-    id = (attr(link as NonNullable<typeof link>, "href") ?? "").split("/").at(-3) ?? "";
+    for (const [i, name] of [SCRIPT, BREAKOUT].entries()) {
+      const [row] = await db
+        .insert(t.schema.authors)
+        .values({ name, email: `x${i}@example.com` })
+        .returning();
+      ids.set(name, String((row as { id: unknown }).id));
+    }
   });
   afterAll(async () => {
     await t.close();
@@ -626,20 +686,25 @@ describe.each(dialects)("XSS escaping ($name)", (fixture) => {
     expect(text(doc)).toContain("<b>x</b>");
   });
 
-  it("renders the change page with the name as a field value, not as markup", async () => {
-    expect(id).not.toBe("");
-    const res = await t.client.get(`/admin/authors/${id}/change/`);
+  it.each([
+    ["a script payload", SCRIPT],
+    ["an attribute breakout", BREAKOUT],
+  ])("renders the change page with %s as a field value, not as markup", async (_label, payload) => {
+    const res = await t.client.get(`/admin/authors/${ids.get(payload)}/change/`);
     expect(res.status).toBe(200);
     const html = await res.text();
     expect(html).not.toContain(SCRIPT);
     const doc = parse(html);
+    const form = qs(doc, { tag: "form", id: "model-form" });
+    expect(form).not.toBeNull();
+    expect(qsa(form as NonNullable<typeof form>, { tag: "script" })).toHaveLength(0);
     expect(qsa(doc, { tag: "script" })).toHaveLength(0);
     // A text column renders as an input or a textarea depending on the dialect.
     const field = qs(doc, { attrs: { id: "id_name" } });
     expect(field).not.toBeNull();
     const value =
       attr(field as NonNullable<typeof field>, "value") ?? text(field as NonNullable<typeof field>);
-    expect(value).toBe(SCRIPT);
+    expect(value).toBe(payload);
   });
 });
 
