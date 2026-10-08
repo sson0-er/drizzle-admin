@@ -11,7 +11,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
-import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, type Element, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 
 type Rec = Record<string, unknown>;
 type RawDb = {
@@ -186,7 +186,8 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const own = await adminOn(t, fixture, { authors: c.options, articles: {} });
       const doc = await docOf(await own.get("/admin/articles/add/"));
       const select = qs(rowOf(doc, "authorId"), { tag: "select" });
-      const values = qsa(select ?? doc, { tag: "option" }).map((o) => attr(o, "value"));
+      expect(select).not.toBeNull();
+      const values = qsa(select as Element, { tag: "option" }).map((o) => attr(o, "value"));
       expect(values).toEqual(c.ids);
     });
 

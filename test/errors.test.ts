@@ -117,6 +117,12 @@ describe("data/errors (synthetic)", () => {
       { name: "DbError", code: `${"a1_.-".repeat(12)}Z9_.` },
       `other DbError ${"a1_.-".repeat(12)}Z9_.`,
     ],
+    [
+      "a 64-character name of the safe charset",
+      { name: `${"a1_.-".repeat(12)}Z9_.`, code: "23505" },
+      `unique ${"a1_.-".repeat(12)}Z9_. 23505`,
+    ],
+    ["a 65-character name", { name: "A".repeat(65), code: "23505" }, "unique - 23505"],
     ["an error without a name", { code: "23505" }, "unique unknown 23505"],
   ])("writes only safe names and codes to the log line: %s", (_label, err, expected) => {
     expect(describeForLog(err)).toBe(expected);

@@ -554,11 +554,12 @@ describe("LoginPage", () => {
 });
 
 describe("icons on pages", () => {
-  // Every page rendered here is also checked for decorative svgs in the last test.
-  const rendered: string[] = [];
+  // Every page rendered here is checked for decorative svgs at parse time, so each test
+  // verifies its own pages whatever the run order.
   const render = (html: unknown) => {
-    rendered.push(String(html));
-    return parse(String(html));
+    const doc = parse(String(html));
+    for (const svg of qsa(doc, { tag: "svg" })) expect(attr(svg, "aria-hidden")).toBe("true");
+    return doc;
   };
   const iconsIn = (el: Element | null | undefined): string[] =>
     el ? qsa(el, { tag: "svg" }).map((svg) => attr(svg, "data-icon") ?? "") : [];
@@ -736,13 +737,9 @@ describe("icons on pages", () => {
           children: "",
         }),
       );
-      expect(iconsIn(q1(doc, { tag: "li", cls: "error" }))).toEqual(["circle-alert"]);
+      const li = q1(doc, { tag: "li", cls: "error" }) as Element;
+      expect(iconsIn(li)).toEqual(["circle-alert"]);
+      expect(text(li).trim()).toBe("<svg onload=alert(1)>");
     });
-  });
-
-  it("marks every svg rendered above as aria-hidden", () => {
-    const svgs = rendered.flatMap((html) => qsa(parse(html), { tag: "svg" }));
-    expect(svgs.length).toBeGreaterThan(0);
-    expect(svgs.every((svg) => attr(svg, "aria-hidden") === "true")).toBe(true);
   });
 });

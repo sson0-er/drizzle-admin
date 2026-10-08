@@ -250,16 +250,22 @@ describe("DisplayValue", () => {
     );
   });
 
-  it.each(["Asia/Tokyo", "America/New_York"])(
-    "shows a date-only Date and a json value the same in %s",
-    (timeZone) => {
-      const display = (f: FormField, value: unknown) =>
-        text(parse(String(DisplayValue({ field: f, value, timeZone }))));
-      const day = field("date", { kind: "date", isDateOnly: true });
-      expect(display(day, new Date("2026-10-07T00:00:00Z"))).toBe("2026/10/07");
-      expect(display(field("json", { kind: "json" }), { a: 1 })).toBe('{"a":1}');
-    },
-  );
+  const dateOnly = field("date", { kind: "date", isDateOnly: true });
+  const json = field("json", { kind: "json" });
+  it.each([
+    ...["Asia/Tokyo", "America/New_York"].flatMap((zone) => [
+      {
+        zone,
+        name: "date-only Date",
+        field: dateOnly,
+        value: new Date("2026-10-07T00:00:00Z"),
+        expected: "2026/10/07",
+      },
+      { zone, name: "json value", field: json, value: { a: 1 }, expected: '{"a":1}' },
+    ]),
+  ])("shows a $name the same in $zone", ({ zone, field: f, value, expected }) => {
+    expect(text(parse(String(DisplayValue({ field: f, value, timeZone: zone }))))).toBe(expected);
+  });
 
   it("masks a password-widget field", () => {
     const html = String(

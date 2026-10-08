@@ -463,6 +463,11 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
       .select()
       .from(authors())
       .where(eq(getTableColumns(authors()).id as never, Number(id)));
+  const rowsNamed = (name: string) =>
+    raw()
+      .select()
+      .from(authors())
+      .where(eq(getTableColumns(authors()).name as never, name));
 
   beforeAll(async () => {
     t = await makeAdmin(fixture, { login: false });
@@ -475,32 +480,69 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
     // Every case runs against its own author, so a control that mutates or deletes touches no
     // row another test reads. `ok` is the status of the control request with every permission.
     const cases: {
+      label: string;
       perm: Perm;
       method: "GET" | "POST";
       path: (id: string) => string;
       form?: (id: string) => Record<string, string>;
+      /** Name of the author the request would insert, to prove a denied request creates no row. */
+      creates?: (id: string) => string;
       ok: number;
     }[] = [
-      { perm: "view", method: "GET", path: () => "/admin/authors/", ok: 200 },
-      { perm: "view", method: "GET", path: (id) => `/admin/authors/${id}/change/`, ok: 200 },
-      { perm: "add", method: "GET", path: () => "/admin/authors/add/", ok: 200 },
       {
+        label: "GET /admin/authors/",
+        perm: "view",
+        method: "GET",
+        path: () => "/admin/authors/",
+        ok: 200,
+      },
+      {
+        label: "GET /admin/authors/<id>/change/",
+        perm: "view",
+        method: "GET",
+        path: (id) => `/admin/authors/${id}/change/`,
+        ok: 200,
+      },
+      {
+        label: "GET /admin/authors/add/",
+        perm: "add",
+        method: "GET",
+        path: () => "/admin/authors/add/",
+        ok: 200,
+      },
+      {
+        label: "POST /admin/authors/add/",
         perm: "add",
         method: "POST",
         path: () => "/admin/authors/add/",
         form: (id) => ({ ...authorForm, name: `added-${id}` }),
+        creates: (id) => `added-${id}`,
         ok: 303,
       },
       {
+        label: "POST /admin/authors/<id>/change/",
         perm: "change",
         method: "POST",
         path: (id) => `/admin/authors/${id}/change/`,
         form: (id) => ({ ...authorForm, name: `changed-${id}` }),
         ok: 303,
       },
-      { perm: "delete", method: "GET", path: (id) => `/admin/authors/${id}/delete/`, ok: 200 },
-      { perm: "delete", method: "POST", path: (id) => `/admin/authors/${id}/delete/`, ok: 303 },
       {
+        label: "GET /admin/authors/<id>/delete/",
+        perm: "delete",
+        method: "GET",
+        path: (id) => `/admin/authors/${id}/delete/`,
+        ok: 200,
+      },
+      {
+        label: "POST /admin/authors/<id>/delete/",
+        perm: "delete",
+        method: "POST",
+        path: (id) => `/admin/authors/${id}/delete/`,
+        ok: 303,
+      },
+      {
+        label: "POST /admin/authors/ (delete_selected)",
         perm: "delete",
         method: "POST",
         path: () => "/admin/authors/",
@@ -511,8 +553,8 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
     ];
 
     it.each(cases)(
-      "$perm false: $method $path -> 403, allowed -> $ok",
-      async ({ perm, method, path, form, ok }) => {
+      "$perm false: $label -> 403, allowed -> $ok",
+      async ({ perm, method, path, form, creates, ok }) => {
         const id = await addAuthor();
         const send = (client: Client) =>
           method === "GET" ? client.get(path(id)) : client.post(path(id), form?.(id));
@@ -521,10 +563,13 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         const denied = await send(await clientWith(without(perm)));
         expect(denied.status).toBe(403);
         expect(await rowsOf(id)).toEqual(before);
+        if (creates) expect(await rowsNamed(creates(id))).toEqual([]);
 
         // Control: with every permission the same request succeeds, so the 403 is the gate.
         const allowed = await send(await clientWith({}));
         expect(allowed.status).toBe(ok);
+        // Proves the name query can see the row the denied request did not create.
+        if (creates) expect(await rowsNamed(creates(id))).toHaveLength(1);
       },
     );
 

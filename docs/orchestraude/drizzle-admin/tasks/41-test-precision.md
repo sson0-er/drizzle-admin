@@ -1,7 +1,7 @@
 ---
 id: 41-test-precision
 depends_on: [33-security-test-fixes, 40-password-hardening-and-cleanup]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 41: test-precision
@@ -98,3 +98,6 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact assertion
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+- Attempt 1: done. Tests only (auth, views, widgets, form, errors); verify passes. No export or prop added. `Element` type added to the existing helpers/html import in test/form.test.ts (import line only adds a name). The `render` helper in "icons on pages" cannot assert a non-empty svg list (some pages have none), so the old `length > 0` check is not carried over; each icon test already asserts its icons.
+- Review round 1: high 0, medium 0, low 1 (quality: needless spread around flatMap in the DisplayValue table, test/widgets.test.ts:255). Done.
