@@ -20,6 +20,7 @@
 | 15 | routes-list | 14, 11 | List page with search/filters/order/paging/FK labels (no N+1), 500 logging; example phase-2 smoke (end of phase 2) |
 | 16 | forms-fields | 05 | `buildFormGroups`, editability, default widgets, FK `tooMany` fallback |
 | 17 | forms-coerce-validate | 16, 02 | Coercion, zod schema, validation pipeline |
+| 17a | test-pglite-stability | 08, 17 | Follow-up (user-approved): make `scripts/verify.sh` deterministic under parallel PGlite startup via `vitest.config.ts` timeouts/concurrency (or PGlite reuse in `test/helpers/db.ts`); 5 consecutive passing runs |
 | 18 | forms-widgets-and-form-page | 16, 11 | Widgets, `toFormValue`, `DisplayValue`, `FormPage` |
 | 19 | routes-add-change | 15, 17, 18 | Add/change handlers, hooks, DB errors, PRG, three buttons, date-only cases (end of phase 3) |
 | 20 | routes-delete | 19 | Delete page and handler, FK failure flash |
@@ -31,9 +32,9 @@
 | 26 | readme | 25 | README per outline, `readme.test.ts` (end of phase 6) |
 
 ## Execution order
-01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
+01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
 
-Numeric order satisfies every `depends_on`. Phase boundaries (§13): phase 1 = 01-06, phase 2 = 07-15, phase 3 = 16-19, phase 4 = 20-21, phase 5 = 22-24, phase 6 = 25-26. Because every task's gate is `scripts/verify.sh` (test, typecheck, lint, build), the phase gate of the requirements holds at the end of each phase.
+Numeric order satisfies every `depends_on`. Task 17a is an inserted follow-up and runs between 17 and 18 (its id sorts there lexically: `17-…` < `17a-…` < `18-…`); existing tasks keep their numbers. Phase boundaries (§13): phase 1 = 01-06, phase 2 = 07-15, phase 3 = 16-19 (including 17a), phase 4 = 20-21, phase 5 = 22-24, phase 6 = 25-26. Because every task's gate is `scripts/verify.sh` (test, typecheck, lint, build), the phase gate of the requirements holds at the end of each phase.
 
 Parallelizable later (independent `depends_on`): 02/03/13 after 01; 07 with 04-06; 16-18 with 07-15 once 05 (and 11 for 18) is done; 22 after 11.
 
@@ -41,6 +42,7 @@ Parallelizable later (independent `depends_on`): 02/03/13 after 01; 07 with 04-0
 - Sessions, the Origin check, the CSRF token check, flash and `can()` are wired in phase 2 (tasks 12-14), because test-strategy.md says only the auth guard is absent before phase 5 and the test client sends Origin and tokens from the start. Login/logout and the guard come in phase 5 (task 23).
 - Before phase 5 there is no login, but handlers need a non-null user for `can()` and `HookCtx`. Task 14 adds a temporary `PRE_AUTH_USER` in `src/routes/middleware.ts` for builtin mode; task 23 removes it (its DoD checks with grep) and switches `makeAdmin` to logging in by default.
 - Route tasks 15, 19, 20, 21 implement permission checks; the permission test matrix is written once in task 24 (`test/auth.test.ts`).
+- Task 17a (follow-up, user-approved) fixes PGlite startup timeouts under parallel vitest files, observed in task 15 attempt 1 and in 3 of 4 full runs during task 17. It touches only `vitest.config.ts` and, if needed, `test/helpers/db.ts`; `src/` and test assertions are out of scope. It depends on 17 only so its 5-run gate covers the full suite as of that point; no later task depends on it in content, but it runs before 18 so later gates are not flaky.
 - The FK > 200 fallback is implemented with forms (tasks 16 and 19) because forms.md defines it there; phase 6 (task 25) adds its integration test. Dark mode and the 767px layout are deferred to task 25 as §13 phase 6 lists them.
 
 ## Definition of Done shared by all tasks
