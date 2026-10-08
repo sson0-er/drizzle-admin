@@ -60,12 +60,13 @@ Changed 2026-10-07: originCheck uses `publicOrigin` (decision 017); external-mod
 5. **user**: builtin → `session.u`; external → `await auth.getUser(c.req.raw)` (`session.u` ignored). Set `c.var.user`. In external mode the token is not rotated when `getUser` starts returning a different user; it rotates only when the session expires (decision 014).
 6. **authGuard** (skipped for exemptions): if `user === null`:
    Changed 2026-10-08: `path` below is the raw percent-encoded pathname `new URL(c.req.url).pathname`, not `c.req.path` (which decodes `%20` to a space that `safeNext` rejects), and `search` is `new URL(c.req.url).search` (decision 032).
-   - builtin → `302` to `loginRedirectUrl(prefix, path + search)`; for non-GET requests use `next = <prefix>/`.
+   Changed 2026-10-08: HEAD is treated like GET (decision 033 item 7).
+   - builtin → `302` to `loginRedirectUrl(prefix, path + search)` for GET and HEAD; for other methods use `next = <prefix>/`. Hono dispatches HEAD through the GET routes but `c.req.method` stays `"HEAD"` (evidence: 2026-10-08-hono-head-cookie-body-node-server), so the guard checks both methods explicitly.
    - external with `loginUrl` → `302` to `externalLoginUrl(loginUrl, path + search)`.
    - external without `loginUrl` → 401 error page.
 7. **csrfToken**: for POST, parse the body once (`c.req.parseBody({ all: true })`, kept in a context variable for handlers) and require `typeof body._csrf === "string" && tokensEqual(body._csrf, session.csrf)`; otherwise 403 error page (`messages.csrfFailed`).
 
-Auth exemptions: `GET /static/admin.css`, and `GET|POST /login/` in builtin mode.
+Auth exemptions: `GET /static/admin.css`, and `GET|POST /login/` in builtin mode. Like every GET route, these also answer HEAD (Hono serves HEAD through GET routes), and the guard exempts `HEAD /login/` too.
 Order rationale: the guard runs before the token check, so a logged-out user who submits a form is sent to login rather than given 403. The login POST is exempt from the guard but not from the token check.
 
 ## Route table (registered in this order; paths relative to the mount point)

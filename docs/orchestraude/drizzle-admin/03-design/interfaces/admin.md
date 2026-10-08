@@ -121,11 +121,13 @@ Steps, in order:
 
 ### Finalization (internal `finalize()`, idempotent)
 Changed 2026-10-07: FK `select` override check added (decision 021).
+Changed 2026-10-08: a failed finalization leaves the registry open and is retried (decision 033 item 13).
 
 - For every field with `foreignKey`: if a registered model has `meta.table === foreignKey.table` and `foreignKey.column === thatModel.meta.pk.key`, set `foreignKey.slug = thatModel.slug`.
 - For every `listFilter` key that is an FK (kind not boolean/enum/date and not `isDateOnly`; Changed 2026-10-07, decision 023): `foreignKey.slug` must be set, otherwise throw `<table>: listFilter "<key>" needs the referenced table to be registered and referenced by its primary key`.
 - For every `widgets[key] === "select"` on an FK field (kind not enum): `foreignKey.slug` must be set, otherwise throw `<table>: widget "select" for "<key>" needs the referenced table to be registered and referenced by its primary key` (decision 021).
 - Freeze the registry, then `buildApp(state)` (routes.md) once. `admin.fetch` = `new Hono().route(prefix || "/", app).fetch(request)`.
+- The registry counts as finalized only after every step above succeeded. If a check or `buildApp` throws, the error propagates from that `admin.app` / `admin.fetch` access, the registry stays open, `register()` is still allowed (for example to register the missing referenced table), and the next access runs finalization again from the start (decision 033 item 13). Register step 1 ("If finalized") refers to this successful state.
 
 ## Data formats
 

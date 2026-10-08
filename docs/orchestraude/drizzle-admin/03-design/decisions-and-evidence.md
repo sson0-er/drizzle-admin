@@ -12,6 +12,8 @@ Changed 2026-10-08: added 030 (task 18 gap: `FormPage` `timeZone` prop, `values`
 Changed 2026-10-08: added 031 (task 21 gap: `ConfirmActionPage` `listHref` prop); evidence 2026-10-08-confirm-action-listhref-prop added.
 Changed 2026-10-08: added 032 (user decision after the task 22 review: `safeNext` raw and decoded path rules); evidence 2026-10-08-safenext-decoded-path added.
 Changed 2026-10-08: 032 amended: dot segments resolved by URL parsing are accepted in normalized form (user answer).
+Changed 2026-10-08: added 033-038 (user answers to the low-findings triage section B and three follow-ups); 013 item 11, 017 and 021 carry notes pointing to them; evidence 2026-10-08-hono-head-cookie-body-node-server added.
+Changed 2026-10-08: 037 extended to list cells (Q7 option (b)); 035 confirmed by the user.
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -37,6 +39,7 @@ Changed 2026-10-08: 032 amended: dot segments resolved by URL parsing are accept
 - 021-widget-override-compatibility: `allowedWidgets` per field kind checked by `register()`; data handling never depends on the widget.
 - 022-unmatched-routes-and-error-rendering: all-methods fallback route for 404, HTML 403 for the Origin check, full logging for non-DB errors.
 - 023-pg-date-string-mode-support: PG `date()` string mode keeps kind string, gets `isDateOnly`, the `date` widget and date-preset filters with `YYYY-MM-DD` string values and string bounds (Q5).
+- 024-allow-esbuild-build-script: `pnpm-workspace.yaml` allows only esbuild's build script, so `pnpm install` exits 0 (task 01). (Changed 2026-10-08: entry was missing from this list.)
 - 025-zoned-to-instant-dst-algorithm: `zonedToInstant` takes candidates from the offsets one day before and after the guess, returns the earliest that round-trips (overlap → first occurrence), else the later candidate (gap → later valid instant); replaces the single-pass correction, which contradicted those outcomes.
 - 026-sqlite-blob-bigint-support: SQLite bigint columns are `blob({ mode: "bigint" })` and stay kind `bigint`; ordering and range comparison on them are bytewise (documented limitation), equality works; SQLite tests must not assume numeric order or range filtering on them.
 - 027-render-page-flash-callback: `renderPage` accepts `JSX.Element | ((flash) => JSX.Element)`; flash is consumed only for 200/400 non-minimal pages and passed to the function form, so 200/400 pages show the consumed messages.
@@ -45,8 +48,15 @@ Changed 2026-10-08: 032 amended: dot segments resolved by URL parsing are accept
 - 030-formpage-timezone-prop: `FormPage` takes a required `timeZone` (display-only date-times via `DisplayValue`); `values` are form strings for editable fields, `displayRow` is the stored row for display-only fields; add/change handlers pass `state.config.timeZone`, change also passes `displayRow: row` (task 18 implementation adopted).
 - 031-confirm-action-listhref-prop: `ConfirmActionPage` takes a required `listHref` (list URL; `PageChrome` has no model slug); the form and cancel link use `listHref + backQuery`; the actions handler passes `listHref: listUrl` and `backQuery` on both confirmation renders (task 21 implementation adopted).
 - 032-safenext-decoded-path-rules: `safeNext` additionally rejects decoded control characters and `\`, raw `//` in the path, malformed percent escapes and decoded `.`/`..` segments that survive URL normalization (literal `/admin/./x`, `/admin/a/../b/` are normalized and accepted); decoded whitespace (`/admin/kv/a%20b/change/`) and encoded `%2F`/`%2F%2F` stay allowed (consistent with 029); returns the still-encoded normalized path; the auth guard passes the raw `new URL(c.req.url).pathname` as `next` (user decision, task 22 review).
+- 033-low-findings-recorded-behaviors: implemented behaviors kept and recorded (L055, L057-L061, L064-L066, L068-L071, L073, L075-L077): several flash Set-Cookie headers, `create` no-row error, vanished-rows `noSelection`, `listDisplayLinks` over FK link, FK filter value outside the choices, `?? []` fkChoices fallback, logged-out HEAD treated like GET (needs a code change), `data-sort` from explicit `o` only, display-only hidden rows, non-DB create/update errors are 500s, glyph literals exempt from messages, `rawValues` booleans, failed finalization retried, JSON truncation, `describeForLog` levels, whitespace-only numbers rejected.
+- 034-fk-reference-view-permission: without `view` on the referenced model, list FK cells show raw values (no link, no label query), the FK filter is not offered (`f_<key>` ignored), and add/change FK fields are plain key inputs (`"noView"`), no related-list link (L047, L048).
+- 035-field-labels: `fieldLabel(key)` humanizes keys (`authorId` → `Author id`); used for list column headers, filter headings and `FormField.label` (L067).
+- 036-triage-behavior-changes: `tooMany` link only for default/`select` widgets (L062); cookie deletions carry the same attributes incl. `Secure` (L072); custom confirm action with no surviving rows → `noSelection` (L003); single delete removing 0 rows → `alreadyDeleted` warning (L074).
+- 037-password-widget-no-echo: the `password` input renders empty; empty on change keeps the stored value (zod optional, not required); display-only password fields and list cells masked as `********` (Q7 option (b)); amends 013 item 11 and 021.
+- 038-body-size-and-example-bind: no in-library body limit in v1, README tells deployers to limit it at the proxy; the example binds to `127.0.0.1` unless `HOST` is set.
 
 ## Evidence referenced
+Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
 - 2026-10-07-drizzle-orm-release-lines (research)
 - 2026-10-07-drizzle-column-introspection (research)
 - 2026-10-07-hono-csrf-and-jsx (research)
@@ -66,6 +76,7 @@ Changed 2026-10-08: 032 amended: dot segments resolved by URL parsing are accept
 - 2026-10-08-trailing-slash-control-char-bypass (design, decision 029 amendment): Hono decodes `%09` to a tab and the denylist redirected to `/\t/evil.example/`, which WHATWG URL parsing resolves to `https://evil.example/`; Hono's `/*` and `*` middleware do not match decoded LF/CR paths (Hono or host 404); a mounted sub-app's `notFound` is ignored; the allowlist gives 404 without `Location` for the attack paths and 301 for `/users?a=1`. Expires 2027-01-06.
 - 2026-10-08-formpage-timezone-prop (design, decision 030): task 18 `FormPageProps` include a required `timeZone`; editable fields read `values`, display-only fields read `displayRow` through `DisplayValue` = `formatValue(meta, value, timeZone)`. Expires 2027-01-06.
 - 2026-10-08-confirm-action-listhref-prop (design, decision 031): task 21 `ConfirmActionPageProps` include a required `listHref`; the form posts to `${listHref}${backQuery}`; `actionsHandler` passes `listHref: listUrl, backQuery` on both confirmation renders. Expires 2027-01-06.
+- 2026-10-08-hono-head-cookie-body-node-server (design, decisions 033, 036, 038): Hono routes HEAD through GET routes but `c.req.method` stays `HEAD` (the auth guard currently gives HEAD `next = <prefix>/`); `deleteCookie` passes all options (incl. `Secure`) to the `Max-Age=0` Set-Cookie; `parseBody` buffers the whole body with no limit (Hono has a separate `body-limit` middleware); `@hono/node-server` `serve` listens on `hostname`. Expires 2027-01-06.
 - 2026-10-08-safenext-decoded-path (design, decision 032): `new URL` resolves literal and `%2e` dot segments but not `..%2Fx`, which `decodeURIComponent` turns into `/admin/../x`; `%20` and `%2F%2F` stay encoded in the pathname; malformed escapes throw `URIError`; Hono `c.req.path` decodes `%20`/`%09`/`%5C` but keeps `%2F`. Expires 2027-01-06.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

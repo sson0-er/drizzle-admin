@@ -14,6 +14,7 @@ Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `h
 
 ### `session.ts` (decisions 008, 014, 017)
 Changed 2026-10-07: `CookieOpts` gained `publicOrigin` and `isSecure()` decides the `Secure` flag (decision 017); external-mode use fixed (decision 014).
+Changed 2026-10-08: `clearSession` deletes with the same attributes as `writeSession`, including `Secure` (decision 036).
 ```ts
 export interface Session { u: AdminUser | null; csrf: string; iat: number } // iat = unix seconds
 export const SESSION_COOKIE = "da_session";
@@ -29,7 +30,7 @@ export function isSecure(c: Context, publicOrigin: string | null): boolean;
 - `readSession` returns `null` if the cookie is missing, the signature is invalid (`getSignedCookie` → `false`), the JSON is malformed or has the wrong shape (validate: `u` null or `{id: string, name: string}`, `csrf` non-empty string, `iat` finite number), or `now - iat > maxAgeSec` or `iat > now + 60`.
 - `writeSession` cookie attributes: `httpOnly: true`, `sameSite: "Lax"`, `path: prefix || "/"`, `maxAge: maxAgeSec`, `secure: isSecure(c, o.publicOrigin)`.
 - External-auth mode (decision 014): the same cookie is used with `u` always `null`; it only carries `csrf` and `iat`. Callers never pass a user to `newSession` in external mode, and the user comes from `getUser` (routes.md).
-- `clearSession` deletes with the same path.
+- `clearSession` deletes with `deleteCookie(c, SESSION_COOKIE, { httpOnly: true, sameSite: "Lax", path: prefix || "/", secure: isSecure(c, o.publicOrigin) })`: the same attributes as `writeSession`; `deleteCookie` adds `Max-Age=0` and passes every option through (evidence: 2026-10-08-hono-head-cookie-body-node-server). So under an https `publicOrigin` (or an https request URL without `publicOrigin`) the deletion carries `Secure` too (decision 036).
 
 ### `csrf.ts`
 Changed 2026-10-07: `originCheck` takes `publicOrigin` (decision 017). Exact-match behaviour must be proven by tests, otherwise the task is blocked (decision 020).
@@ -47,6 +48,7 @@ Whether hono compares the string `origin` option by exact equality is unverified
 
 ### `flash.ts`
 Changed 2026-10-07: options gained `publicOrigin` for the `Secure` flag (decision 017).
+Changed 2026-10-08: several `da_flash` Set-Cookie headers per response are acceptable (decision 033 item 1); `consumeFlash` deletes with the same attributes as `addFlash`, including `Secure` (decision 036).
 ```ts
 export type FlashLevel = "success" | "warning" | "error";
 export interface FlashMessage { level: FlashLevel; text: string }
@@ -55,7 +57,7 @@ export interface FlashOpts { secret: string; prefix: string; publicOrigin: strin
 export async function addFlash(c: Context, o: FlashOpts, msgs: FlashMessage[]): Promise<void>;
 export async function consumeFlash(c: Context, o: FlashOpts): Promise<FlashMessage[]>;
 ```
-Signed cookie, `httpOnly`, `sameSite: "Lax"`, `path: prefix || "/"`, `maxAge: 60`, `secure: isSecure(c, o.publicOrigin)` (as for the session). `addFlash` appends to messages already set in this response. `consumeFlash` reads, validates the shape (invalid → `[]`) and deletes the cookie. Only pages rendered with 200/400 consume flash; redirects do not.
+Signed cookie, `httpOnly`, `sameSite: "Lax"`, `path: prefix || "/"`, `maxAge: 60`, `secure: isSecure(c, o.publicOrigin)` (as for the session). `addFlash` appends to messages already set in this response: each call emits one more `da_flash` Set-Cookie holding all messages queued so far in this response, so when it is called more than once the response carries several headers and the last one is complete (browsers keep the last; unverified). A single header is not required (decision 033 item 1). `consumeFlash` reads, validates the shape (invalid → `[]`) and, whenever a cookie was present, deletes it with the same attributes as `addFlash` except `maxAge` (`httpOnly`, `sameSite: "Lax"`, `path`, `secure: isSecure(c, o.publicOrigin)`; decision 036). Only pages rendered with 200/400 consume flash; redirects do not.
 
 ### `redirect.ts`
 ```ts

@@ -14,64 +14,74 @@ Models where `can(M, "view", U)`, in registration order → `DashboardPage({ mod
 
 ## List (`GET /:model/`)
 Changed 2026-10-07: custom actions gated by `ACTION_PERMISSION` = `change` (decision 016).
+Changed 2026-10-08: FK labels, links and filters require `view` on the referenced model (decision 034); `listDisplayLinks` wins over the FK link and an FK filter value outside the offered choices is accepted (decision 033 items 4, 5); columns and filters carry labels (decision 035); `sort` reflects only an explicit `o` (decision 033 item 8).
+
+Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`.
 
 1. `M` or 404; `view` permission or 403.
 2. Parse the query (decision 013 item 6):
    - `q`: used only if `M.searchFields.length > 0`.
    - `o`: comma list; each item `-?key`; keep keys in `M.listDisplay`, dedupe. Empty → `M.ordering`; still empty → `[{ key: pk, desc: true }]`.
-   - `f_<key>` for `key` in `M.listFilter` only.
+   - `f_<key>` for `key` in `M.listFilter` only; an empty value is ignored. For an FK filter with `!refVisible` the parameter is ignored (not passed to `repo.list`), because that filter is not offered (step 5; decision 034).
    - `p`: integer ≥ 1, else 1.
 3. `repo.list(M.meta, { q, searchFields: M.searchFields, filters, ordering, page, perPage: M.listPerPage })`.
-4. FK labels (no N+1): for each `key` in `listDisplay` with `foreignKey.slug` and no formatter, collect distinct non-null `String(row[key])`, call `repo.getMany(refModel.meta, values)` once, and map `String(refRow[refPk]) → refModel.toString(refRow)`.
-5. Filter choices: boolean → all / `1` yes / `0` no; enum → all + values; kind date or `isDateOnly` (incl. PG `date()` string mode; Changed 2026-10-07, decision 023) → all + today/past7/month/year; FK → all + `repo.options(refModel.meta, { limit: 200, ordering: refModel.ordering, toLabel: refModel.toString })`.
+4. FK labels (no N+1): for each `key` in `listDisplay` with `foreignKey.slug`, no formatter and `refVisible`, collect distinct non-null `String(row[key])`, call `repo.getMany(refModel.meta, values)` once, and map `String(refRow[refPk]) → refModel.toString(refRow)`. With `!refVisible` no query runs for that column (decision 034).
+   4b. Cells: `text = formatCell(...)` with `fkLabel` only when step 4 loaded one, and `masked: M.widgets[key] === "password"` (the cell shows `********`; decision 037 point 5, Changed 2026-10-08). `href`, first match: the column is in `listDisplayLinks` → the row's own change page (this wins even for an FK column; decision 033 item 4); FK column with `refVisible`, no formatter and a non-null value → `${P}/${refSlug}/${enc(value)}/change/`; otherwise none. So with `!refVisible` an FK cell shows the raw value without a link or label (decision 034).
+5. Filter choices: boolean → all / `1` yes / `0` no; enum → all + values; kind date or `isDateOnly` (incl. PG `date()` string mode; Changed 2026-10-07, decision 023) → all + today/past7/month/year; FK with `refVisible` → all + `repo.options(refModel.meta, { limit: 200, ordering: refModel.ordering, toLabel: refModel.toString })`; FK with `!refVisible` → the filter is omitted (no sidebar section, no query; decision 034).
+   The selected choice is the one whose value equals the active `f_<key>`; when none matches, "all" is marked selected. For boolean, enum and date filters a non-matching value is also ignored by `buildFilters`, so "all" is accurate. For an FK filter, a valid key that is not among the 200 offered choices still filters the rows while "all" is marked selected; this is accepted (decision 033 item 5). Code comments must not claim that the repository ignores such FK values.
 6. Actions offered: `delete_selected` if `can(M, "delete", U)`, plus custom actions if `can(M, ACTION_PERMISSION, U)` (`"change"`, decision 016). Rendered as a dropdown only if there is at least one.
-7. `ListPage(...)`, 200. The action form posts to `list URL + current search string` so the redirect can return to the same state.
+7. `ListPage(...)`, 200. `columns[i] = { key, label: fieldLabel(key), sort, sortHref }` and `filters[i].label = fieldLabel(key)` (forms.md, decision 035). `sort` is `asc`/`desc` only for keys in the explicit `o` parameter; with the default ordering every column is `none` (decision 033 item 8). The action form posts to `list URL + current search string` so the redirect can return to the same state.
 
 ## Actions (`POST /:model/`)
 Changed 2026-10-07: custom actions require `change` (decision 016).
 Changed 2026-10-08: both `ConfirmActionPage` renders pass `listHref` and `backQuery` (decision 031).
+Changed 2026-10-08: no surviving rows → `noSelection` warning for `delete_selected` (recorded, decision 033 item 3) and for the custom-action confirmation step (decision 036).
 
 Body: `action`, `_selected` (repeated), optional `_confirm=1`. `listUrl` = `${prefix}/${M.slug}/`; `backQuery` = the request's query string (leading `?`, or `""`); `back` = `listUrl + backQuery`.
 Every `ConfirmActionPage` render below passes `modelLabel: M.label`, `action` (the submitted value), `listHref: listUrl` and `backQuery`, plus the props listed in its step.
 1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back.
 2. `action === "delete_selected"`:
    - no `delete` permission → 403.
-   - no `_confirm` → `rows = repo.getMany(...)` → `ConfirmActionPage({ isDelete: true, actionLabel: messages.deleteSelected, items: rows.map(r => ({ pk, label: M.toString(r) })), listHref: listUrl, backQuery })`, 200.
-   - `_confirm=1` → `rows = repo.getMany(...)`; for each row `await hooks.beforeDelete?.(row, { ...ctx, mode: "delete" })`; a throw → error flash `hookFailed`, 303 back. Then `n = repo.delete(M.meta, pks of rows)` → success flash `deletedMany(n)`, 303 back. DB error → classify → error flash (`dbForeignKey` for foreignKey, else `dbOther`), 303 back.
+   - `rows = repo.getMany(...)` (both steps). `rows` empty (every selected row vanished) → warning flash `noSelection`, 303 back (decision 033 item 3).
+   - no `_confirm` → `ConfirmActionPage({ isDelete: true, actionLabel: messages.deleteSelected, items: rows.map(r => ({ pk, label: M.toString(r) })), listHref: listUrl, backQuery })`, 200.
+   - `_confirm=1` → for each row `await hooks.beforeDelete?.(row, { ...ctx, mode: "delete" })`; a throw → error flash `hookFailed`, 303 back. Then `n = repo.delete(M.meta, pks of rows)` → success flash `deletedMany(n)`, 303 back. DB error → classify → error flash (`dbForeignKey` for foreignKey, else `dbOther`), 303 back.
 3. Custom action `a` with `a.name === action`:
    - missing → error flash `unknownAction`, 303 back.
    - no `ACTION_PERMISSION` (`change`) → 403.
-   - `a.confirm && !_confirm` → `ConfirmActionPage({ isDelete: false, actionLabel: a.label, items, listHref: listUrl, backQuery })`, 200.
+   - `a.confirm && !_confirm` → `rows = repo.getMany(...)`; `rows` empty → warning flash `noSelection`, 303 back (decision 036); else `ConfirmActionPage({ isDelete: false, actionLabel: a.label, items: rows.map(...), listHref: listUrl, backQuery })`, 200.
    - else `result = await a.run({ ids, db, user: U })` → success flash `result?.message ?? actionDone`; a throw → error flash `actionFailed`; 303 back.
 
 ## Add (`GET|POST /:model/add/`)
 Changed 2026-10-08: every `FormPage` render passes `timeZone: state.config.timeZone` (decision 030).
+Changed 2026-10-08: FK choices need `view` on the referenced model (decision 034); non-DB errors from `repo.create` are 500s (decision 033 item 10).
 
 1. `M` or 404; `add` permission or 403.
-2. FK choices: for each form FK field with `slug`: `opts = repo.options(refMeta, { limit: 201, ... })` → `opts.length > 200 ? "tooMany" : opts`.
+2. FK choices: for each form FK field with `slug` (`ref` = its registered model): `!can(ref, "view", U)` → `"noView"` without a query (decision 034); otherwise `opts = repo.options(refMeta, { limit: 201, ... })` → `opts.length > 200 ? "tooMany" : opts`.
 3. GET → `FormPage({ mode: "add", groups, values: {}, timeZone })`, 200. `timeZone` is always `state.config.timeZone` (the resolved `AdminConfig.timeZone`, admin.md `AdminState`); the same value is passed to `validateSubmission` and `toFormValue`. No `displayRow` (add has no stored row and no display-only fields, forms.md).
 4. POST → `validateSubmission({ mode: "add", ... })`. On error → `FormPage` with `values` (echoed request strings), `fieldErrors`, `formErrors`, `timeZone`, status 400.
 5. `data = hooks.beforeSave ? await hooks.beforeSave(data, { ...ctx, mode: "add" }) : data`; a throw → form error `hookFailed`, 400.
-6. `row = await repo.create(M.meta, data)`; DB error → form error by class (`dbUnique`, `dbForeignKey`, `dbNotNull`, `dbOther`), 400.
+6. `row = await repo.create(M.meta, data)`; DB error (`isDbError`) → form error by class (`dbUnique`, `dbForeignKey`, `dbNotNull`, `dbOther`), 400. Any other error (including `create`'s "returned no row" error, data.md) is rethrown and becomes a 500 through `onError`, logged in full (decisions 022, 033 item 10).
 7. `await hooks.afterSave?.(row, { ...ctx, mode: "add" })`; a throw → extra warning flash `afterSaveFailed`.
 8. Success flash `added(M.toString(row))`; 303 to: `_addanother` → `${P}/${slug}/add/`; `_continue` → `${P}/${slug}/${enc(pk)}/change/`; otherwise list URL.
 
 ## Change (`GET|POST /:model/:pk/change/`)
 Changed 2026-10-07: FK choices are computed as in Add step 2 (review finding).
 Changed 2026-10-08: `FormPage` gets `displayRow: row` and `timeZone: state.config.timeZone` on GET and on the 400 re-render (decision 030).
+Changed 2026-10-08: `password` fields render empty and an empty submission keeps the stored value (decision 037); non-DB errors from `repo.update` are 500s (decision 033 item 10).
 
 1. `M` or 404; GET needs `view`, POST needs `change` (else 403). `row = repo.get(M.meta, pk)` → 404 if null.
 2. FK choices exactly as Add step 2 (GET and POST; `buildFormGroups` needs them for both). `canChange = can(M, "change", U)`; groups with `canChange` (all display-only when false). Save buttons only if `canChange`; delete link only if `can(M, "delete", U)`.
 3. GET → `FormPage({ mode: "change", groups, values, displayRow: row, timeZone, canSave: canChange, deleteHref? })` with `values` = `toFormValue(field, row[key], timeZone)` of each editable field, 200.
-4. POST → as Add steps 4-7 with `mode: "change"` and `repo.update(M.meta, pk, data)`; `null` → 404. The 400 re-render passes the echoed request strings as `values` and the stored `row` (from step 1) as `displayRow`, plus `timeZone`.
+4. POST → as Add steps 4-7 with `mode: "change"` and `repo.update(M.meta, pk, data)`; `null` → 404. As in Add step 6, only DB errors become form errors; others are rethrown (500). An editable `password`-widget field submitted empty is absent from `data` (forms.md), so `update` keeps its stored value; its input always renders empty, also on the 400 re-render (decision 037). The 400 re-render passes the echoed request strings as `values` and the stored `row` (from step 1) as `displayRow`, plus `timeZone`.
 5. Success flash `changed(...)`; 303 to: `_continue` → the same change URL; `_addanother` → add URL; otherwise list URL.
 
 ## Delete (`GET|POST /:model/:pk/delete/`)
 Changed 2026-10-07: `DeletePage` props aligned with views.md.
+Changed 2026-10-08: 0 deleted rows → warning `alreadyDeleted` instead of the success flash (decision 036).
 
 1. `M` or 404; `delete` permission or 403; `row` or 404.
 2. GET → `DeletePage({ modelLabel: M.label, objectLabel: M.toString(row), cancelHref: change URL })`, 200.
-3. POST → `beforeDelete(row, { mode: "delete", ... })` (a throw → error flash `hookFailed`, 303 list) → `repo.delete(M.meta, [pk])` → success flash `deleted(label)`, 303 list. DB error → error flash (`dbForeignKey` / `dbOther`), 303 to the list URL (§8: return to the list).
+3. POST → `beforeDelete(row, { mode: "delete", ... })` (a throw → error flash `hookFailed`, 303 list) → `n = repo.delete(M.meta, [pk])` → `n > 0`: success flash `deleted(label)`, 303 list; `n === 0` (the row vanished after step 1, e.g. a concurrent delete): warning flash `alreadyDeleted(label)`, 303 list (decision 036). DB error → error flash (`dbForeignKey` / `dbOther`), 303 to the list URL (§8: return to the list).
 
 ## Login (`GET|POST /login/`, builtin only)
 - GET: if `user` is already set → 302 to `safeNext(query.next, P)`. Otherwise `LoginPage({ next: query.next ?? "", username: "" })`, 200.

@@ -24,3 +24,4 @@ Add `AdminConfig.publicOrigin?: string` in v1, for example `"https://admin.examp
 ## Consequences
 - `AdminConfig` has one field more than §5.2; README configuration reference and a "Deploying behind a reverse proxy" section document it. The reverse-proxy item is removed from "Known limitations".
 - When `publicOrigin` is set, direct POSTs to the internal URL pass only with `Sec-Fetch-Site: same-origin` (browsers send it; non-browser clients get 403). Intended.
+- Changed 2026-10-08: the same `Secure` rule also applies when a cookie is deleted (`clearSession`, `consumeFlash`), decision 036.

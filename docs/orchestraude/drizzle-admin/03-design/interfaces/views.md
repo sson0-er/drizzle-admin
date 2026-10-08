@@ -11,6 +11,7 @@ All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes o
 ## API
 
 ### Layout and common props
+Changed 2026-10-08: the breadcrumb separator glyph is exempt from the messages rule (decision 033 item 11).
 ```ts
 interface PageChrome {
   siteTitle: string; prefix: string; title: string;
@@ -20,17 +21,18 @@ interface PageChrome {
 }
 export function Layout(props: PageChrome & { children: Child }): JSX.Element;
 ```
-Structure: `<html lang="ja">`, `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, `<title>{title} | {siteTitle}</title>`, `<link rel="stylesheet" href={`${prefix}/static/admin.css?v=${ADMIN_CSS_VERSION}`}>`; `<header id="header">` with the site title link and, if `user`, the user name and (if `showLogout`) `<form method="post" action={`${prefix}/logout/`}>` with the CSRF hidden input; `<nav class="breadcrumbs">`; `<ul class="messagelist">` with `<li class={level}>`; `<main id="content">`.
+Structure (the breadcrumb separator `›` is a glyph-only literal, exempt from the messages rule, decision 033 item 11): `<html lang="ja">`, `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, `<title>{title} | {siteTitle}</title>`, `<link rel="stylesheet" href={`${prefix}/static/admin.css?v=${ADMIN_CSS_VERSION}`}>`; `<header id="header">` with the site title link and, if `user`, the user name and (if `showLogout`) `<form method="post" action={`${prefix}/logout/`}>` with the CSRF hidden input; `<nav class="breadcrumbs">`; `<ul class="messagelist">` with `<li class={level}>`; `<main id="content">`.
 Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
 
 ### Pages (all take `PageChrome` plus the listed props)
 Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `displayRow` split described (decision 030).
 Changed 2026-10-08: `ConfirmActionPage` gains the required `listHref` prop (decision 031).
+Changed 2026-10-08: `ListPage` `columns` and `filters` carry a `label` shown in headers and filter headings (decision 035); `data-sort` reflects only an explicit `o` (decision 033 item 8); display-only hidden-widget fields keep their row and display-only `password` fields are masked (decisions 033 item 9, 037).
 
 | Component | Extra props | Stable selectors used by tests |
 |---|---|---|
 | `DashboardPage` | `models: { slug; label; canAdd }[]` | `table#dashboard`, row `tr[data-model=<slug>]` with `a.changelink` (list) and `a.addlink` (add, only if canAdd) |
-| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
+| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` (heading = the filter `label`) containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` (text = the column `label`) and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
 | `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?; timeZone` (see below) | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
 | `DeletePage` | `modelLabel; objectLabel; cancelHref` | `form#delete-form`, `p.confirm-text`, `button[type=submit]` |
 | `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; listHref: string; backQuery: string` (`listHref` = list URL `${prefix}/${slug}/`, required because `PageChrome` has no model slug; `backQuery` = query string with leading `?`, or `""`) | `form#action-confirm` (POST to `listHref + backQuery`) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li`; the cancel link points to `listHref + backQuery` |
@@ -40,16 +42,22 @@ Changed 2026-10-08: `ConfirmActionPage` gains the required `listHref` prop (deci
 `ListPage` props:
 ```ts
 {
-  model: { slug; label }; columns: { key; sort: "asc" | "desc" | "none"; sortHref: string }[];
+  model: { slug; label };
+  columns: { key: string; label: string; sort: "asc" | "desc" | "none"; sortHref: string }[];
+  // label = fieldLabel(key) (forms.md, decision 035); sort reflects only an explicit `o` parameter:
+  // with the default ordering (M.ordering or -pk) every column is "none" (decision 033 item 8)
   rows: { pk: string; cells: Cell[] }[];
   // Cell = { text: string; href?: string } ; href for listDisplayLinks (change page) or FK links
+  //   (listDisplayLinks wins when both apply, decision 033 item 4)
   q?: string | null;  // null → hide the search box
-  filters: { key: string; choices: { label: string; href: string; selected: boolean }[] }[];
+  filters: { key: string; label: string; choices: { label: string; href: string; selected: boolean }[] }[];
+  // filters[].label = fieldLabel(key), shown as the filter heading (decision 035)
   actions: { name: string; label: string }[]; canAdd: boolean;
   page: number; pages: number; total: number; pageHref: (n: number) => string; backQuery: string;
 }
 ```
-Pagination shows previous/next and up to 5 numbers around the current page, plus `messages.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
+Column headers and filter headings render `label`, never the raw key; `data-key` / `data-filter` keep the key (decision 035).
+Pagination shows previous/next (the glyphs `‹` / `›`, exempt from the messages rule, decision 033 item 11) and up to 5 numbers around the current page, plus `messages.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
 
 `FormPage` props (decision 030):
 ```ts
@@ -63,7 +71,7 @@ Pagination shows previous/next and up to 5 numbers around the current page, plus
   timeZone: string;                      // resolved AdminConfig.timeZone, for display-only date-times
 }
 ```
-Two value sources, never mixed: an editable field renders `Widget` with `values[key] ?? ""` (strings already converted by `toFormValue` on GET, or echoed from the request body on a 400 re-render); a display-only field renders `DisplayValue({ field, value: displayRow?.[key], timeZone })` from the stored row (forms.md), so it always shows the stored value even when the re-rendered form shows rejected input. `timeZone` is required because `DisplayValue` formats date-times with it (`formatValue`, rule 6 in `format.ts` below). A field with widget `hidden` (editable) renders only its input, without a `div.form-row` ("no label row", forms.md).
+Two value sources, never mixed: an editable field renders `Widget` with `values[key] ?? ""` (strings already converted by `toFormValue` on GET, or echoed from the request body on a 400 re-render); a display-only field renders `DisplayValue({ field, value: displayRow?.[key], timeZone })` from the stored row (forms.md), so it always shows the stored value even when the re-rendered form shows rejected input. `timeZone` is required because `DisplayValue` formats date-times with it (`formatValue`, rule 6 in `format.ts` below). A field with widget `hidden` (editable) renders only its input, without a `div.form-row` ("no label row", forms.md). A display-only field with widget `hidden` still renders a labelled `div.form-row` with its `DisplayValue`, because nothing is submitted for it and the user may see the value (decision 033 item 9). A display-only field with widget `password` renders the mask `********` instead of its value (decision 037).
 
 ### `url.ts`
 ```ts
@@ -74,15 +82,18 @@ export function sortHref(...): string; // implements the header cycle of decisio
 
 ### `format.ts`
 Changed 2026-10-07: rule order is explicit (FK label before number formatting); date-only values use `formatDate` (decision 019).
+Changed 2026-10-08: truncation scope fixed to rules 7 and 10 (decision 033 item 15).
+Changed 2026-10-08: `formatCell` takes `masked`; password-widget cells render `********` (decision 037 point 5, Q7).
 Changed 2026-10-07: date-only strings (PG `date()` string mode) are shown as stored (decision 023).
 
 ```ts
 export function formatValue(field: FieldMeta, value: unknown, tz: string): string;
 export function formatCell(args: { field: FieldMeta; value: unknown; row: DbRow; tz: string;
-  formatter?: (v: unknown, row: DbRow) => string; fkLabel?: string }): string;
+  formatter?: (v: unknown, row: DbRow) => string; fkLabel?: string;
+  masked?: boolean }): string;   // true for a field whose widget is "password" (decision 037)
 export const TRUNCATE_AT = 100;
 ```
-Rules, applied in this order (first match wins): (1) a formatter → its string as-is (escaped by JSX); (2) null/undefined → `-`; (3) `fkLabel` given (FK field) → `fkLabel`; (4) boolean → `✓` / `✗`; (5) Date and `field.isDateOnly` → `formatDate(value)` (UTC parts, no time zone; decision 019); (6) Date → `formatDateTime(value, tz)`; (7) kind json → `JSON.stringify`; (8) bigint/number → `String`; (9) `Uint8Array`/Buffer → `[binary]`; (10) other → `String(value)`. Rule 5 applies only to `Date` values. A date-only string (kind string + `isDateOnly`) is not a `Date`, so it falls through to rule 10 and is shown as stored (`2026-10-07`); it is never converted to a `Date` (decision 023). `formatValue` applies rules 2 and 4-10. Default-formatted strings longer than 100 chars → first 100 + `…`.
+Rules, applied in this order (first match wins): (0) `masked` → `********`, regardless of the value (null included), the formatter and `fkLabel`, so neither the value nor whether it is set is shown (decision 037 point 5); (1) a formatter → its string as-is (escaped by JSX); (2) null/undefined → `-`; (3) `fkLabel` given (FK field) → `fkLabel`; (4) boolean → `✓` / `✗`; (5) Date and `field.isDateOnly` → `formatDate(value)` (UTC parts, no time zone; decision 019); (6) Date → `formatDateTime(value, tz)`; (7) kind json → `JSON.stringify`; (8) bigint/number → `String`; (9) `Uint8Array`/Buffer → `[binary]`; (10) other → `String(value)`. Rule 5 applies only to `Date` values. A date-only string (kind string + `isDateOnly`) is not a `Date`, so it falls through to rule 10 and is shown as stored (`2026-10-07`); it is never converted to a `Date` (decision 023). `formatValue` applies rules 2 and 4-10. Truncation: the output of rule 7 (JSON text) and rule 10 (`String(value)`) longer than `TRUNCATE_AT` (100) characters becomes its first 100 characters + `…`; a long JSON value may be cut mid-token. Formatter output (1), `fkLabel` (3), booleans (4), dates (5, 6), numbers (8) and `[binary]` (9) are never truncated (decision 033 item 15).
 
 ### Static modules
 ```ts

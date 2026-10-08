@@ -48,6 +48,7 @@ Changed 2026-10-07: date-only strings for PG `date()` string mode (decision 023)
 Changed 2026-10-08: the trailing-slash redirect never leaves the prefix (decision 029).
 Changed 2026-10-08: allowlist instead of denylist after a tab-character bypass (decision 029).
 Changed 2026-10-08: whitespace excluded from the allowlist; decoded LF/CR 404 accepted as a known limitation (decision 029, former Q6).
+Changed 2026-10-08: vanished rows on delete and actions, non-DB errors on create/update, FK labels gated by `view` on the referenced model, password values never rendered (decisions 033, 034, 036, 037).
 
 - Configuration errors (`createAdmin`, `register`, finalization): throw `Error` with message prefix `drizzle-admin: ` naming the table/option/key. Never deferred to request time.
 - Unknown model slug, invalid or unknown primary key → 404 HTML page.
@@ -56,7 +57,9 @@ Changed 2026-10-08: whitespace excluded from the allowlist; decoded LF/CR 404 ac
 - Missing permission → 403 HTML page. Missing/invalid CSRF token or failed Origin check → 403 HTML page (layout, `messages.csrfFailed`).
 - Unauthenticated → 302 redirect to `<prefix>/login/?next=...` (built-in) or `loginUrl?next=...` (external); external without `loginUrl` → 401.
 - Form problems (coercion, zod, `validate`, DB constraint, `beforeSave` failure) → 400 with the form re-rendered, raw submitted values kept, field and form-level errors shown.
-- Delete/action failures (FK violation, hook/action throw) → error flash + 303 to list.
+- Delete/action failures (FK violation, hook/action throw) → error flash + 303 to list. Rows that vanished concurrently: bulk delete or a confirm action with no surviving rows → `noSelection` warning + 303; a single delete that removes 0 rows → `alreadyDeleted` warning + 303 (decisions 033, 036).
+- Non-DB errors thrown by `repo.create` / `repo.update` are not form errors: they go to `onError` → 500 (decision 033).
+- Information the user may not see is not rendered: FK labels, links, filters and select choices of a referenced model need `view` on it (decision 034); `password`-widget values never appear in the HTML: inputs render empty, display-only fields and list cells show `********` (decision 037).
 - DB errors are classified by code (decision 011); raw messages are never rendered. Unexpected errors → `app.onError` → 500 generic page + `console.error`: redacted (`describeForLog`) for DB errors, full error otherwise.
 - Configurations that used to fail at query time are prevented: PG search casts every column to text (decision 018), and incompatible widget overrides are rejected by `register()` (decision 021).
 - Date-only values (PG `date({mode:"date"})`) are UTC-midnight calendar dates everywhere, so the configured time zone never shifts the stored day (decision 019).
@@ -68,6 +71,7 @@ Changed 2026-10-07: Q5 answered (decision 023).
 Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisions summary range updated.
 Changed 2026-10-08: decisions 027-029 (task 14 follow-ups) added; summaries updated.
 Changed 2026-10-08: decisions summary range updated for 030 (task 18) and 031 (task 21).
+Changed 2026-10-08: questions and decisions summaries updated for the low-findings answers (decisions 033-038, Q7).
 
 | File | Summary |
 |---|---|
@@ -84,5 +88,5 @@ Changed 2026-10-08: decisions summary range updated for 030 (task 18) and 031 (t
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
-| decisions-and-evidence.md | Decisions 001-031 and evidence ids referenced by this design |
+| questions.md | Open: none; resolved: Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| decisions-and-evidence.md | Decisions 001-038 and evidence ids referenced by this design |

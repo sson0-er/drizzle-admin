@@ -8,6 +8,7 @@
 
 ## Decision
 - Coercion, the zod schema, `toFormValue` and display formatting depend only on the field (`kind`, `isDateOnly`, `foreignKey`), never on the widget. The widget only selects the HTML element.
+  Changed 2026-10-08: one exception, decision 037: the `password` widget renders no value, an empty `password` submission on the change page keeps the stored value, and a display-only `password` field shows a mask.
 - `register()` rejects an override that is not in the allowed set for the field: `drizzle-admin: <table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
 
 Changed 2026-10-07: added the row for kind string + `isDateOnly` (PG `date()` string mode), which no longer allows `textarea` / `password`; rows are matched first-match (decision 023).
@@ -26,6 +27,7 @@ Changed 2026-10-07: added the row for kind string + `isDateOnly` (PG `date()` st
 | unknown | none (the field is never editable) |
 
 - `select` on an FK field whose referenced model is not registered (no `slug` after finalization) is rejected at finalization, because there are no choices. If the referenced table has more than 200 rows, a `select` override falls back to the default `tooMany` behaviour (an input plus a link).
+  Changed 2026-10-08: the link appears only for the default widget and a `select` override; `hidden`, `number` and `text` overrides get no link (decision 036). Without `view` permission on the referenced model, the default and `select` fall back to the plain input without a link (decision 034).
 
 ## Alternatives considered
 - Let the widget drive coercion: `checkbox` on a string field would then need a string meaning for checked and unchecked, and a widget would change data semantics. This is more rules for no requested feature.

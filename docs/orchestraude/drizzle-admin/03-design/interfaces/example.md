@@ -46,6 +46,8 @@ export async function createExampleApp(opts: { secret: string; adminPassword: st
 Everything below except the port and environment handling lives here; `server.ts` reads the environment, calls it and serves.
 
 ### `example/server.ts` (behavior of app.ts + server.ts together)
+Changed 2026-10-08: the server binds to `127.0.0.1` by default, overridable with `HOST` (decision 038).
+
 - `new Database(":memory:")`, `PRAGMA foreign_keys = ON`, `createSchema`, `drizzle(sqlite)`, `await seed(db)`.
 - `createAdmin({ db, dialect: "sqlite", basePath: "/admin", siteTitle: "drizzle-admin demo", secret, auth: { verifyCredentials } })`
   - `secret = process.env.ADMIN_SECRET ?? <random 32-byte hex generated at startup>`; sessions do not survive a restart unless it is set.
@@ -54,14 +56,15 @@ Everything below except the port and environment handling lives here; `server.ts
   - users: the §5.1 options (listDisplay id/email/isActive/createdAt, searchFields email/name, listFilter isActive and role, ordering `-createdAt`, readonlyFields createdAt, toString email). Action `deactivate` sets `isActive = false` for the ids and has `confirm: true`. Action `activate` does the opposite without confirmation.
   - posts: listDisplay id/title/authorId/status/publishedAt, searchFields title, listFilter status/authorId/publishedAt, listPerPage 20, toString title.
   - tags: defaults only.
-- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` on `Number(process.env.PORT ?? 3000)`. Prints the URL and login hint.
+- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` with `serve({ fetch: app.fetch, port, hostname })`, where `port = Number(process.env.PORT ?? 3000)` and `hostname = process.env.HOST ?? "127.0.0.1"`. `serve` passes `hostname` to `server.listen(port, hostname)` (evidence: 2026-10-08-hono-head-cookie-body-node-server), so by default the demo with its default password is reachable only from the local machine. Prints the URL built from `hostname` and `port` (an IPv6 literal in brackets) and the login hint (decision 038).
 
 ## Data formats
 Run instructions (also in the README "Development" section):
 ```
 mise install          # node 24.21.0 and pnpm 12.10.0 from mise.toml
 pnpm install
-pnpm example          # then open http://localhost:3000/admin/ and log in as admin / admin
+pnpm example          # then open http://127.0.0.1:3000/admin/ and log in as admin / admin
+HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first)
 ```
 
 ## Errors

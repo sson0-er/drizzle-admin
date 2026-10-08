@@ -3,12 +3,13 @@
 Files: `src/messages.ts`, `src/time.ts`. No dependencies. Web-standard APIs only (`Intl`).
 
 ## Responsibilities
-- `messages.ts`: every user-visible UI string (Japanese), in one file (§2). No other source file contains UI text literals.
+- `messages.ts`: every user-visible UI string (Japanese), in one file (§2). No other source file contains UI text literals. Changed 2026-10-08: glyph-only literals that contain no words are exempt: the paginator's `‹` / `›`, the breadcrumb separator `›`, the boolean cell marks `✓` / `✗`, the null cell `-`, the truncation `…`, the empty choice `---------` and the password mask `********` (decisions 033 item 11, 037).
 - `time.ts`: time-zone validation, conversion between `datetime-local` values and instants, date-preset ranges, list date formatting.
 
 ## API
 
 ### `src/messages.ts`
+Changed 2026-10-08: `alreadyDeleted` added for a single delete that removed 0 rows (decision 036).
 ```ts
 export const messages = {
   defaultSiteTitle: "サイト管理",
@@ -30,6 +31,7 @@ export const messages = {
   // results (flash)
   added: (s: string) => `「${s}」を追加しました。`, changed: (s: string) => `「${s}」を変更しました。`,
   deleted: (s: string) => `「${s}」を削除しました。`, deletedMany: (n: number) => `${n} 件削除しました。`,
+  alreadyDeleted: (s: string) => `「${s}」は既に削除されています。`,   // warning, decision 036
   actionDone: "操作を実行しました。", afterSaveFailed: "保存しましたが、保存後の処理でエラーが発生しました。",
   // errors
   dbUnique: "同じ値のデータが既に存在します。", dbForeignKey: "関連するデータがあるため処理できません。",

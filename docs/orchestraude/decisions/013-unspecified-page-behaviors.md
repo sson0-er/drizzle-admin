@@ -18,6 +18,7 @@ The pre-spec defines pages and options but leaves several low-impact behaviors o
 9. Failed login re-renders with status 400 (consistent with §9 error status).
 10. `beforeSave` / `beforeDelete` throwing → generic error (400 form error, or error flash on delete). `afterSave` throwing after a successful write → success redirect with an extra warning flash. Action `run` throwing → generic error flash. Hook and action error messages are not rendered.
 11. The `password` widget renders `<input type="password">` with the current value like any text input (no special semantics).
+    Changed 2026-10-08: superseded by decision 037. The `password` input always renders empty (no stored or submitted value in the HTML), and an empty submission on the change page keeps the stored value.
 12. Trailing-slash redirect uses 301 (Django `APPEND_SLASH`).
 13. Changed 2026-10-07: `listFilter` also accepts kind string + `isDateOnly` (PG `date()` string mode, decision 023), and widget overrides are checked by `allowedWidgets` (decision 021). `register()` additionally rejects: `listFilter` on fields other than kind boolean/enum/date, `isDateOnly` (kind string, decision 023) or FK; `searchFields` on kinds other than string/enum; both `fields` and `fieldsets` given; duplicate action names or the reserved name `delete_selected`; `listPerPage` not a positive integer.
 
