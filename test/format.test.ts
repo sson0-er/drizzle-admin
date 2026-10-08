@@ -113,6 +113,15 @@ describe("truncation", () => {
     expect(out).toHaveLength(TRUNCATE_AT + 1);
   });
 
+  it("cuts a json value whose serialization exceeds 100 chars", () => {
+    const value = { text: "d".repeat(TRUNCATE_AT) };
+    const json = JSON.stringify(value);
+    expect(json.length).toBeGreaterThan(TRUNCATE_AT);
+    expect(formatValue(field({ kind: "json" }), value, TOKYO)).toBe(
+      `${json.slice(0, TRUNCATE_AT)}…`,
+    );
+  });
+
   it("keeps a 100-char string intact", () => {
     const text = "b".repeat(TRUNCATE_AT);
     expect(formatValue(field(), text, TOKYO)).toBe(text);

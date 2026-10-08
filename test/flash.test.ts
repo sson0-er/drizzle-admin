@@ -41,6 +41,13 @@ async function consume(app: Hono, cookie: string) {
   return { res, body: (await res.json()) as FlashMessage[] };
 }
 
+// An invalid cookie must be removed, or it would be re-sent and re-rejected until it expires.
+const expectDeleted = (res: Response) => {
+  const h = res.headers.get("set-cookie") ?? "";
+  expect(h).toContain(`${FLASH_COOKIE}=;`);
+  expect(h).toContain("Max-Age=0");
+};
+
 describe("flash", () => {
   const app = makeApp(opts);
 
@@ -66,15 +73,20 @@ describe("flash", () => {
   });
 
   it("returns [] for a tampered cookie", async () => {
-    const cookie = pair(await app.request("http://localhost/add1")).replace("one", "evil");
-    const { body } = await consume(app, cookie);
+    const original = pair(await app.request("http://localhost/add1"));
+    const cookie = original.replace("one", "evil");
+    expect(cookie).not.toBe(original); // guards against the replace silently not matching
+    const { res, body } = await consume(app, cookie);
     expect(body).toEqual([]);
+    expectDeleted(res);
   });
 
   it("returns [] for a cookie signed with another secret", async () => {
     const other = makeApp({ ...opts, secret: "other" });
     const cookie = pair(await other.request("http://localhost/add1"));
-    expect((await consume(app, cookie)).body).toEqual([]);
+    const { res, body } = await consume(app, cookie);
+    expect(body).toEqual([]);
+    expectDeleted(res);
   });
 
   it.each([
@@ -85,7 +97,9 @@ describe("flash", () => {
     ["null entry", JSON.stringify([null])],
   ])("returns [] for an invalid shape (%s)", async (_label, v) => {
     const cookie = pair(await app.request(`http://localhost/raw?v=${encodeURIComponent(v)}`));
-    expect((await consume(app, cookie)).body).toEqual([]);
+    const { res, body } = await consume(app, cookie);
+    expect(body).toEqual([]);
+    expectDeleted(res);
   });
 
   it("sets HttpOnly, SameSite=Lax, Path and Max-Age=60", async () => {

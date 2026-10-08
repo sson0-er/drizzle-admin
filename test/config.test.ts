@@ -14,9 +14,9 @@ const base: AdminConfig = {
 const make = (over: Record<string, unknown> = {}) => ({ ...base, ...over }) as AdminConfig;
 const resolved = (over: Record<string, unknown> = {}) => resolveConfig(make(over));
 const rejects = (over: Record<string, unknown>, option: string) => {
-  expect(() => createAdmin(make(over))).toThrow(
-    new RegExp(`^Error: drizzle-admin: .*${option}|^drizzle-admin: .*${option}`),
-  );
+  // Option names are plain identifiers today; escaping keeps the anchor exact if that changes.
+  const escaped = option.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  expect(() => createAdmin(make(over))).toThrow(new RegExp(`^drizzle-admin: .*${escaped}`));
 };
 
 describe("createAdmin", () => {

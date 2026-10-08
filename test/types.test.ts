@@ -66,3 +66,9 @@ describe("ModelAdminOptions column keys (checked by pnpm typecheck)", () => {
     expect(typeof admin.register).toBe("function");
   });
 });
+
+describe("runtime exports of src/index.ts", () => {
+  it("export createAdmin only", async () => {
+    expect(Object.keys(await import("../src/index.js"))).toEqual(["createAdmin"]);
+  });
+});

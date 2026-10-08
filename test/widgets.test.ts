@@ -250,6 +250,17 @@ describe("DisplayValue", () => {
     );
   });
 
+  it.each(["Asia/Tokyo", "America/New_York"])(
+    "shows a date-only Date and a json value the same in %s",
+    (timeZone) => {
+      const display = (f: FormField, value: unknown) =>
+        text(parse(String(DisplayValue({ field: f, value, timeZone }))));
+      const day = field("date", { kind: "date", isDateOnly: true });
+      expect(display(day, new Date("2026-10-07T00:00:00Z"))).toBe("2026/10/07");
+      expect(display(field("json", { kind: "json" }), { a: 1 })).toBe('{"a":1}');
+    },
+  );
+
   it("masks a password-widget field", () => {
     const html = String(
       DisplayValue({ field: field("password"), value: "stored", timeZone: "UTC" }),

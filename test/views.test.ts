@@ -192,6 +192,10 @@ describe("Layout", () => {
     }
   });
 
+  it("renders no message list without flash messages", () => {
+    expect(q1(render({ flash: [] }), { tag: "ul", cls: "messagelist" })).toBeNull();
+  });
+
   it("renders the logout form with a CSRF input only when showLogout is true", () => {
     const withLogout = render();
     const form = q1(withLogout, { tag: "form", attrs: { action: "/admin/logout/" } });

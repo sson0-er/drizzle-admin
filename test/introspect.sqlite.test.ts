@@ -1,5 +1,5 @@
-import { getTableName, type Table } from "drizzle-orm";
-import { integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
+import { getTableName, sql, type Table } from "drizzle-orm";
+import { blob, foreignKey, integer, primaryKey, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import { introspectTable, toSnapshot } from "../src/introspect/index.js";
 import * as pgSchema from "./fixtures/schema-pg.js";
@@ -105,5 +105,47 @@ describe("introspectTable (sqlite)", () => {
       primaryKey({ columns: [x.a] }),
     ]);
     expect(introspectTable(t, "sqlite").pk.key).toBe("a");
+  });
+});
+
+describe("introspectTable (sqlite): mapping rules for special columns", () => {
+  const parent = sqliteTable(
+    "parent",
+    { a: integer("a").notNull(), b: integer("b").notNull() },
+    (t) => [primaryKey({ columns: [t.a, t.b] })],
+  );
+  const multiFk = sqliteTable(
+    "child",
+    { id: integer("id").primaryKey(), a: integer("a"), b: integer("b") },
+    (t) => [foreignKey({ columns: [t.a, t.b], foreignColumns: [parent.a, parent.b] })],
+  );
+  const generated = sqliteTable("gen", {
+    id: integer("id").primaryKey(),
+    first: text("first").notNull(),
+    upper: text("upper").generatedAlwaysAs(sql`upper(first)`),
+  });
+  const binary = sqliteTable("bin", {
+    id: integer("id").primaryKey(),
+    data: blob("data", { mode: "buffer" }),
+  });
+
+  it.each([
+    {
+      name: "neither column of a multi-column FK has foreignKey",
+      actual: [field(multiFk, "a").foreignKey, field(multiFk, "b").foreignKey],
+      expected: [undefined, undefined],
+    },
+    {
+      name: "a generated column is isGenerated",
+      actual: field(generated, "upper").isGenerated,
+      expected: true,
+    },
+    {
+      name: "a buffer blob column has kind unknown",
+      actual: field(binary, "data").kind,
+      expected: "unknown",
+    },
+  ])("$name", ({ actual, expected }) => {
+    expect(actual).toEqual(expected);
   });
 });

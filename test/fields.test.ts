@@ -10,6 +10,7 @@ import {
   type FormGroup,
   type FormMode,
 } from "../src/forms/fields.js";
+import type { FieldMeta } from "../src/introspect/index.js";
 import type { AdminConfig, ModelAdminOptions, ResolvedModel } from "../src/types.js";
 import * as pg from "./fixtures/schema-pg.js";
 import * as sqlite from "./fixtures/schema-sqlite.js";
@@ -68,6 +69,7 @@ function build(
     mode: FormMode;
     canChange: boolean;
     fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;
+    refSlugOf: (key: string) => string | undefined;
   }> = {},
 ): FormGroup[] {
   return buildFormGroups({
@@ -76,8 +78,20 @@ function build(
     canChange: over.canChange ?? true,
     prefix: "/admin",
     fkChoices: over.fkChoices ?? new Map(),
-    refSlugOf: (key) => model.meta.fields.find((f) => f.key === key)?.foreignKey?.slug,
+    refSlugOf:
+      over.refSlugOf ?? ((key) => model.meta.fields.find((f) => f.key === key)?.foreignKey?.slug),
   });
+}
+
+/** Copy of the model whose field `key` has its meta patched (the fixtures' FKs are notNull integers). */
+function withMeta(model: ResolvedModel, key: string, patch: Partial<FieldMeta>): ResolvedModel {
+  return {
+    ...model,
+    meta: {
+      ...model.meta,
+      fields: model.meta.fields.map((f) => (f.key === key ? { ...f, ...patch } : f)),
+    },
+  };
 }
 
 const flat = (groups: FormGroup[]): FormField[] => groups.flatMap((g) => g.fields);
@@ -87,6 +101,9 @@ const field = (groups: FormGroup[], key: string): FormField => {
   if (found === undefined) throw new Error(`no field ${key}`);
   return found;
 };
+
+const articlesAndAuthors = (): ResolvedModel =>
+  modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
 
 describe("buildFormGroups: editability", () => {
   it("omits an auto-increment PK on add and shows it display-only on change", () => {
@@ -152,8 +169,6 @@ describe("buildFormGroups: editability", () => {
 });
 
 describe("buildFormGroups: default widgets", () => {
-  const articlesAndAuthors = (): ResolvedModel =>
-    modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
   const authorChoices: Choice[] = [
     { value: "1", label: "Ann" },
     { value: "2", label: "Bob" },
@@ -179,16 +194,7 @@ describe("buildFormGroups: default widgets", () => {
   });
 
   it("falls back to text for a non-numeric FK key", () => {
-    const model = modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
-    const meta = model.meta.fields.find((f) => f.key === "authorId");
-    if (meta === undefined) throw new Error("no authorId");
-    const textual = {
-      ...model,
-      meta: {
-        ...model.meta,
-        fields: model.meta.fields.map((f) => (f === meta ? { ...f, kind: "string" as const } : f)),
-      },
-    };
+    const textual = withMeta(articlesAndAuthors(), "authorId", { kind: "string" });
     const f = field(build(textual, { fkChoices: new Map([["authorId", "tooMany"]]) }), "authorId");
     expect(f.widget).toBe("text");
     expect(f.fkFallbackHref).toBe("/admin/authors/");
@@ -200,6 +206,18 @@ describe("buildFormGroups: default widgets", () => {
     const f = field(build(model, { fkChoices: new Map([["authorId", "tooMany"]]) }), "authorId");
     expect(f.widget).toBe("number");
     expect(f.fkFallbackHref).toBe("/admin/authors/");
+  });
+
+  it("builds the fallback link from refSlugOf, not from foreignKey.slug", () => {
+    const model = articlesAndAuthors();
+    const f = field(
+      build(model, {
+        fkChoices: new Map([["authorId", "tooMany"]]),
+        refSlugOf: () => "people",
+      }),
+      "authorId",
+    );
+    expect(f.fkFallbackHref).toBe("/admin/people/");
   });
 
   it("treats an FK to an unregistered table as a plain field", () => {
@@ -262,7 +280,7 @@ describe("buildFormGroups: password widget", () => {
 describe("buildFormGroups: widget overrides and the empty choice", () => {
   it("replaces the default widget with an explicit override", () => {
     const model = modelOf("sqlite", sqlite.authors, {
-      widgets: { name: "textarea", role: "text", active: "checkbox" },
+      widgets: { name: "textarea", role: "text" },
     });
     const groups = build(model);
     expect(field(groups, "name").widget).toBe("textarea");
@@ -294,17 +312,42 @@ describe("buildFormGroups: widget overrides and the empty choice", () => {
     },
   );
 
+  it("falls back to a number input and a link for a bigint FK with too many choices", () => {
+    const model = withMeta(articlesAndAuthors(), "authorId", { kind: "bigint" });
+    const f = field(build(model, { fkChoices: new Map([["authorId", "tooMany"]]) }), "authorId");
+    expect(f.widget).toBe("number");
+    expect(f.fkFallbackHref).toBe("/admin/authors/");
+  });
+
+  it.each(["number", "text"] as const)(
+    "keeps a %s override on an FK that has a choices list and gives it no choices",
+    (override) => {
+      // Set on the resolved model: registration would reject "text" on a numeric FK.
+      const model = { ...articlesAndAuthors(), widgets: { authorId: override } };
+      const choices: Choice[] = [{ value: "1", label: "Ann" }];
+      const f = field(build(model, { fkChoices: new Map([["authorId", choices]]) }), "authorId");
+      expect(f.widget).toBe(override);
+      expect(f.choices).toBeUndefined();
+      expect(f.fkFallbackHref).toBeUndefined();
+    },
+  );
+
+  it.each([
+    { name: "notNull", notNull: true, choices: [] },
+    { name: "nullable", notNull: false, choices: [{ value: "", label: "---------" }] },
+  ])(
+    "gives a $name FK without an fkChoices entry a select with only the empty choice, if any",
+    ({ notNull, choices }) => {
+      const model = withMeta(articlesAndAuthors(), "authorId", { notNull });
+      const f = field(build(model), "authorId");
+      expect(f.widget).toBe("select");
+      expect(f.choices).toEqual(choices);
+    },
+  );
+
   it("falls back to a text input for a noView FK with a non-numeric key", () => {
     const model = modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
-    const textual = {
-      ...model,
-      meta: {
-        ...model.meta,
-        fields: model.meta.fields.map((f) =>
-          f.key === "authorId" ? { ...f, kind: "string" as const } : f,
-        ),
-      },
-    };
+    const textual = withMeta(model, "authorId", { kind: "string" });
     const f = field(build(textual, { fkChoices: new Map([["authorId", "noView"]]) }), "authorId");
     expect(f.widget).toBe("text");
     expect(f.fkFallbackHref).toBeUndefined();
@@ -325,13 +368,7 @@ describe("buildFormGroups: widget overrides and the empty choice", () => {
   it("adds the empty choice to a nullable FK select", () => {
     // The fixture's `authorId` is notNull, so make a nullable copy of it.
     const model = modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
-    const nullable = {
-      ...model,
-      meta: {
-        ...model.meta,
-        fields: model.meta.fields.map((f) => (f.key === "authorId" ? { ...f, notNull: false } : f)),
-      },
-    };
+    const nullable = withMeta(model, "authorId", { notNull: false });
     const f = field(
       build(nullable, { fkChoices: new Map([["authorId", [{ value: "1", label: "Ann" }]]]) }),
       "authorId",

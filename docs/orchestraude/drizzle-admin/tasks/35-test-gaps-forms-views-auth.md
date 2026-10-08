@@ -1,7 +1,7 @@
 ---
 id: 35-test-gaps-forms-views-auth
 depends_on: [30-cookie-deletion-and-head-guard, 32-password-no-echo]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 35: test-gaps-forms-views-auth
@@ -88,3 +88,7 @@ Test-only task.
 - Findings: docs/orchestraude/drizzle-admin/05-low-findings.md (L034, L106, L108, L111, L116-L118, L121, L128, L129, L135-L137 details)
 
 ## History
+
+- Implemented as test-only; no new test failed against the current code. Skipped: none of the listed items was already covered by tasks 28, 31 or 32.
+- fields.test.ts: the "text override on an FK with a choices list" row sets `widgets` on the resolved model, because `register` rejects `text` on a numeric FK. The three copy-pasted meta-patching blocks became one `withMeta` helper (fourth copy), and `articlesAndAuthors` moved to module level.
+- L121: `active: "checkbox"` was removed from the override test; `name: "textarea"` and `role: "text"` already differ from the defaults.

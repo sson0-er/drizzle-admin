@@ -158,6 +158,7 @@ describe("coerceForm: kinds", () => {
     const f = field("n", { kind: "bigint" });
     expect(run(f, "9007199254740993").data).toEqual({ n: 9007199254740993n });
     expect(run(f, "-5").data).toEqual({ n: -5n });
+    expect(run(f, " 5 ").data).toEqual({ n: 5n });
     expect(run(f, "1.5").errors).toEqual({ n: messages.invalidInteger });
     expect(run(f, "abc").errors).toEqual({ n: messages.invalidInteger });
   });
@@ -228,6 +229,10 @@ describe("coerceForm: date-only", () => {
     for (const raw of ["2026-02-30", "2026/10/07", "2026-10-7", "2026-10-07T00:00"]) {
       expect(run(f, raw).errors).toEqual({ d: messages.invalidDate });
     }
+  });
+
+  it("rejects a slash-separated date on a date-only Date field with invalidDate", () => {
+    expect(run(dateField, "2026/10/07").errors).toEqual({ d: messages.invalidDate });
   });
 
   it("gives null for an empty value when nullable", () => {
