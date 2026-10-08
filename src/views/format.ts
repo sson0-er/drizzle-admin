@@ -36,6 +36,9 @@ export function formatValue(field: FieldMeta, value: unknown, tz: string): strin
   return truncate(stringify(value));
 }
 
+// Glyph-only literal, not a message (decision 033 item 11).
+const PASSWORD_MASK = "********";
+
 export function formatCell(args: {
   field: FieldMeta;
   value: unknown;
@@ -43,8 +46,11 @@ export function formatCell(args: {
   tz: string;
   formatter?: (v: unknown, row: DbRow) => string;
   fkLabel?: string;
+  /** Password-widget field: the value must never reach the HTML (decision 037). */
+  masked?: boolean;
 }): string {
-  const { field, value, row, tz, formatter, fkLabel } = args;
+  const { field, value, row, tz, formatter, fkLabel, masked } = args;
+  if (masked) return PASSWORD_MASK;
   if (formatter) return formatter(value, row);
   if (value === null || value === undefined) return "-";
   if (fkLabel !== undefined) return fkLabel;

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { FormField } from "../src/forms/fields.js";
 import { messages } from "../src/messages.js";
 import { ADMIN_CSS, ADMIN_CSS_VERSION } from "../src/static/admin-css.js";
 import { SELECT_ALL_SCRIPT } from "../src/static/select-all.js";
 import { DashboardPage } from "../src/views/dashboard.js";
 import { ErrorPage } from "../src/views/error.js";
+import { FormPage } from "../src/views/form.js";
 import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
 import { LoginPage } from "../src/views/login.js";
@@ -386,6 +388,50 @@ describe("ListPage", () => {
     expect(cell && text(cell)).toBe("<script>alert(1)</script>");
     expect(cell && qsa(cell, { tag: "script" })).toHaveLength(0);
     expect(qsa(doc, { tag: "script" })).toHaveLength(1);
+  });
+});
+
+describe("FormPage password display", () => {
+  const password: FormField = {
+    key: "pw",
+    label: "pw",
+    meta: {
+      key: "pw",
+      dbName: "pw",
+      kind: "string",
+      notNull: true,
+      hasDefault: false,
+      isPrimaryKey: false,
+      isAutoIncrement: false,
+      isInteger: false,
+      isLongText: false,
+      isDateOnly: false,
+      isGenerated: false,
+    },
+    widget: "password",
+    editable: false,
+    required: true,
+  };
+
+  it("masks a display-only password field", () => {
+    const html = String(
+      FormPage({
+        ...chrome,
+        mode: "change",
+        modelLabel: "Account",
+        groups: [{ fields: [password] }],
+        values: {},
+        fieldErrors: {},
+        formErrors: [],
+        canSave: false,
+        displayRow: { pw: "stored" },
+        timeZone: "UTC",
+      }),
+    );
+    const row = q1(parse(html), { tag: "div", cls: "form-row" });
+    expect(row && text(row)).toContain("********");
+    expect(row && text(row)).not.toContain("stored");
+    expect(html).not.toContain("stored");
   });
 });
 

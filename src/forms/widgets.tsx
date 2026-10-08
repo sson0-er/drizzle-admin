@@ -31,8 +31,16 @@ export function toFormValue(field: FormField, value: unknown, timeZone: string):
   }
 }
 
+// Glyph-only literal, not a message (decision 033 item 11).
+const PASSWORD_MASK = "********";
+
 export function DisplayValue(props: { field: FormField; value: unknown; timeZone: string }) {
-  return <span class="readonly">{formatValue(props.field.meta, props.value, props.timeZone)}</span>;
+  const { field, value, timeZone } = props;
+  return (
+    <span class="readonly">
+      {field.widget === "password" ? PASSWORD_MASK : formatValue(field.meta, value, timeZone)}
+    </span>
+  );
 }
 
 function Input(props: { field: FormField; value: string }) {
@@ -42,7 +50,8 @@ function Input(props: { field: FormField; value: string }) {
   // No `required` attribute anywhere, so server-side errors stay observable with plain requests.
   switch (field.widget) {
     case "password":
-      return <input type="password" name={name} id={id} value={value} />;
+      // Never echo the value, not even on a 400 re-render (decision 037).
+      return <input type="password" name={name} id={id} />;
     case "number":
       return (
         <input

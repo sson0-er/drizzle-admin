@@ -1,7 +1,7 @@
 ---
 id: 32-password-no-echo
 depends_on: [31-password-keep-on-empty, 28-fk-reference-view-permission]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 32: password-no-echo
@@ -56,3 +56,5 @@ The value of a `password`-widget field never appears in the HTML (decision 037 p
 - Decisions: docs/orchestraude/decisions/037-password-widget-no-echo.md (points 1, 4, 5), docs/orchestraude/decisions/033-low-findings-recorded-behaviors.md (item 11)
 
 ## History
+- Implemented: password `Input` renders no `value`; `DisplayValue` and `formatCell` (`masked`) use a module-private `********` literal each (no new exports); `list.ts` passes `masked: model.widgets[key] === "password"`. `form.tsx` untouched.
+- Tests: the FormPage display-only test lives in `test/views.test.ts` as the DoD names it (the other FormPage tests are in `widgets.test.ts`). `password-widget.test.ts` now runs a second (view-only) admin per dialect and re-seeds `a = s3cret` in `beforeEach`.

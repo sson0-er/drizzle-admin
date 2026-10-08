@@ -165,6 +165,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
         value,
         row,
         tz: timeZone,
+        masked: model.widgets[key] === "password",
         ...(formatter === undefined ? {} : { formatter }),
         ...(fkLabel === undefined ? {} : { fkLabel }),
       });

@@ -55,10 +55,10 @@ describe("Widget", () => {
     expect(attr(el, "id")).toBe("id_f");
   });
 
-  it("renders a password input and keeps its value", () => {
-    const el = control(renderWidget(field("password"), "secret"), "input");
-    expect(attr(el, "type")).toBe("password");
-    expect(attr(el, "value")).toBe("secret");
+  it("renders a password input that never contains the given value", () => {
+    const html = renderWidget(field("password"), "stored");
+    expect(attr(control(html, "input"), "type")).toBe("password");
+    expect(html).not.toContain("stored");
   });
 
   it("uses step=1 for integer and bigint, step=any otherwise", () => {
@@ -248,6 +248,14 @@ describe("DisplayValue", () => {
     expect(render(field("datetime", { kind: "date" }), new Date("2026-10-07T00:30:00Z"))).toBe(
       "2026/10/07 09:30",
     );
+  });
+
+  it("masks a password-widget field", () => {
+    const html = String(
+      DisplayValue({ field: field("password"), value: "stored", timeZone: "UTC" }),
+    );
+    expect(text(parse(html))).toBe("********");
+    expect(html).not.toContain("stored");
   });
 
   it("escapes markup", () => {

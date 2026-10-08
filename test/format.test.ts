@@ -25,6 +25,17 @@ function field(overrides: Partial<FieldMeta> = {}): FieldMeta {
 const cell = (args: Partial<Parameters<typeof formatCell>[0]> & { value: unknown }) =>
   formatCell({ field: field(), row: {}, tz: TOKYO, ...args });
 
+describe("formatCell masked", () => {
+  it.each([
+    { name: "a string value", args: { value: "s3cret" } },
+    { name: "null", args: { value: null } },
+    { name: "a formatter", args: { value: "s3cret", formatter: () => "custom" } },
+    { name: "an fkLabel", args: { value: 42, fkLabel: "Alice" } },
+  ])("shows the mask for $name", ({ args }) => {
+    expect(cell({ ...args, masked: true })).toBe("********");
+  });
+});
+
 describe("formatCell rule order", () => {
   it("1: returns the formatter output as is, even for null and markup", () => {
     expect(cell({ value: "x", formatter: () => "<b>bold</b>" })).toBe("<b>bold</b>");
