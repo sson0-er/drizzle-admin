@@ -1,7 +1,7 @@
 ---
 id: 53-security-low-findings-tests
 depends_on: [49-i18n-dictionaries-and-request-locale]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 53: security-low-findings-tests
@@ -86,3 +86,5 @@ Follow the conventions in CLAUDE.md: independent cases are `it.each` rows (one c
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+- Attempt 1: done. Tests only; verify passes. Deviations: L007/L009 use two `it.runIf` tests (one per dialect) with fixed expectations. L008 reads text and level from one fetch via a new local helper `flashItems` in test/actions.test.ts, because the flash cookie is consumed by the first GET (a second `flashes(client, res)` call would return an empty list); the filtered `flashes(client, res, "warning")` call is gone from both cap tests. L010 uses two small local helpers inside the test.
+- Review round 1: high 0, medium 0, low 4 (quality: flashItems duplicates flashes, two extra https host rows; spec: flashItems instead of flashes(client, res) accepted as meeting intent, view:false assertion rewritten through local helpers). Done.

@@ -754,10 +754,17 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
     });
 
     it("lists no link to the hidden model on the dashboard", async () => {
+      const hrefsOn = async (res: Response) =>
+        qsa(await docOf(res), { tag: "a" }).map((a) => attr(a, "href") ?? "");
+      const authorsLinks = (hrefs: string[]) =>
+        hrefs.filter((href) => href.startsWith("/admin/authors/"));
+      // Positive control: with every permission the link is there.
+      expect(authorsLinks(await hrefsOn(await (await clientWith({})).get("/admin/")))).not.toEqual(
+        [],
+      );
       const res = await (await clientWith({ view: false })).get("/admin/");
       expect(res.status).toBe(200);
-      const hrefs = qsa(await docOf(res), { tag: "a" }).map((a) => attr(a, "href") ?? "");
-      expect(hrefs.filter((href) => href.startsWith("/admin/authors/"))).toEqual([]);
+      expect(authorsLinks(await hrefsOn(res))).toEqual([]);
     });
 
     it.each([

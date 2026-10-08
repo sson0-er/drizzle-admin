@@ -490,16 +490,23 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       );
     });
 
-    it("add: views=3000000000 is rejected on PG (int4) and stored on SQLite", async () => {
-      const res = await send(client, "/admin/articles/add/", {
-        title: "int4-overflow",
-        authorId: "1",
-        views: "3000000000",
-      });
-      expect(res.status).toBe(fixture.name === "pglite" ? 400 : 303);
-      if (fixture.name === "pglite") {
+    const overflowForm = { title: "int4-overflow", authorId: "1", views: "3000000000" };
+
+    it.runIf(fixture.name === "pglite")(
+      "add: views=3000000000 is rejected on PG (int4)",
+      async () => {
+        const res = await send(client, "/admin/articles/add/", overflowForm);
+        expect(res.status).toBe(400);
         expect(errorsOf(await docOf(res), "views")).toContain(messages.invalidInteger);
-      }
+      },
+    );
+
+    it.runIf(fixture.name === "sqlite")("add: views=3000000000 is stored on SQLite", async () => {
+      const res = await send(client, "/admin/articles/add/", overflowForm);
+      expect(res.status).toBe(303);
+      expect(await rowWhere(t, "articles", "title", "int4-overflow")).toMatchObject({
+        views: 3000000000,
+      });
     });
 
     it("change: a coercion error -> 400 with the raw values kept", async () => {

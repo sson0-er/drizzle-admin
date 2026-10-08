@@ -71,6 +71,11 @@ describe.each(dialects)("actions ($name)", (fixture) => {
       text(li).trim(),
     );
   }
+  /** The flash cookie is consumed by the first GET, so text and level are read from one fetch. */
+  async function flashItems(c: Client, res: Response) {
+    const doc = await docOf(await c.get(res.headers.get("Location") ?? ""));
+    return qsa(qs(doc, { tag: "ul", cls: "messagelist" }) as Node, { tag: "li" });
+  }
 
   beforeAll(async () => {
     t = await makeAdmin(fixture, {
@@ -206,14 +211,18 @@ describe.each(dialects)("actions ($name)", (fixture) => {
       });
       expect(res.status).toBe(303);
       expect(res.headers.get("Location")).toBe("/admin/authors/");
-      expect(await flashes(client, res, "warning")).toEqual([messages.tooManySelected(500)]);
+      const items = await flashItems(client, res);
+      expect(items.map((li) => text(li).trim())).toEqual([messages.tooManySelected(500)]);
+      expect(attr(items[0] as Node, "class")?.split(/\s+/)).toContain("warning");
       expect(await rowCount(client)).toBe(before);
     });
 
     it("does not run a custom action for more than 500 ids", async () => {
       const res = await post(client, "/admin/authors/", { action: "tag", _selected: ids(501) });
       expect(res.status).toBe(303);
-      expect(await flashes(client, res, "warning")).toEqual([messages.tooManySelected(500)]);
+      const items = await flashItems(client, res);
+      expect(items.map((li) => text(li).trim())).toEqual([messages.tooManySelected(500)]);
+      expect(attr(items[0] as Node, "class")?.split(/\s+/)).toContain("warning");
       expect(runs.tag).toHaveLength(0);
     });
 

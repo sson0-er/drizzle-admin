@@ -102,6 +102,12 @@ describe("example host guard", () => {
     ["http://example.test:3000/", "example.test", 3000, true],
     ["http://localhost:3000/", "example.test", 3000, false],
     ["http://127.0.0.1/", "127.0.0.1", 80, true],
+    ["http://localhost:3000/", "0.0.0.0", 3000, true],
+    ["http://[2001:db8::1]:3000/", "::", 3000, true],
+    ["http://evil.example:3000/", "::", 3000, false],
+    ["http://example.test:3000/", "Example.TEST", 3000, true],
+    ["https://127.0.0.1/", "127.0.0.1", 443, true],
+    ["https://127.0.0.1/", "127.0.0.1", 80, false],
   ])("isAllowedHost(%s, bind %s, port %d) is %s", (url, bindHost, port, expected) => {
     expect(isAllowedHost(url, bindHost, port)).toBe(expected);
   });

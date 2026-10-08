@@ -168,7 +168,13 @@ describe.each(dialects)("list page ($name)", (fixture) => {
 
   it.each([
     ["removes NUL characters", "a%00b", "ab"],
+    ["trims surrounding whitespace", "%20%20ab%20", "ab"],
     ["cuts the text to 200 code points", "x".repeat(250), "x".repeat(200)],
+    [
+      "cuts astral characters by code point, not UTF-16 unit",
+      "%F0%9F%98%80".repeat(201),
+      "😀".repeat(200),
+    ],
   ])("normalizes the search text: %s", async (_name, q, echoed) => {
     const { status, doc } = await page(t, `/admin/authors/?q=${q}`);
     expect(status).toBe(200);
