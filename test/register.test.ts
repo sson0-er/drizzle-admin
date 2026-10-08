@@ -2,6 +2,7 @@ import { blob, integer, primaryKey, sqliteTable } from "drizzle-orm/sqlite-core"
 import { describe, expect, it } from "vitest";
 import { createAdmin, resolvedModels } from "../src/admin.js";
 import { allowedWidgets } from "../src/forms/fields.js";
+import type { ModelAdminOptions } from "../src/index.js";
 import type { FieldMeta } from "../src/introspect/index.js";
 import type { AdminConfig, WidgetType } from "../src/types.js";
 import * as pg from "./fixtures/schema-pg.js";
@@ -429,7 +430,7 @@ describe("ResolvedModel defaults", () => {
     expect(resolvedModels(admin).get("authors")?.toString({ id: 3 })).toBe("Author #3");
   });
 
-  it("normalizes permissions: boolean, function and undefined", () => {
+  it("normalizes permissions: boolean, function and undefined (unset delete inherits view)", () => {
     const admin = sqliteAdmin();
     const user = { id: "1", name: "n" };
     admin.register(authors, {
@@ -440,7 +441,7 @@ describe("ResolvedModel defaults", () => {
     expect(permissions?.add(user)).toBe(true);
     expect(permissions?.change(user)).toBe(true);
     expect(permissions?.change({ id: "2", name: "n" })).toBe(false);
-    expect(permissions?.delete(user)).toBe(true);
+    expect(permissions?.delete(user)).toBe(false);
   });
 
   it("keeps registration order", () => {
@@ -448,6 +449,99 @@ describe("ResolvedModel defaults", () => {
     admin.register(kv);
     admin.register(authors);
     expect([...resolvedModels(admin).keys()]).toEqual(["kv", "authors"]);
+  });
+});
+
+describe("register: default listDisplay skips exclude (decision 046)", () => {
+  const columns = [
+    "id",
+    "title",
+    "body",
+    "authorId",
+    "publishedAt",
+    "meta",
+    "views",
+    "score",
+    "big",
+  ] as const;
+  it.each<{
+    name: string;
+    options: ModelAdminOptions<typeof articles>;
+    listDisplay: string[];
+    links: string[];
+  }>([
+    {
+      name: "an excluded non-key column",
+      options: { exclude: ["title"] },
+      listDisplay: ["id", "body", "authorId", "publishedAt", "meta"],
+      links: ["id"],
+    },
+    {
+      name: "an excluded primary key",
+      options: { exclude: ["id"] },
+      listDisplay: ["title", "body", "authorId", "publishedAt", "meta"],
+      links: ["title"],
+    },
+    {
+      name: "every column excluded",
+      options: { exclude: [...columns] },
+      listDisplay: ["id"],
+      links: ["id"],
+    },
+    {
+      name: "an explicit listDisplay is not filtered",
+      options: { listDisplay: ["id", "title"], exclude: ["title"] },
+      listDisplay: ["id", "title"],
+      links: ["id"],
+    },
+  ])("$name", ({ options, listDisplay, links }) => {
+    const admin = sqliteAdmin();
+    admin.register(articles, options);
+    const model = resolvedModels(admin).get("articles");
+    expect(model?.listDisplay).toEqual(listDisplay);
+    expect(model?.listDisplayLinks).toEqual(links);
+  });
+});
+
+describe("register: permission inheritance (decision 043)", () => {
+  const users = [
+    { id: "1", name: "n" },
+    { id: "2", name: "n" },
+  ];
+  const perms = ["view", "add", "change", "delete"] as const;
+  const byId = (u: { id: string }) => u.id === "1";
+
+  it.each([
+    { name: "{}", permissions: {}, expected: [true, true, true, true] },
+    { name: "view false", permissions: { view: false }, expected: [false, false, false, false] },
+    {
+      name: "view false, add true",
+      permissions: { view: false, add: true },
+      expected: [false, true, false, false],
+    },
+    {
+      name: "view false, delete true",
+      permissions: { view: false, delete: true },
+      expected: [false, false, false, true],
+    },
+  ])("$name", ({ permissions, expected }) => {
+    const admin = sqliteAdmin();
+    admin.register(authors, { permissions });
+    const model = resolvedModels(admin).get("authors");
+    expect(perms.map((p) => model?.permissions[p](users[0] as never))).toEqual(expected);
+  });
+
+  it.each(users)("unset write permissions follow a view function for user $id", (user) => {
+    const admin = sqliteAdmin();
+    admin.register(authors, { permissions: { view: byId } });
+    const model = resolvedModels(admin).get("authors");
+    const expected = byId(user);
+    expect(perms.map((p) => model?.permissions[p](user))).toEqual([
+      expected,
+      expected,
+      expected,
+      expected,
+    ]);
   });
 });
 

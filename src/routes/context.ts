@@ -2,6 +2,7 @@ import type { Context } from "hono";
 import { type JSXNode, jsx } from "hono/jsx";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { addFlash, consumeFlash, type FlashMessage, type FlashOpts } from "../auth/flash.js";
+import { canAny } from "../auth/permissions.js";
 import type { CookieOpts, Session } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
 import { messages } from "../messages.js";
@@ -108,7 +109,12 @@ export function defaultOrdering(model: ResolvedModel): ResolvedModel["ordering"]
 }
 
 export function modelOr404(c: AdminContext, slug: string): ResolvedModel | Response {
-  return c.var.state.models.get(slug) ?? errorPage(c, 404, messages.notFound);
+  const model = c.var.state.models.get(slug);
+  // A model the user holds no permission on answers like an unknown slug (decision 043).
+  if (model === undefined || !canAny(model, requireUser(c))) {
+    return errorPage(c, 404, messages.notFound);
+  }
+  return model;
 }
 
 /**

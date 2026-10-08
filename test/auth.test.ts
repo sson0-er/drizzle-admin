@@ -575,6 +575,8 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
       form?: (id: string) => Record<string, string>;
       /** Name of the author the request would insert, to prove a denied request creates no row. */
       creates?: (id: string) => string;
+      /** Status of the denied request: a user without `view` has no permission at all, so 404. */
+      denied: 403 | 404;
       ok: number;
     }[] = [
       {
@@ -582,6 +584,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         perm: "view",
         method: "GET",
         path: () => "/admin/authors/",
+        denied: 404,
         ok: 200,
       },
       {
@@ -589,6 +592,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         perm: "view",
         method: "GET",
         path: (id) => `/admin/authors/${id}/change/`,
+        denied: 404,
         ok: 200,
       },
       {
@@ -596,6 +600,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         perm: "add",
         method: "GET",
         path: () => "/admin/authors/add/",
+        denied: 403,
         ok: 200,
       },
       {
@@ -605,6 +610,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         path: () => "/admin/authors/add/",
         form: (id) => ({ ...authorForm, name: `added-${id}` }),
         creates: (id) => `added-${id}`,
+        denied: 403,
         ok: 303,
       },
       {
@@ -613,6 +619,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         method: "POST",
         path: (id) => `/admin/authors/${id}/change/`,
         form: (id) => ({ ...authorForm, name: `changed-${id}` }),
+        denied: 403,
         ok: 303,
       },
       {
@@ -620,6 +627,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         perm: "delete",
         method: "GET",
         path: (id) => `/admin/authors/${id}/delete/`,
+        denied: 403,
         ok: 200,
       },
       {
@@ -627,6 +635,7 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         perm: "delete",
         method: "POST",
         path: (id) => `/admin/authors/${id}/delete/`,
+        denied: 403,
         ok: 303,
       },
       {
@@ -636,24 +645,25 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
         path: () => "/admin/authors/",
         form: (id) => ({ action: "delete_selected", _selected: id }),
         // Without `_confirm` the action only renders the confirmation page.
+        denied: 403,
         ok: 200,
       },
     ];
 
     it.each(cases)(
-      "$perm false: $label -> 403, allowed -> $ok",
-      async ({ perm, method, path, form, creates, ok }) => {
+      "$perm false: $label -> $denied, allowed -> $ok",
+      async ({ perm, method, path, form, creates, denied: deniedStatus, ok }) => {
         const id = await addAuthor();
         const send = (client: Client) =>
           method === "GET" ? client.get(path(id)) : client.post(path(id), form?.(id));
 
         const before = await rowsOf(id);
         const denied = await send(await clientWith(without(perm)));
-        expect(denied.status).toBe(403);
+        expect(denied.status).toBe(deniedStatus);
         expect(await rowsOf(id)).toEqual(before);
         if (creates) expect(await rowsNamed(creates(id))).toEqual([]);
 
-        // Control: with every permission the same request succeeds, so the 403 is the gate.
+        // Control: with every permission the same request succeeds, so the permission is the gate.
         const allowed = await send(await clientWith({}));
         expect(allowed.status).toBe(ok);
         // Proves the name query can see the row the denied request did not create.
@@ -675,6 +685,89 @@ describe.each(dialects)("permissions in routes ($name)", (fixture) => {
       expect(await rowsOf(viaDeletePage)).toHaveLength(1);
       expect(await rowsOf(viaAction)).toHaveLength(1);
     });
+  });
+
+  describe("hidden models (decision 043)", () => {
+    const hiddenCases: {
+      label: string;
+      method: "GET" | "POST";
+      path: (id: string) => string;
+      form?: (id: string) => Record<string, string>;
+    }[] = [
+      { label: "GET /admin/authors/", method: "GET", path: () => "/admin/authors/" },
+      { label: "GET /admin/authors/add/", method: "GET", path: () => "/admin/authors/add/" },
+      {
+        label: "GET /admin/authors/<id>/change/",
+        method: "GET",
+        path: (id) => `/admin/authors/${id}/change/`,
+      },
+      {
+        label: "GET /admin/authors/<id>/delete/",
+        method: "GET",
+        path: (id) => `/admin/authors/${id}/delete/`,
+      },
+      {
+        label: "POST /admin/authors/<id>/change/",
+        method: "POST",
+        path: (id) => `/admin/authors/${id}/change/`,
+        form: (id) => ({ ...authorForm, name: `changed-${id}` }),
+      },
+      {
+        label: "POST /admin/authors/<id>/delete/",
+        method: "POST",
+        path: (id) => `/admin/authors/${id}/delete/`,
+      },
+      {
+        label: "POST /admin/authors/ without _selected",
+        method: "POST",
+        path: () => "/admin/authors/",
+        form: () => ({ action: "delete_selected" }),
+      },
+      {
+        label: "POST /admin/authors/ with an unknown action",
+        method: "POST",
+        path: () => "/admin/authors/",
+        form: (id) => ({ action: "nope", _selected: id }),
+      },
+      {
+        label: "POST /admin/authors/ delete_selected with _confirm",
+        method: "POST",
+        path: () => "/admin/authors/",
+        form: (id) => ({ action: "delete_selected", _selected: id, _confirm: "1" }),
+      },
+    ];
+
+    it.each(hiddenCases)("$label answers like an unknown slug", async ({ method, path, form }) => {
+      const id = await addAuthor();
+      const client = await clientWith({ view: false });
+      const before = await rowsOf(id);
+      const unknown = await client.get("/admin/nosuch/");
+      expect(unknown.status).toBe(404);
+
+      const res =
+        method === "GET" ? await client.get(path(id)) : await client.post(path(id), form?.(id));
+      expect(res.status).toBe(404);
+      expect(text(parse(await res.text()))).toBe(text(parse(await unknown.text())));
+      expect(await rowsOf(id)).toEqual(before);
+    });
+
+    it("lists no link to the hidden model on the dashboard", async () => {
+      const res = await (await clientWith({ view: false })).get("/admin/");
+      expect(res.status).toBe(200);
+      const hrefs = qsa(await docOf(res), { tag: "a" }).map((a) => attr(a, "href") ?? "");
+      expect(hrefs.filter((href) => href.startsWith("/admin/authors/"))).toEqual([]);
+    });
+
+    it.each([
+      { path: "/admin/authors/", status: 403 },
+      { path: "/admin/authors/add/", status: 200 },
+    ])(
+      "keeps the per-route answer with add only: GET $path -> $status",
+      async ({ path, status }) => {
+        const client = await clientWith({ view: false, add: true });
+        expect((await client.get(path)).status).toBe(status);
+      },
+    );
   });
 
   describe("hidden controls", () => {

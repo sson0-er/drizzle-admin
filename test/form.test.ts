@@ -776,9 +776,9 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       expect(text(row)).not.toContain("✓");
     });
 
-    it("forbids the change page without view permission", async () => {
+    it("answers 404 on the change page for a model without any permission", async () => {
       const c = await adminOn(t, fixture, { authors: { permissions: { view: false } } });
-      expect((await c.get("/admin/authors/1/change/")).status).toBe(403);
+      expect((await c.get("/admin/authors/1/change/")).status).toBe(404);
     });
   });
 

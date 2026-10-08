@@ -221,13 +221,16 @@ function resolveModel(
   const label = options.label ?? name;
   // `options.toString` would otherwise resolve to Object.prototype.toString when unset.
   const customToString = Object.hasOwn(options, "toString") ? options.toString : undefined;
-  const listDisplay =
-    options.listDisplay ??
-    [meta.pk.key, ...meta.fields.filter((f) => !f.isPrimaryKey).map((f) => f.key)].slice(
-      0,
-      1 + DEFAULT_LIST_DISPLAY_EXTRA,
-    );
   const excluded = new Set(options.exclude);
+  const defaultDisplay = [
+    meta.pk.key,
+    ...meta.fields.filter((f) => !f.isPrimaryKey).map((f) => f.key),
+  ]
+    .filter((key) => !excluded.has(key))
+    .slice(0, 1 + DEFAULT_LIST_DISPLAY_EXTRA);
+  // A list needs at least one column, so excluding every column falls back to the primary key.
+  const listDisplay =
+    options.listDisplay ?? (defaultDisplay.length > 0 ? defaultDisplay : [meta.pk.key]);
   const withoutExcluded = (keys: string[]) => keys.filter((key) => !excluded.has(key));
   const fieldsets = options.fieldsets
     ? options.fieldsets.map((fs) => ({
@@ -235,6 +238,11 @@ function resolveModel(
         fields: withoutExcluded(fs.fields),
       }))
     : [{ fields: withoutExcluded(options.fields ?? meta.fields.map((f) => f.key)) }];
+
+  const view = toPermission(options.permissions?.view);
+  // Unset write permissions follow `view`, so restricting `view` alone closes the model (decision 043).
+  const inherit = (entry: boolean | ((user: AdminUser) => boolean) | undefined) =>
+    entry === undefined ? view : toPermission(entry);
 
   return {
     slug,
@@ -254,10 +262,10 @@ function resolveModel(
     ...(options.validate === undefined ? {} : { validate: options.validate }),
     hooks: options.hooks ?? {},
     permissions: {
-      view: toPermission(options.permissions?.view),
-      add: toPermission(options.permissions?.add),
-      change: toPermission(options.permissions?.change),
-      delete: toPermission(options.permissions?.delete),
+      view,
+      add: inherit(options.permissions?.add),
+      change: inherit(options.permissions?.change),
+      delete: inherit(options.permissions?.delete),
     },
     actions: options.actions ?? [],
   };

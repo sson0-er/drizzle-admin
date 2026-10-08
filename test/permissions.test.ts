@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createAdmin, resolvedModels } from "../src/admin.js";
-import { ACTION_PERMISSION, can, type Perm } from "../src/auth/permissions.js";
+import { ACTION_PERMISSION, can, canAny, type Perm } from "../src/auth/permissions.js";
 import type { AdminUser, ResolvedModel } from "../src/types.js";
 import { authors } from "./fixtures/schema-sqlite.js";
 
@@ -43,6 +43,33 @@ describe("can", () => {
     const model = modelWith({ permissions: { delete: false } });
     expect(can(model, "delete", alice)).toBe(false);
     expect(can(model, "change", alice)).toBe(true);
+  });
+});
+
+describe("canAny", () => {
+  it.each([
+    { name: "{}", permissions: {}, user: alice, expected: true },
+    { name: "view false", permissions: { view: false }, user: alice, expected: false },
+    {
+      name: "view false, add true",
+      permissions: { view: false, add: true },
+      user: alice,
+      expected: true,
+    },
+    {
+      name: "view by id, alice",
+      permissions: { view: (u: AdminUser) => u.id === "1" },
+      user: alice,
+      expected: true,
+    },
+    {
+      name: "view by id, bob",
+      permissions: { view: (u: AdminUser) => u.id === "1" },
+      user: bob,
+      expected: false,
+    },
+  ])("$name -> $expected", ({ permissions, user, expected }) => {
+    expect(canAny(modelWith({ permissions }), user)).toBe(expected);
   });
 });
 

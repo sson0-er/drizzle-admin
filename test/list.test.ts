@@ -500,10 +500,10 @@ describe.each(dialects)("list page permissions and failures ($name)", (fixture) 
     await t.close();
   });
 
-  it("answers 403 without the view permission", async () => {
+  it("answers 404 for a model without any permission (decision 043)", async () => {
     const res = await t.client.get("/admin/articles/");
-    expect(res.status).toBe(403);
-    expect(text(parse(await res.text()))).toContain(messages.forbidden);
+    expect(res.status).toBe(404);
+    expect(text(parse(await res.text()))).toContain(messages.notFound);
   });
 
   it("offers no actions and no add link without the permissions", async () => {

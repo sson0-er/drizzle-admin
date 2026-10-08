@@ -1,7 +1,7 @@
 ---
 id: 44-permission-inheritance-and-hidden-models
 depends_on: [43-instance-bound-cookie-keys]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 44: permission-inheritance-and-hidden-models
@@ -78,3 +78,17 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact status an
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Implemented inheritance of unset `add` / `change` / `delete` from the resolved `view`, the `exclude`-aware default `listDisplay` (empty result falls back to the primary key), `canAny`, and the hidden-model 404 in `modelOr404`. No export or prop beyond the design was added (`canAny` is in auth.md). No handler ran a check before `modelOr404`.
+- New tests written first and run against the unchanged code; they failed there:
+  - Hidden models (`view: false`, sqlite and pglite): GET list and GET change gave 403 (expected 404); GET add and GET delete gave 200; POST change, POST delete and the three POST list rows (no `_selected`, `action=nope`, `delete_selected` with `_confirm=1`) gave 303.
+  - `exclude` defaults: `exclude: ["title"]` still gave `["id","title","body","authorId","publishedAt"]`, `exclude: ["id"]` the same array, and every column excluded the same array instead of `["id"]`. The explicit `listDisplay` row passed on the old code, as intended.
+  - Permission inheritance rows and the `canAny` rows (not-yet-exported function) also failed there.
+- Existing assertions changed (all under "Existing tests to update"):
+  - test/auth.test.ts "403 for each missing permission": added a per-row `denied` status (404 for the two `perm: "view"` rows, 403 elsewhere) used in the title and in the denied-status assertion.
+  - test/list.test.ts "answers 403 without the view permission" -> "answers 404 for a model without any permission (decision 043)": 404 and `messages.notFound`.
+  - test/form.test.ts "forbids the change page without view permission" -> 404, retitled.
+  - test/register.test.ts "normalizes permissions ...": `permissions?.delete(user)` is now `false`; title mentions inheritance.
+  - No other existing assertion changed.
+- Review round 1: high 0, medium 0, low 3 (quality: inherit repeats the permission option type; tests: dashboard hidden-link test lacks a positive control, inheritance table has an unneeded as-never cast). Done.
