@@ -15,6 +15,8 @@ import {
 } from "./context.js";
 
 const DELETE_ACTION = "delete_selected";
+/** Most distinct ids one bulk action takes: keeps the `getMany` / `delete` bind parameters bounded. */
+export const MAX_SELECTED = 500;
 
 /** `_selected` as strings (a single value or a repeated field), each id once. */
 function selectedIds(body: Record<string, unknown>): string[] {
@@ -40,6 +42,9 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
 
   const ids = selectedIds(body);
   if (ids.length === 0) return flashBack("warning", messages.noSelection);
+  if (ids.length > MAX_SELECTED) {
+    return flashBack("warning", messages.tooManySelected(MAX_SELECTED));
+  }
 
   const action = typeof body.action === "string" ? body.action : "";
   const confirmed = body._confirm === "1";

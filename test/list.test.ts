@@ -164,6 +164,16 @@ describe.each(dialects)("list page ($name)", (fixture) => {
     expect(column(doc, "key").sort()).toEqual(["a", "b", "c"]);
   });
 
+  it.each([
+    ["removes NUL characters", "a%00b", "ab"],
+    ["cuts the text to 200 code points", "x".repeat(250), "x".repeat(200)],
+  ])("normalizes the search text: %s", async (_name, q, echoed) => {
+    const { status, doc } = await page(t, `/admin/authors/?q=${q}`);
+    expect(status).toBe(200);
+    const form = qs(doc, { tag: "form", id: "changelist-search" }) as Node;
+    expect(attr(qs(form, { tag: "input", attrs: { name: "q" } }) as Node, "value")).toBe(echoed);
+  });
+
   it("filters by a boolean and keeps q and o in every link", async () => {
     const { doc } = await page(t, "/admin/authors/?q=a&o=name&f_active=1");
     expect(column(doc, "name")).toEqual(["alice", "bob", "dave"]);

@@ -135,10 +135,16 @@ describe("register: option checks", () => {
     expect(resolvedModels(admin).get("authors")?.actions).toHaveLength(2);
   });
 
-  it.each([0, 1.5, -1])("rejects listPerPage %s", (listPerPage) => {
-    expect(registerError(authors, { listPerPage })).toContain(
-      "listPerPage must be a positive integer",
+  it.each([0, 1.5, -1, 501])("rejects listPerPage %s", (listPerPage) => {
+    expect(registerError(authors, { listPerPage })).toBe(
+      "drizzle-admin: authors: listPerPage must be a positive integer of at most 500",
     );
+  });
+
+  it("accepts listPerPage up to the selection cap", () => {
+    const admin = sqliteAdmin();
+    admin.register(authors, { listPerPage: 500 });
+    expect(resolvedModels(admin).get("authors")?.listPerPage).toBe(500);
   });
 
   it("propagates the dialect mismatch and no-primary-key errors from introspection", () => {

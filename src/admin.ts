@@ -3,6 +3,7 @@ import { Hono } from "hono";
 import { allowedWidgets } from "./forms/fields.js";
 import { type FieldMeta, introspectTable } from "./introspect/index.js";
 import { messages } from "./messages.js";
+import { MAX_SELECTED } from "./routes/actions.js";
 import { buildApp } from "./routes/index.js";
 import { resolveTimeZone } from "./time.js";
 import type {
@@ -196,8 +197,8 @@ function resolveModel(
     actionNames.add(action.name);
   }
   const listPerPage = options.listPerPage ?? 50;
-  if (!Number.isInteger(listPerPage) || listPerPage <= 0) {
-    fail(`${name}: listPerPage must be a positive integer`);
+  if (!Number.isInteger(listPerPage) || listPerPage <= 0 || listPerPage > MAX_SELECTED) {
+    fail(`${name}: listPerPage must be a positive integer of at most ${MAX_SELECTED}`);
   }
   for (const [key, widget] of widgetEntries) {
     const field = column("widgets", key);

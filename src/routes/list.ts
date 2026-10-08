@@ -18,6 +18,7 @@ import {
 } from "./context.js";
 
 const FK_FILTER_LIMIT = 200;
+const SEARCH_MAX_LENGTH = 200;
 const DATE_PRESETS = [
   { value: "today", label: messages.today },
   { value: "past7", label: messages.past7 },
@@ -127,7 +128,12 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   const params = url.searchParams;
 
   const searchable = model.searchFields.length > 0;
-  const q = searchable ? (params.get("q") ?? "") : null;
+  // NUL is rejected by PostgreSQL; the cut counts code points so a surrogate pair is never split.
+  const q = searchable
+    ? Array.from((params.get("q") ?? "").replaceAll("\u0000", "").trim())
+        .slice(0, SEARCH_MAX_LENGTH)
+        .join("")
+    : null;
   // Password columns are neither sortable nor linked: one source for `o`, the cells and the headers.
   const masked = new Set(model.listDisplay.filter((key) => model.widgets[key] === "password"));
   const userOrdering = parseOrdering(

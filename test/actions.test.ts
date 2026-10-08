@@ -188,6 +188,42 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     }
   });
 
+  describe("selection cap", () => {
+    const ids = (n: number) => Array.from({ length: n }, (_, i) => String(i + 1));
+    const rowCount = async (c: Client) =>
+      qsa(qs(await docOf(await c.get("/admin/authors/")), { tag: "tbody" }) as Node, {
+        tag: "tr",
+      }).length;
+
+    it("warns and deletes nothing when more than 500 ids are selected for delete_selected", async () => {
+      const before = await rowCount(client);
+      const res = await post(client, "/admin/authors/", {
+        action: "delete_selected",
+        _confirm: "1",
+        _selected: ids(501),
+      });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe("/admin/authors/");
+      expect(await flashes(client, res, "warning")).toEqual([messages.tooManySelected(500)]);
+      expect(await rowCount(client)).toBe(before);
+    });
+
+    it("does not run a custom action for more than 500 ids", async () => {
+      const res = await post(client, "/admin/authors/", { action: "tag", _selected: ids(501) });
+      expect(res.status).toBe(303);
+      expect(await flashes(client, res, "warning")).toEqual([messages.tooManySelected(500)]);
+      expect(runs.tag).toHaveLength(0);
+    });
+
+    it("counts distinct ids: 500 ids with duplicates still reach the confirmation page", async () => {
+      const res = await post(client, "/admin/authors/", {
+        action: "delete_selected",
+        _selected: [...ids(500), "1", "2", "3"],
+      });
+      expect(res.status).toBe(200);
+    });
+  });
+
   it("answers 404 for an unknown model", async () => {
     expect((await post(client, "/admin/nope/", { action: "x", _selected: "1" })).status).toBe(404);
   });

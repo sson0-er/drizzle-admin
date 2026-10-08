@@ -25,6 +25,7 @@ export const messages = {
   resultCount: (n: number) => `${n} 件`,
   noSelection: "操作を実行するには、項目を選択してください。",
   unknownAction: "不明な操作です。",
+  tooManySelected: (max: number) => `一度に操作できるのは ${max} 件までです。`,
   // forms
   save: "保存",
   saveAndAddAnother: "保存してもう一つ追加",

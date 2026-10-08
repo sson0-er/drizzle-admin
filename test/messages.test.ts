@@ -67,6 +67,7 @@ const functionKeys = [
   "deletedMany",
   "confirmDelete",
   "confirmAction",
+  "tooManySelected",
 ] as const;
 
 describe("messages", () => {
@@ -92,5 +93,6 @@ describe("messages", () => {
     expect(messages.deletedMany(2)).toBe("2 件削除しました。");
     expect(messages.confirmDelete("x")).toBe("「x」を削除してもよろしいですか?");
     expect(messages.confirmAction("y")).toBe("「y」を実行してもよろしいですか?");
+    expect(messages.tooManySelected(500)).toBe("一度に操作できるのは 500 件までです。");
   });
 });

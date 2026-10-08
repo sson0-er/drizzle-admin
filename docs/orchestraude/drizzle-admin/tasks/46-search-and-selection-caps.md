@@ -1,7 +1,7 @@
 ---
 id: 46-search-and-selection-caps
 depends_on: [44-permission-inheritance-and-hidden-models, 45-key-value-domains-and-identity]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 46: search-and-selection-caps
@@ -74,3 +74,15 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact status an
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- New tests were written first and run against the unchanged code; all failed as expected:
+  - list `?q=a%00b`: sqlite echoed `a�b` (expected `ab`); pglite answered 500 (expected 200).
+  - list `?q=` + 250 `x`: both dialects echoed the 250-character value (expected 200).
+  - actions, 501 ids with `delete_selected` + `_confirm=1`, and 501 ids with the custom `tag` action: both dialects received no flash (`[]`, expected the `tooManySelected(500)` warning), i.e. the request reached the delete / `run` path. `messages.tooManySelected` did not exist yet (`not a function`); the received values above were taken after adding only that message.
+  - register `listPerPage` `0`, `1.5`, `-1`: received `drizzle-admin: authors: listPerPage must be a positive integer` (old message); `501` was accepted (register did not throw).
+  - messages: `tooManySelected` was `undefined`.
+  - The 500-ids-plus-duplicates confirmation case passes on the old code too (it pins that the cap counts distinct ids).
+- No export beyond `MAX_SELECTED` was added.
+- `scripts/verify.sh` passes.
+- Review round 1: high 0, medium 0, low 3 (tests: trim/code-point cut not pinned, searched value not asserted; spec: flash count filtered by class). Done.
