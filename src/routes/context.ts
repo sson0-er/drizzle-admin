@@ -16,6 +16,8 @@ export interface AdminVars {
   session: Session;
   /** Builtin: `session.u`; external: `await getUser(c.req.raw)`. */
   user: AdminUser | null;
+  /** Signing keys derived from `secret` per cookie and prefix; set first by the session middleware. */
+  cookieKeys: { session: ArrayBuffer; flash: ArrayBuffer };
   /** Parsed once by the csrfToken middleware for POST; null otherwise. */
   body: FormBody | null;
 }
@@ -23,18 +25,20 @@ export interface AdminVars {
 export type AdminEnv = { Variables: AdminVars };
 export type AdminContext = Context<AdminEnv>;
 
-export const cookieOpts = ({ config }: AdminState): CookieOpts => ({
-  secret: config.secret,
-  prefix: config.prefix,
-  maxAgeSec: config.sessionMaxAgeSec,
-  publicOrigin: config.publicOrigin,
-});
+export const cookieOpts = (c: AdminContext): CookieOpts => {
+  const { config } = c.var.state;
+  return {
+    key: c.var.cookieKeys.session,
+    prefix: config.prefix,
+    maxAgeSec: config.sessionMaxAgeSec,
+    publicOrigin: config.publicOrigin,
+  };
+};
 
-export const flashOpts = ({ config }: AdminState): FlashOpts => ({
-  secret: config.secret,
-  prefix: config.prefix,
-  publicOrigin: config.publicOrigin,
-});
+export const flashOpts = (c: AdminContext): FlashOpts => {
+  const { config } = c.var.state;
+  return { key: c.var.cookieKeys.flash, prefix: config.prefix, publicOrigin: config.publicOrigin };
+};
 
 /** Guard-protected handlers call this; a null user here is a bug in the middleware order. */
 export function requireUser(c: AdminContext): AdminUser {
@@ -119,7 +123,7 @@ export async function renderPage(
   opts?: { minimal?: boolean },
 ): Promise<Response> {
   const wantsFlash = (status === 200 || status === 400) && !opts?.minimal;
-  const flash = wantsFlash ? await consumeFlash(c, flashOpts(c.var.state)) : [];
+  const flash = wantsFlash ? await consumeFlash(c, flashOpts(c)) : [];
   return html(c, status, typeof page === "function" ? page(flash) : page);
 }
 
@@ -128,6 +132,6 @@ export async function redirectWithFlash(
   location: string,
   msgs: FlashMessage[],
 ): Promise<Response> {
-  await addFlash(c, flashOpts(c.var.state), msgs);
+  await addFlash(c, flashOpts(c), msgs);
   return c.redirect(location, 303);
 }

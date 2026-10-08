@@ -1,11 +1,11 @@
 import type { MiddlewareHandler } from "hono";
 import { CSRF_FIELD, tokensEqual } from "../auth/csrf.js";
-import { externalLoginUrl, loginRedirectUrl } from "../auth/redirect.js";
+import { externalLoginUrl, loginRedirectUrl, safeNext } from "../auth/redirect.js";
 import { newSession, readSession, writeSession } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
 import { messages } from "../messages.js";
 import type { AdminState } from "../types.js";
-import { type AdminEnv, cookieOpts, errorPage } from "./context.js";
+import { type AdminEnv, type AdminVars, cookieOpts, errorPage } from "./context.js";
 
 type Mw = MiddlewareHandler<AdminEnv>;
 
@@ -28,9 +28,10 @@ export const securityHeaders: Mw = async (c, next) => {
 };
 
 export const sessionMiddleware =
-  (state: AdminState): Mw =>
+  (_state: AdminState, getCookieKeys: () => Promise<AdminVars["cookieKeys"]>): Mw =>
   async (c, next) => {
-    const opts = cookieOpts(state);
+    c.set("cookieKeys", await getCookieKeys());
+    const opts = cookieOpts(c);
     const now = Math.floor(Date.now() / 1000);
     let session = await readSession(c, opts, now);
     if (session === null) {
@@ -84,7 +85,9 @@ export const authGuard: Mw = async (c, next) => {
     const replayable = method === "GET" || method === "HEAD";
     return c.redirect(loginRedirectUrl(prefix, replayable ? target : `${prefix}/`), 302);
   }
-  if (auth.loginUrl !== undefined) return c.redirect(externalLoginUrl(auth.loginUrl, target), 302);
+  if (auth.loginUrl !== undefined) {
+    return c.redirect(externalLoginUrl(auth.loginUrl, safeNext(target, prefix)), 302);
+  }
   return errorPage(c, 401, messages.unauthorized);
 };
 

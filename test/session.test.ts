@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   type CookieOpts,
   clearSession,
+  deriveCookieKey,
   isSecure,
   newCsrfToken,
   newSession,
@@ -14,7 +15,7 @@ import {
 
 const NOW = 1_800_000_000;
 const opts: CookieOpts = {
-  secret: "s3cret",
+  key: await deriveCookieKey("s3cret", SESSION_COOKIE, "/admin"),
   prefix: "/admin",
   maxAgeSec: 3600,
   publicOrigin: null,
@@ -38,7 +39,9 @@ function makeApp(o: CookieOpts) {
       c,
       SESSION_COOKIE,
       c.req.query("v") ?? "",
-      c.req.query("secret") ?? o.secret,
+      c.req.query("secret") === undefined
+        ? o.key
+        : await deriveCookieKey(c.req.query("secret") as string, SESSION_COOKIE, o.prefix),
     );
     return c.text("ok");
   });
@@ -63,6 +66,29 @@ async function signedRaw(app: Hono, v: string, secret?: string): Promise<string>
   if (secret) q.set("secret", secret);
   return cookiePair(await app.request(`http://localhost/raw?${q}`));
 }
+
+describe("deriveCookieKey (decision 042)", () => {
+  it("returns 32 bytes", async () => {
+    expect((await deriveCookieKey("s3cret", SESSION_COOKIE, "/admin")).byteLength).toBe(32);
+  });
+
+  it("is deterministic", async () => {
+    const a = new Uint8Array(await deriveCookieKey("s3cret", SESSION_COOKIE, "/admin"));
+    const b = new Uint8Array(await deriveCookieKey("s3cret", SESSION_COOKIE, "/admin"));
+    expect(b).toEqual(a);
+  });
+
+  it.each([
+    ["cookie name", ["da_session", "/a"], ["da_flash", "/a"]],
+    ["prefix /a vs /b", ["da_session", "/a"], ["da_session", "/b"]],
+    ["prefix /a vs empty", ["da_session", "/a"], ["da_session", ""]],
+    ["prefix /b vs empty", ["da_session", "/b"], ["da_session", ""]],
+  ] as const)("differs by %s", async (_label, [nameA, prefixA], [nameB, prefixB]) => {
+    const a = new Uint8Array(await deriveCookieKey("s3cret", nameA, prefixA));
+    const b = new Uint8Array(await deriveCookieKey("s3cret", nameB, prefixB));
+    expect(b).not.toEqual(a);
+  });
+});
 
 describe("session round trip", () => {
   const app = makeApp(opts);
@@ -105,6 +131,21 @@ describe("session round trip", () => {
   it("returns null for a cookie signed with another secret", async () => {
     const v = JSON.stringify({ u: null, csrf: "x", iat: NOW });
     expect(await readWith(app, await signedRaw(app, v, "other"))).toBeNull();
+  });
+
+  it("returns null for a cookie signed with the raw secret (pre-042 format)", async () => {
+    const a = new Hono();
+    a.get("/raw", async (c) => {
+      await setSignedCookie(
+        c,
+        SESSION_COOKIE,
+        JSON.stringify({ u: null, csrf: "x", iat: NOW }),
+        "s3cret",
+      );
+      return c.text("ok");
+    });
+    const cookie = cookiePair(await a.request("http://localhost/raw"));
+    expect(await readWith(app, cookie)).toBeNull();
   });
 
   it("returns null for malformed JSON", async () => {

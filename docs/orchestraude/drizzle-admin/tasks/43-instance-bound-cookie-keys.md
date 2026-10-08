@@ -1,7 +1,7 @@
 ---
 id: 43-instance-bound-cookie-keys
 depends_on: [42-register-check-order]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 43: instance-bound-cookie-keys
@@ -82,3 +82,12 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact message a
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Implemented per the task; verify passes. No export or prop beyond the design was added. `sessionMiddleware(_state, getCookieKeys)` keeps the designed signature, so `state` is unused there (underscore-prefixed for Biome).
+- Tests written first and run against the unchanged code (the three hand-signed-cookie cases failed only because the test helper already imported `deriveCookieKey`, which did not exist yet):
+  - cross-instance, session: `GET /b/` after login at `/a` returned 200 (expected 302).
+  - cross-instance, flash: `GET /b/login/` returned 302 (expected 200). Before the change `/b` accepted the `/a` session, so the login page redirected away instead of rendering.
+  - external `GET //evil.com/` with basePath `"/"`: `Location` was `/sso/login?next=%2F%2Fevil.com%2F` (expected `/sso/login?next=%2F`).
+  - `sessionMaxAgeSec: 34560001`: `createAdmin` did not throw.
+- Review round 1: high 0, medium 0, low 2 (quality: unused _state parameter; magic number 34560000). Done.

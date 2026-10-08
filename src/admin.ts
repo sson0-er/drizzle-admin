@@ -72,9 +72,10 @@ export function resolveConfig(config: AdminConfig): AdminState["config"] {
   }
   if (
     sessionMaxAgeSec !== undefined &&
-    (!Number.isInteger(sessionMaxAgeSec) || sessionMaxAgeSec <= 0)
+    // hono's cookie serializer throws for a Max-Age above 400 days, which would 500 every page.
+    (!Number.isInteger(sessionMaxAgeSec) || sessionMaxAgeSec <= 0 || sessionMaxAgeSec > 34560000)
   ) {
-    fail("sessionMaxAgeSec must be a positive integer");
+    fail("sessionMaxAgeSec must be a positive integer of at most 34560000 (400 days)");
   }
   return {
     db,

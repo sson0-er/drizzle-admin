@@ -10,7 +10,7 @@ export interface FlashMessage {
 }
 export const FLASH_COOKIE = "da_flash";
 export interface FlashOpts {
-  secret: string;
+  key: ArrayBuffer;
   prefix: string;
   publicOrigin: string | null;
 }
@@ -30,14 +30,14 @@ function isFlashMessage(v: unknown): v is FlashMessage {
 export async function addFlash(c: Context, o: FlashOpts, msgs: FlashMessage[]): Promise<void> {
   const all = [...(pending.get(c) ?? []), ...msgs.map(({ level, text }) => ({ level, text }))];
   pending.set(c, all);
-  await setSignedCookie(c, FLASH_COOKIE, JSON.stringify(all), o.secret, {
+  await setSignedCookie(c, FLASH_COOKIE, JSON.stringify(all), o.key, {
     ...cookieAttrs(c, o.prefix, o.publicOrigin),
     maxAge: FLASH_MAX_AGE_SEC,
   });
 }
 
 export async function consumeFlash(c: Context, o: FlashOpts): Promise<FlashMessage[]> {
-  const raw = await getSignedCookie(c, o.secret, FLASH_COOKIE);
+  const raw = await getSignedCookie(c, o.key, FLASH_COOKIE);
   if (raw === undefined) return [];
   // Delete whenever a cookie was present, so a bad one cannot linger.
   deleteCookie(c, FLASH_COOKIE, cookieAttrs(c, o.prefix, o.publicOrigin));

@@ -1,13 +1,15 @@
 import { Hono } from "hono";
 import { HTTPException } from "hono/http-exception";
 import { originCheck } from "../auth/csrf.js";
+import { FLASH_COOKIE } from "../auth/flash.js";
+import { deriveCookieKey, SESSION_COOKIE } from "../auth/session.js";
 import { describeForLog, isDbError } from "../data/errors.js";
 import { createRepository } from "../data/repository.js";
 import { messages } from "../messages.js";
 import { ADMIN_CSS } from "../static/admin-css.js";
 import type { AdminState } from "../types.js";
 import { actionsHandler } from "./actions.js";
-import { type AdminContext, type AdminEnv, errorPage } from "./context.js";
+import { type AdminContext, type AdminEnv, type AdminVars, errorPage } from "./context.js";
 import { dashboardHandler } from "./dashboard.js";
 import { deleteHandler } from "./delete.js";
 import { addHandler, changeHandler } from "./form.js";
@@ -52,6 +54,13 @@ export function buildApp(state: AdminState): Hono {
     timeZone: config.timeZone,
   });
   const app = new Hono<AdminEnv>();
+  // Derived on the first request, not at build time: the key derivation is async (decision 042).
+  let keys: Promise<AdminVars["cookieKeys"]> | undefined;
+  const getCookieKeys = () =>
+    (keys ??= Promise.all([
+      deriveCookieKey(config.secret, SESSION_COOKIE, config.prefix),
+      deriveCookieKey(config.secret, FLASH_COOKIE, config.prefix),
+    ]).then(([session, flash]) => ({ session, flash })));
 
   app.use("*", initVars(state, repo));
   // 1. securityHeaders
@@ -65,7 +74,7 @@ export function buildApp(state: AdminState): Hono {
   );
   // 3-7. originCheck, session, user, authGuard, csrfToken.
   app.use("*", originCheck(config.publicOrigin));
-  app.use("*", sessionMiddleware(state));
+  app.use("*", sessionMiddleware(state, getCookieKeys));
   app.use("*", userMiddleware(state));
   app.use("*", authGuard);
   app.use("*", csrfToken);

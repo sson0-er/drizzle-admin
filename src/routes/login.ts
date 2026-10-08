@@ -29,7 +29,7 @@ export async function loginHandler(c: AdminContext): Promise<Response> {
   // A fresh session (new CSRF token) on every login, so a pre-login token cannot be reused.
   await writeSession(
     c,
-    cookieOpts(state),
+    cookieOpts(c),
     newSession({ id: verified.id, name: verified.name }, Math.floor(Date.now() / 1000)),
   );
   return c.redirect(safeNext(next, prefix), 303);
@@ -54,6 +54,6 @@ function renderLogin(
 /** `POST ${prefix}/logout/` (builtin mode only). */
 export function logoutHandler(c: AdminContext): Response {
   const { state } = c.var;
-  clearSession(c, cookieOpts(state));
+  clearSession(c, cookieOpts(c));
   return c.redirect(`${state.config.prefix}/login/`, 303);
 }

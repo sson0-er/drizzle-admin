@@ -87,8 +87,16 @@ describe("createAdmin", () => {
       expect(resolved({ sessionMaxAgeSec: 60 }).sessionMaxAgeSec).toBe(60);
     });
 
-    it.each([0, 1.5, -1, Number.NaN])("rejects %s", (sessionMaxAgeSec) => {
-      rejects({ sessionMaxAgeSec }, "sessionMaxAgeSec");
+    it("accepts 400 days", () => {
+      expect(resolved({ sessionMaxAgeSec: 34560000 }).sessionMaxAgeSec).toBe(34560000);
+    });
+
+    it.each([34560001, 0, 1.5, -1, Number.NaN])("rejects %s", (sessionMaxAgeSec) => {
+      expect(() => createAdmin(make({ sessionMaxAgeSec }))).toThrow(
+        new Error(
+          "drizzle-admin: sessionMaxAgeSec must be a positive integer of at most 34560000 (400 days)",
+        ),
+      );
     });
   });
 

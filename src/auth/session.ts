@@ -10,10 +10,32 @@ export interface Session {
 }
 export const SESSION_COOKIE = "da_session";
 export interface CookieOpts {
-  secret: string;
+  key: ArrayBuffer;
   prefix: string;
   maxAgeSec: number;
   publicOrigin: string | null;
+}
+
+const utf8 = (s: string): Uint8Array<ArrayBuffer> => new TextEncoder().encode(s);
+
+/**
+ * Per-instance, per-cookie signing key (decision 042): HMAC-SHA256 keyed with the secret over
+ * the cookie name and prefix. Instances with another prefix, and the other cookie, derive a
+ * different key from the same secret, so their cookies never verify here.
+ */
+export async function deriveCookieKey(
+  secret: string,
+  cookieName: string,
+  prefix: string,
+): Promise<ArrayBuffer> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    utf8(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  return crypto.subtle.sign("HMAC", key, utf8(`${cookieName}\0${prefix}`));
 }
 
 // Allowed clock skew for an `iat` that lies in the future.
@@ -74,7 +96,7 @@ function parseSession(raw: string): Session | null {
 }
 
 export async function readSession(c: Context, o: CookieOpts, now: number): Promise<Session | null> {
-  const raw = await getSignedCookie(c, o.secret, SESSION_COOKIE);
+  const raw = await getSignedCookie(c, o.key, SESSION_COOKIE);
   if (typeof raw !== "string") return null;
   const session = parseSession(raw);
   if (session === null) return null;
@@ -86,7 +108,7 @@ export async function readSession(c: Context, o: CookieOpts, now: number): Promi
 export async function writeSession(c: Context, o: CookieOpts, s: Session): Promise<void> {
   // Explicit key list so extra properties on a caller's object never reach the cookie.
   const value = JSON.stringify({ u: s.u, csrf: s.csrf, iat: s.iat });
-  await setSignedCookie(c, SESSION_COOKIE, value, o.secret, {
+  await setSignedCookie(c, SESSION_COOKIE, value, o.key, {
     ...cookieAttrs(c, o.prefix, o.publicOrigin),
     maxAge: o.maxAgeSec,
   });

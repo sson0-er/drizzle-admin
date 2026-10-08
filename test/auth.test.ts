@@ -1,6 +1,8 @@
 import { eq, getTableColumns, type Table } from "drizzle-orm";
+import { Hono } from "hono";
 import { serializeSigned } from "hono/utils/cookie";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { deriveCookieKey } from "../src/auth/session.js";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { messages } from "../src/messages.js";
 import type { AdminUser } from "../src/types.js";
@@ -33,7 +35,8 @@ async function signedCookie(
   session: { u: AdminUser | null; csrf: string; iat: number },
   secret: string,
 ): Promise<string> {
-  const line = await serializeSigned("da_session", JSON.stringify(session), secret);
+  const key = await deriveCookieKey(secret, "da_session", "/admin");
+  const line = await serializeSigned("da_session", JSON.stringify(session), key);
   return line.split(";")[0] ?? "";
 }
 
@@ -307,6 +310,74 @@ describe.each(dialects)("login, logout and auth guard ($name)", (fixture) => {
   });
 });
 
+describe("cross-instance sessions (decision 042)", () => {
+  let fixtureSetup: Awaited<ReturnType<typeof sqlite.setup>>;
+  let outer: Hono;
+  let replica: Hono;
+
+  const instance = (basePath: string, accepts: string) => {
+    const admin = createAdmin({
+      db: fixtureSetup.db,
+      dialect: sqlite.dialect,
+      basePath,
+      secret: TEST_SECRET,
+      auth: {
+        verifyCredentials: async (username, password) =>
+          username === accepts && password === TEST_PASSWORD ? { id: "1", name: accepts } : null,
+      },
+    });
+    admin.register(fixtureSetup.schema.authors);
+    return admin;
+  };
+  const freshOuter = () => createClient((req) => outer.fetch(req));
+
+  beforeAll(async () => {
+    fixtureSetup = await sqlite.setup();
+    outer = new Hono();
+    outer.route("/a", instance("/a", "alice").app);
+    outer.route("/b", instance("/b", "bob").app);
+    replica = new Hono();
+    replica.route("/a", instance("/a", "alice").app);
+  });
+  afterAll(async () => {
+    await fixtureSetup.close();
+  });
+
+  it("rejects the session of /a at /b", async () => {
+    const client = freshOuter();
+    expect((await client.login({ prefix: "/a", username: "alice" })).status).toBe(303);
+    const res = await client.get("/b/");
+    expect(res.status).toBe(302);
+    expect(location(res)).toBe("/b/login/?next=%2Fb%2F");
+  });
+
+  it("does not show the flash of /a at /b", async () => {
+    const client = freshOuter();
+    await client.login({ prefix: "/a", username: "alice" });
+    const add = await client.post("/a/authors/add/", {
+      name: "zed",
+      email: "zed@example.com",
+      active: "on",
+      role: "viewer",
+      createdAt: "2026-01-01T09:00",
+    });
+    expect(add.status).toBe(303);
+    expect(client.cookie("da_flash")).toBeDefined();
+    const res = await client.get("/b/login/");
+    expect(res.status).toBe(200);
+    expect(qs(parse(await res.text()), { tag: "ul", attrs: { class: "messagelist" } })).toBeNull();
+  });
+
+  it("shares the session between replicas with the same secret and basePath", async () => {
+    const client = freshOuter();
+    await client.login({ prefix: "/a", username: "alice" });
+    const res = await replica.request("http://localhost/a/", {
+      headers: { Cookie: `da_session=${client.cookie("da_session")}` },
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("external auth mode", () => {
   const changeForm = {
     name: "alice",
@@ -336,6 +407,23 @@ describe("external auth mode", () => {
     const res = await withUrl.client.get("/admin/authors/?q=a");
     expect(res.status).toBe(302);
     expect(location(res)).toBe("https://sso.example/login?next=%2Fadmin%2Fauthors%2F%3Fq%3Da");
+  });
+
+  it.each([
+    ["/", "//evil.com/", "/sso/login?next=%2F"],
+    ["/admin", "/admin/authors/?q=1", "/sso/login?next=%2Fadmin%2Fauthors%2F%3Fq%3D1"],
+  ])("passes next through safeNext (basePath %s, GET %s)", async (basePath, path, expected) => {
+    current = null;
+    const t = await makeAdmin(sqlite, {
+      config: { basePath, auth: { getUser, loginUrl: "/sso/login" } },
+    });
+    try {
+      const res = await t.client.get(path);
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe(expected);
+    } finally {
+      await t.close();
+    }
   });
 
   it("answers 401 without a loginUrl", async () => {

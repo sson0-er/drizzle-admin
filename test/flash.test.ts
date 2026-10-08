@@ -8,8 +8,13 @@ import {
   type FlashMessage,
   type FlashOpts,
 } from "../src/auth/flash.js";
+import { deriveCookieKey, SESSION_COOKIE, writeSession } from "../src/auth/session.js";
 
-const opts: FlashOpts = { secret: "s3cret", prefix: "/admin", publicOrigin: null };
+const opts: FlashOpts = {
+  key: await deriveCookieKey("s3cret", FLASH_COOKIE, "/admin"),
+  prefix: "/admin",
+  publicOrigin: null,
+};
 
 function makeApp(o: FlashOpts) {
   const app = new Hono();
@@ -27,7 +32,7 @@ function makeApp(o: FlashOpts) {
   });
   app.get("/consume", async (c) => c.json(await consumeFlash(c, o)));
   app.get("/raw", async (c) => {
-    await setSignedCookie(c, FLASH_COOKIE, c.req.query("v") ?? "", o.secret);
+    await setSignedCookie(c, FLASH_COOKIE, c.req.query("v") ?? "", o.key);
     return c.text("ok");
   });
   return app;
@@ -82,9 +87,33 @@ describe("flash", () => {
   });
 
   it("returns [] for a cookie signed with another secret", async () => {
-    const other = makeApp({ ...opts, secret: "other" });
+    const other = makeApp({
+      ...opts,
+      key: await deriveCookieKey("other", FLASH_COOKIE, "/admin"),
+    });
     const cookie = pair(await other.request("http://localhost/add1"));
     const { res, body } = await consume(app, cookie);
+    expect(body).toEqual([]);
+    expectDeleted(res);
+  });
+
+  it("returns [] for a da_session value sent as da_flash", async () => {
+    const a = new Hono();
+    a.get("/session", async (c) => {
+      const key = await deriveCookieKey("s3cret", SESSION_COOKIE, "/admin");
+      const session = { u: null, csrf: "x", iat: 1_800_000_000 };
+      await writeSession(
+        c,
+        { key, prefix: "/admin", maxAgeSec: 3600, publicOrigin: null },
+        session,
+      );
+      return c.text("ok");
+    });
+    const value = (await a.request("http://localhost/session")).headers
+      .get("set-cookie")
+      ?.split(";")[0]
+      ?.slice(SESSION_COOKIE.length + 1);
+    const { res, body } = await consume(app, `${FLASH_COOKIE}=${value}`);
     expect(body).toEqual([]);
     expectDeleted(res);
   });
