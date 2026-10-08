@@ -80,7 +80,7 @@ Behavior:
 - `create`: `insert(table).values(data).returning()` → `[0]`. If no row is returned (practically unreachable), throw a plain `Error(`drizzle-admin: insert into "${meta.tableName}" returned no row`)`. It is not a DB error (`isDbError` false), so the add handler rethrows it and `onError` answers 500 (decision 033 item 2).
 - `update`: `parsePk` null → `null`; `update(table).set(data).where(eq(pk, v)).returning()` → `[0] ?? null`. When `data` is empty, return `get()` instead (Drizzle rejects an empty `set`; unverified).
 - `delete`: parse/dedupe; empty → 0; `delete(table).where(inArray(pk, values)).returning({ pk: pkCol })` → length.
-- `options`: `select().from(table).orderBy(...buildOrderBy(meta, ordering)).limit(limit)` → `{ value: String(row[pk.key]), label: toLabel(row) }`.
+- `options`: `select().from(table).orderBy(...buildOrderBy(meta, ordering)).limit(limit)` → `{ value: String(row[pk.key]), label: toLabel(row) }`. The repository applies no default of its own: an empty `ordering` sorts by primary key ascending (`buildOrderBy`). Routes therefore always pass the referenced model's ordering with the primary-key-descending fallback (routes-handlers.md `defaultOrdering`; decision 013 item 7).
 - DB errors propagate unchanged; callers classify them.
 
 ### `src/data/errors.ts`
@@ -92,6 +92,7 @@ export function isDbError(err: unknown): boolean;       // decision 022
 ```
 Changed 2026-10-07: `isDbError` added for the 500 log policy (decision 022).
 Changed 2026-10-08: the source level of `<name>` / `<code>` in `describeForLog` and the `-` placeholder are specified (decision 033 item 16).
+Changed 2026-10-08: `<name>` and `<code>` are sanitized against log injection before output (decision 033 item 16, L046).
 
 `isDbError` is true when `err` or one of up to 5 `.cause` levels is `instanceof DrizzleQueryError` (imported from `drizzle-orm`) or has a string `code`. `err.name` is not used, because a `DrizzleQueryError` has `name` "Error" (evidence: 2026-10-07-pg-search-non-text-columns).
 
@@ -99,6 +100,8 @@ Walks `err` and up to 5 `.cause` levels, reading `code` (decision 011). better-s
 `SQLITE_CONSTRAINT_UNIQUE`, `SQLITE_CONSTRAINT_PRIMARYKEY`, `23505` → unique; `SQLITE_CONSTRAINT_FOREIGNKEY`, `23503` → foreignKey; `SQLITE_CONSTRAINT_NOTNULL`, `23502` → notNull; otherwise other.
 
 `describeForLog` returns `"<kind> <name> <code>"` and never the message, SQL or parameters. Walking the same chain (`err` plus up to 5 `.cause` levels), `<name>` and `<code>` come from the first level whose string `code` maps to a kind above; if no code maps, from the first level that has any string `code` (kind `other`); if no level has a string code, `<name>` is the top-level error's name and `<code>` is `-`. A missing or empty `name` is written `unknown`. So a PGlite error logs the cause's name (e.g. `DatabaseError`), not the wrapping `DrizzleQueryError`'s `Error` (decision 033 item 16). Examples: `unique SqliteError SQLITE_CONSTRAINT_UNIQUE`, `other Error -`.
+
+Output sanitization (L046, decision 033 item 16): before the line is built, the selected `<name>` and `<code>` are each tested against `/^[A-Za-z0-9_.-]{1,64}$/`. A value that does not match (newline, space, any other character, or longer than 64 characters) is written as `-`. A missing or empty name is still written `unknown` (it is not tested). Only the output is sanitized: `<kind>` is computed from the raw code, and the choice of level above is unchanged. Examples: name `"Bad\nName"` with code `"23505"` → `unique - 23505`; code `"x".repeat(65)` → `<kind> <name> -`.
 
 ## Data formats
 Changed 2026-10-07: date-only representation (decision 019). Date-only strings added (decision 023).

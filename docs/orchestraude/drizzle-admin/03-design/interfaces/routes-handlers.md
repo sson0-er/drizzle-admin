@@ -15,19 +15,20 @@ Models where `can(M, "view", U)`, in registration order → `DashboardPage({ mod
 ## List (`GET /:model/`)
 Changed 2026-10-07: custom actions gated by `ACTION_PERMISSION` = `change` (decision 016).
 Changed 2026-10-08: FK labels, links and filters require `view` on the referenced model (decision 034); `listDisplayLinks` wins over the FK link and an FK filter value outside the offered choices is accepted (decision 033 items 4, 5); column headers and filter headings stay the raw key (decision 035); `sort` reflects only an explicit `o` (decision 033 item 8).
+Changed 2026-10-08: FK filter choices use `defaultOrdering(ref)`, so an unordered referenced model is sorted by primary key descending, not ascending (decision 013 item 7, L083).
 
-Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`.
+Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`. For any resolved model `R`, `defaultOrdering(R)` = `R.ordering` when non-empty, otherwise `[{ key: R.meta.pk.key, desc: true }]` (primary key descending; decision 013 items 4 and 7). The list page ordering without `o` (step 2), the FK filter choices (step 5) and the FK select choices (Add step 2, Change) all use it, so the 200-row cap picks the same rows the referenced model's own list page shows first. Whether this is a shared helper or an inline expression is an implementation choice.
 
 1. `M` or 404; `view` permission or 403.
 2. Parse the query (decision 013 item 6):
    - `q`: used only if `M.searchFields.length > 0`.
-   - `o`: comma list; each item `-?key`; keep keys in `M.listDisplay`, dedupe. Empty → `M.ordering`; still empty → `[{ key: pk, desc: true }]`.
+   - `o`: comma list; each item `-?key`; keep keys in `M.listDisplay`, dedupe. Empty → `defaultOrdering(M)` (`M.ordering`; still empty → `[{ key: pk, desc: true }]`).
    - `f_<key>` for `key` in `M.listFilter` only; an empty value is ignored. For an FK filter with `!refVisible` the parameter is ignored (not passed to `repo.list`), because that filter is not offered (step 5; decision 034).
    - `p`: integer ≥ 1, else 1.
 3. `repo.list(M.meta, { q, searchFields: M.searchFields, filters, ordering, page, perPage: M.listPerPage })`.
 4. FK labels (no N+1): for each `key` in `listDisplay` with `foreignKey.slug`, no formatter and `refVisible`, collect distinct non-null `String(row[key])`, call `repo.getMany(refModel.meta, values)` once, and map `String(refRow[refPk]) → refModel.toString(refRow)`. With `!refVisible` no query runs for that column (decision 034).
    4b. Cells: `text = formatCell(...)` with `fkLabel` only when step 4 loaded one, and `masked: M.widgets[key] === "password"` (the cell shows `********`; decision 037 point 5, Changed 2026-10-08). `href`, first match: the column is in `listDisplayLinks` → the row's own change page (this wins even for an FK column; decision 033 item 4); FK column with `refVisible`, no formatter and a non-null value → `${P}/${refSlug}/${enc(value)}/change/`; otherwise none. So with `!refVisible` an FK cell shows the raw value without a link or label (decision 034).
-5. Filter choices: boolean → all / `1` yes / `0` no; enum → all + values; kind date or `isDateOnly` (incl. PG `date()` string mode; Changed 2026-10-07, decision 023) → all + today/past7/month/year; FK with `refVisible` → all + `repo.options(refModel.meta, { limit: 200, ordering: refModel.ordering, toLabel: refModel.toString })`; FK with `!refVisible` → the filter is omitted (no sidebar section, no query; decision 034).
+5. Filter choices: boolean → all / `1` yes / `0` no; enum → all + values; kind date or `isDateOnly` (incl. PG `date()` string mode; Changed 2026-10-07, decision 023) → all + today/past7/month/year; FK with `refVisible` → all + `repo.options(ref.meta, { limit: 200, ordering: defaultOrdering(ref), toLabel: ref.toString })` (the referenced model's `ordering`, or primary key descending when it has none; decision 013 item 7); FK with `!refVisible` → the filter is omitted (no sidebar section, no query; decision 034).
    The selected choice is the one whose value equals the active `f_<key>`; when none matches, "all" is marked selected. For boolean, enum and date filters a non-matching value is also ignored by `buildFilters`, so "all" is accurate. For an FK filter, a valid key that is not among the 200 offered choices still filters the rows while "all" is marked selected; this is accepted (decision 033 item 5). Code comments must not claim that the repository ignores such FK values.
 6. Actions offered: `delete_selected` if `can(M, "delete", U)`, plus custom actions if `can(M, ACTION_PERMISSION, U)` (`"change"`, decision 016). Rendered as a dropdown only if there is at least one.
 7. `ListPage(...)`, 200. `columns[i] = { key, sort, sortHref }`; headers and filter headings show the key (decision 035). `sort` is `asc`/`desc` only for keys in the explicit `o` parameter; with the default ordering every column is `none` (decision 033 item 8). The action form posts to `list URL + current search string` so the redirect can return to the same state.
@@ -54,9 +55,10 @@ Every `ConfirmActionPage` render below passes `modelLabel: M.label`, `action` (t
 ## Add (`GET|POST /:model/add/`)
 Changed 2026-10-08: every `FormPage` render passes `timeZone: state.config.timeZone` (decision 030).
 Changed 2026-10-08: FK choices need `view` on the referenced model (decision 034); non-DB errors from `repo.create` are 500s (decision 033 item 10).
+Changed 2026-10-08: FK choices are ordered by `defaultOrdering(ref)` (decision 013 item 7, L083).
 
 1. `M` or 404; `add` permission or 403.
-2. FK choices: for each form FK field with `slug` (`ref` = its registered model): `!can(ref, "view", U)` → `"noView"` without a query (decision 034); otherwise `opts = repo.options(refMeta, { limit: 201, ... })` → `opts.length > 200 ? "tooMany" : opts`.
+2. FK choices: for each form FK field with `slug` (`ref` = its registered model): `!can(ref, "view", U)` → `"noView"` without a query (decision 034); otherwise `opts = repo.options(ref.meta, { limit: 201, ordering: defaultOrdering(ref), toLabel: ref.toString })` → `opts.length > 200 ? "tooMany" : opts`. `defaultOrdering` is defined in the List notation: the referenced model's `ordering`, or primary key descending when it has none (decision 013 item 7).
 3. GET → `FormPage({ mode: "add", groups, values: {}, timeZone })`, 200. `timeZone` is always `state.config.timeZone` (the resolved `AdminConfig.timeZone`, admin.md `AdminState`); the same value is passed to `validateSubmission` and `toFormValue`. No `displayRow` (add has no stored row and no display-only fields, forms.md).
 4. POST → `validateSubmission({ mode: "add", ... })`. On error → `FormPage` with `values` (echoed request strings), `fieldErrors`, `formErrors`, `timeZone`, status 400.
 5. `data = hooks.beforeSave ? await hooks.beforeSave(data, { ...ctx, mode: "add" }) : data`; a throw → form error `hookFailed`, 400.

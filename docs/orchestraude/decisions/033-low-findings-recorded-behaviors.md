@@ -24,6 +24,7 @@ User decision (2026-10-08, bulk approval). Each item names the interface file th
 14. L073: the SQLite `blob({ mode: "bigint" })` fixture is acceptable; already decided in decision 026. No change.
 15. L075 (views.md `format.ts`): truncation to 100 characters + `…` applies to the output of rule 7 (JSON) and rule 10 (`String(value)`) only. Formatter output, `fkLabel`, booleans, dates, numbers and `[binary]` are not truncated. A long JSON value may be cut mid-token. A test pins JSON truncation (L135).
 16. L076 (data.md `describeForLog`): `<name>` and `<code>` come from the first level of the cause chain (`err` and up to 5 `.cause` levels) whose string `code` maps to a kind; if none maps, from the first level with any string `code`; if no level has a code, `<name>` is the top-level error's name and `<code>` is `-`. A missing or empty name is `unknown`.
+    Changed 2026-10-08 (L046, user-approved in the low-findings triage, section A): before output, `<name>` and `<code>` must each match `/^[A-Za-z0-9_.-]{1,64}$/`; a value that does not match is written `-`. A missing or empty name stays `unknown`. Classification still uses the raw code; only the log line is sanitized. Reason: the chosen level may be any error with a string `code`, not only a driver error, so a newline or very long value could forge or flood log lines.
 17. L077 (forms.md coercion): rule 2's "empty" means missing or exactly `""`. Whitespace-only input is not empty; for kind number it is rejected as `invalidNumber` (it is not `Number("") === 0`).
 
 ## Alternatives considered
@@ -45,3 +46,4 @@ User decision (2026-10-08) on the orchestrator's recommendations. The behaviors 
 ## Consequences
 - Interface files updated: auth.md, data.md, forms.md, routes.md, routes-handlers.md, views.md, support.md, admin.md; test-strategy.md gains the pinned tests (L135, L138).
 - Follow-up code changes: item 7 (auth guard HEAD) and the item 5 code comment. No other code change.
+- Changed 2026-10-08: item 16's output sanitization (L046) is a follow-up code change in `src/data/errors.ts`, with a unit test in `errors.test.ts`.

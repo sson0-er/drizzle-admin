@@ -14,6 +14,7 @@ The pre-spec defines pages and options but leaves several low-impact behaviors o
 5. Header click cycles one column at a time: not sorted → `o=k` → `o=-k` → no `o`. Other sort keys are dropped. A manually written multi-key `o` is still honored.
 6. Query parameters: `q` search, `p` page (1-based), `o` ordering, `f_<key>` filters. Changing search, filter or ordering drops `p`. A non-integer or `< 1` page becomes 1; a page beyond the last renders an empty table with pagination.
 7. FK filter choices show the first 200 referenced rows in the referenced model's default ordering.
+    Changed 2026-10-08 (L083, user-approved in the low-findings triage): "default ordering" means the referenced model's `ordering` when set, otherwise primary key descending (item 4), the same fallback the list page uses. This applies to the FK filter choices on the list page and to the FK select choices on the add/change forms (`repo.options` with limit 200 / 201). The first implementation passed the bare `ordering`, which is `[]` for an unordered model and made `buildOrderBy` sort by primary key ascending.
 8. In external-auth mode (`getUser`) `/login/` and `/logout/` return 404 and no logout button is shown. When both `verifyCredentials` and `getUser` are set, `getUser` wins (§5.2 "When set, the login page is not used"). Unauthenticated in external mode without `loginUrl` → 401 page.
 9. Failed login re-renders with status 400 (consistent with §9 error status).
 10. `beforeSave` / `beforeDelete` throwing → generic error (400 form error, or error flash on delete). `afterSave` throwing after a successful write → success redirect with an extra warning flash. Action `run` throwing → generic error flash. Hook and action error messages are not rendered.
@@ -33,3 +34,4 @@ Django behaviors are matched where §1 asks for a Django feel (unverified agains
 
 ## Consequences
 - These behaviors are documented in the README.
+- Changed 2026-10-08: item 7's fallback (L083) needs a follow-up code change in `src/routes/list.ts` and `src/routes/form.ts`, with list and form tests (test-strategy.md).

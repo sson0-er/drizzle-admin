@@ -30,6 +30,17 @@
 | 24 | security-matrix-and-proxy | 23 | Permission matrix, XSS, `proxy.test.ts`, example phase-5 smoke (end of phase 5) |
 | 25 | polish-css-and-fk-fallback | 24 | Dark mode and responsive CSS, FK > 200 fallback integration test |
 | 26 | readme | 25 | README per outline, `readme.test.ts` (end of phase 6) |
+| 27 | fk-ordering-and-example | 06, 15, 19 | Follow-up: FK filter/select choices use the referenced model's default ordering (pk desc fallback, L083); seed clamp computed inside `seed()` + seed-distribution test (L002, L090, L119); example binds `127.0.0.1` with `HOST` (decision 038) |
+| 28 | fk-reference-view-permission | 27 | Follow-up: `"noView"` FK choices, list labels/links/filter gated by `view` on the referenced model (decision 034, L047, L048); `tooMany` link only for default/`select` (L062); FK filter comment fix (L060) |
+| 29 | vanished-rows-warnings | 20, 21 | Follow-up: custom confirm action with no surviving rows → `noSelection` (L003); 0-row single delete → `alreadyDeleted` warning (L074); new messages key |
+| 30 | cookie-deletion-and-head-guard | 12, 23, 24 | Follow-up: session/flash deletion cookies carry the same attributes incl. `Secure` (L072); logged-out HEAD gets `next` like GET (L064) |
+| 31 | password-keep-on-empty | 28 | Follow-up: change-mode empty `password` submission omitted from `data`, zod `.optional()`, `required` false (decision 037 points 2-3) |
+| 32 | password-no-echo | 31, 28 | Follow-up: password input renders empty, display-only field and list cell show `********` (decision 037 points 1, 4, 5) |
+| 33 | security-test-fixes | 28, 30 | Follow-up, tests only: delete-refusal test and 403 controls on dedicated rows, attribute XSS payload, full trailing-slash allowlist and 301 cases, per-dialect pages cases (L044, L089, L096, L053, L086, L092, L091) |
+| 34 | test-gaps-data-time | 29 | Follow-up, tests only: query/repository/errors/time/delete gaps (L054, L100, L099, L093, L097, L114, L101, L102, L103) + vanished `delete_selected` pin (L138) |
+| 35 | test-gaps-forms-views-auth | 30, 32 | Follow-up, tests only: fields/coerce/widgets/flash/views/types/config/introspect gaps (L121, L128, L136, L137, L106, L108, L111, L116, L118, L117, L034, L129) + JSON truncation pin (L135) |
+| 36 | readme-and-hardening | 27, 28, 32, 34 | Follow-up: README accuracy (L049, L050, L087, L051, L082, L045; body-size limit and `127.0.0.1`/`HOST`, decision 038; password and FK view notes); `describeForLog` name/code sanitization (L046); `safeNext` comment (L004, L080); `run` JSDoc (L045) |
+| 37 | claude-md | 27-36 | Follow-up: expand CLAUDE.md (overview, commands, layout, design and security principles, where docs live, agent workflow), Conventions section kept verbatim |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -44,6 +55,27 @@ Parallelizable later (independent `depends_on`): 02/03/13 after 01; 07 with 04-0
 - Route tasks 15, 19, 20, 21 implement permission checks; the permission test matrix is written once in task 24 (`test/auth.test.ts`).
 - Task 17a (follow-up, user-approved) fixes PGlite startup timeouts under parallel vitest files, observed in task 15 attempt 1 and in 3 of 4 full runs during task 17. It touches only `vitest.config.ts` and, if needed, `test/helpers/db.ts`; `src/` and test assertions are out of scope. It depends on 17 only so its 5-run gate covers the full suite as of that point; no later task depends on it in content, but it runs before 18 so later gates are not flaky.
 - The FK > 200 fallback is implemented with forms (tasks 16 and 19) because forms.md defines it there; phase 6 (task 25) adds its integration test. Dark mode and the 767px layout are deferred to task 25 as §13 phase 6 lists them.
+
+### Follow-up tasks 27-37 (low-findings triage and approved design changes)
+Execution order: 27 → 28 → 29 → 30 → 31 → 32 → 33 → 34 → 35 → 36 → 37
+
+Numeric order satisfies every `depends_on`; tasks 01-26 are done and unchanged. The sources are `05-low-findings-triage.md` (A items and follow-up candidates 1-7) and decisions 033, 034, 036, 037 and 038. L067 (labels) is out of scope: decision 035 keeps raw keys.
+- Behavior changes come first (27-32), so the test-only tasks (33-35) and the README (36) are written against the final code. CLAUDE.md (37) runs last so that it describes the final code.
+- Dependencies between follow-up tasks come from shared files:
+  - 27 → 28: `src/routes/list.ts` and `form.ts`, same functions;
+  - 28 → 31: `src/forms/fields.ts`;
+  - 28 / 31 → 32: `src/routes/list.ts` and `test/password-widget.test.ts`;
+  - 29 → 34: `test/delete.test.ts`;
+  - 28 / 30 → 33: `test/auth.test.ts`;
+  - 30 / 32 → 35: `test/flash.test.ts`, `test/format.test.ts`, `test/widgets.test.ts`, `test/views.test.ts`;
+  - 34 → 36: `test/errors.test.ts`.
+  Task 36 also depends on 27, 28 and 32 because the README describes their behavior.
+- 31 (empty password keeps the stored value) runs before 32 (input renders empty). In the other order there would be an intermediate state where saving the change form without retyping wipes the password.
+- Parallelizable later: 29 and 30 are independent of 27/28 and of each other; 33, 34 and 35 are independent of each other once their dependencies are done.
+- Every follow-up task's DoD includes `scripts/verify.sh`. Implementers follow the Conventions section in `CLAUDE.md`. Reviewers do not re-raise items in `docs/orchestraude/review-policy.md`.
+- Design text not yet updated, which the tasks follow anyway (orchestrator to sync):
+  - routes-handlers.md List step 5 writes `ordering: refModel.ordering`, while task 27 applies decision 013 item 7 (pk descending fallback);
+  - data.md does not yet state the `describeForLog` charset rule of task 36 (L046).
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes
