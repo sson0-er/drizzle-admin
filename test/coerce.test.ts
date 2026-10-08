@@ -154,6 +154,46 @@ describe("coerceForm: kinds", () => {
     expect(run(f, "2").data).toEqual({ n: 2 });
   });
 
+  it.each([
+    ["0x1F", { isInteger: true }, "0x1F", { n: messages.invalidInteger }],
+    ["0b11", { isInteger: true }, "0b11", { n: messages.invalidInteger }],
+    ["1e3", { isInteger: true }, "1e3", { n: messages.invalidInteger }],
+    ["1.5", { isInteger: true }, "1.5", { n: messages.invalidInteger }],
+    ["+5", { isInteger: true }, "+5", { n: messages.invalidInteger }],
+    ["unsafe integer", { isInteger: true }, "9007199254740993", { n: messages.invalidInteger }],
+    ["abc", { isInteger: true }, "abc", { n: messages.invalidNumber }],
+    [
+      "int32 above max",
+      { isInteger: true, valueCheck: "int32" },
+      "3000000000",
+      { n: messages.invalidInteger },
+    ],
+    [
+      "int64 above max",
+      { kind: "bigint", valueCheck: "int64" },
+      "9223372036854775808",
+      { n: messages.invalidInteger },
+    ],
+  ] satisfies [string, Partial<FieldMeta>, string, Record<string, string>][])(
+    "rejects %s on an integer field",
+    (_name, meta, raw, errors) => {
+      expect(run(field("n", { kind: "number", ...meta }), raw).errors).toEqual(errors);
+    },
+  );
+
+  it.each([
+    ["integer with whitespace", { isInteger: true }, " 42 ", 42],
+    ["non-integer exponent", {}, "1e3", 1000],
+  ] satisfies [string, Partial<FieldMeta>, string, number][])(
+    "accepts %s",
+    (_name, meta, raw, value) => {
+      expect(run(field("n", { kind: "number", ...meta }), raw)).toEqual({
+        data: { n: value },
+        errors: {},
+      });
+    },
+  );
+
   it("parses bigint and rejects non-integers with invalidInteger", () => {
     const f = field("n", { kind: "bigint" });
     expect(run(f, "9007199254740993").data).toEqual({ n: 9007199254740993n });

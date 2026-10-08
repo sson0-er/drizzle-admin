@@ -414,6 +414,13 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
         message: messages.invalidInteger,
       },
       {
+        name: "hexadecimal integer",
+        path: "articles",
+        form: { views: "0x1F" },
+        field: "views",
+        message: messages.invalidInteger,
+      },
+      {
         name: "invalid real",
         path: "articles",
         form: { score: "x" },
@@ -479,6 +486,18 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       expect(await rowsOf(t, c.path === "articles" ? "articles" : "authors")).not.toContainEqual(
         expect.objectContaining({ title: "kept title" }),
       );
+    });
+
+    it("add: views=3000000000 is rejected on PG (int4) and stored on SQLite", async () => {
+      const res = await send(client, "/admin/articles/add/", {
+        title: "int4-overflow",
+        authorId: "1",
+        views: "3000000000",
+      });
+      expect(res.status).toBe(fixture.name === "pglite" ? 400 : 303);
+      if (fixture.name === "pglite") {
+        expect(errorsOf(await docOf(res), "views")).toContain(messages.invalidInteger);
+      }
     });
 
     it("change: a coercion error -> 400 with the raw values kept", async () => {

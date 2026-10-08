@@ -291,6 +291,59 @@ describe("parsePk / parseFieldValue", () => {
     expect(parseFieldValue(role, "admin")).toBe("admin");
   });
 
+  describe("value domains", () => {
+    const fieldWith = (patch: Partial<FieldMeta>): FieldMeta => ({
+      key: "k",
+      dbName: "k",
+      kind: "number",
+      notNull: true,
+      hasDefault: false,
+      isPrimaryKey: false,
+      isAutoIncrement: false,
+      isInteger: true,
+      isLongText: false,
+      isDateOnly: false,
+      isGenerated: false,
+      ...patch,
+    });
+    const int16 = fieldWith({ valueCheck: "int16" });
+    const int32 = fieldWith({ valueCheck: "int32" });
+    const int64 = fieldWith({ kind: "bigint", isInteger: false, valueCheck: "int64" });
+    const uuid = fieldWith({ kind: "string", isInteger: false, valueCheck: "uuid" });
+    const text = fieldWith({ kind: "string", isInteger: false });
+    const enumField = fieldWith({
+      kind: "enum",
+      isInteger: false,
+      enumValues: ["admin", "editor"],
+    });
+    const uuidValue = "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11";
+
+    it.each([
+      ["int32 max", int32, "2147483647", 2147483647],
+      ["int32 min", int32, "-2147483648", -2147483648],
+      ["int32 above max", int32, "2147483648", null],
+      ["int32 below min", int32, "-2147483649", null],
+      ["int16 max", int16, "32767", 32767],
+      ["int16 above max", int16, "32768", null],
+      ["int64 max", int64, "9223372036854775807", 9223372036854775807n],
+      ["int64 above max", int64, "9223372036854775808", null],
+      ["int64 below min", int64, "-9223372036854775809", null],
+      ["integer without valueCheck", fieldWith({}), "3000000000", 3000000000],
+      ["uuid", uuid, uuidValue, uuidValue],
+      ["uuid upper case", uuid, uuidValue.toUpperCase(), uuidValue.toUpperCase()],
+      ["non-uuid", uuid, "abc", null],
+      ["braced uuid", uuid, `{${uuidValue}}`, null],
+      ["hyphen-less uuid", uuid, uuidValue.replaceAll("-", ""), null],
+      ["string with NUL", text, "a\u0000b", null],
+      ["plain string", text, "plain", "plain"],
+      ["enum member", enumField, "admin", "admin"],
+      ["enum non-member", enumField, "root", null],
+    ])("%s", (_name, f, raw, expected) => {
+      expect(parseFieldValue(f, raw)).toBe(expected);
+      expect(parsePk(f, raw)).toBe(expected);
+    });
+  });
+
   it("returns null for other kinds", () => {
     expect(parseFieldValue(meta, "{}")).toBeNull();
     expect(parseFieldValue(field(pgMeta(pg.events), "day"), "2026-10-07")).toBeNull();

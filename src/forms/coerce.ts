@@ -1,11 +1,10 @@
+import { parseFieldValue } from "../data/query.js";
 import { messages } from "../messages.js";
 import { parseDateOnly, parseDatetimeLocal } from "../time.js";
 import type { FormBody } from "../types.js";
 import type { FormField, FormMode } from "./fields.js";
 
 export type { FormBody };
-
-const INTEGER = /^-?\d+$/;
 
 // Multi-valued keys use the last string. A `File` (or a missing key) counts as missing.
 function lastString(body: FormBody, key: string): string | undefined {
@@ -36,14 +35,13 @@ function parseByKind(field: FormField, raw: string, timeZone: string): Parsed {
       // Number("") is 0, so a whitespace-only input must be rejected explicitly.
       const n = trimmed === "" ? Number.NaN : Number(trimmed);
       if (!Number.isFinite(n)) return { error: messages.invalidNumber };
-      if (meta.isInteger && !Number.isInteger(n)) return { error: messages.invalidInteger };
-      return { value: n };
+      if (!meta.isInteger) return { value: n };
+      const value = parseFieldValue(meta, trimmed);
+      return value === null ? { error: messages.invalidInteger } : { value };
     }
     case "bigint": {
-      const trimmed = raw.trim();
-      return INTEGER.test(trimmed)
-        ? { value: BigInt(trimmed) }
-        : { error: messages.invalidInteger };
+      const value = parseFieldValue(meta, raw.trim());
+      return value === null ? { error: messages.invalidInteger } : { value };
     }
     case "date": {
       // Date-only columns are UTC calendar dates; applying the time zone would shift the stored day.

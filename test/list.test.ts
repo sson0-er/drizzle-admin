@@ -580,3 +580,33 @@ describe.each(["Asia/Tokyo", "America/New_York"])("f_due=today in %s (pglite)", 
     expect(selectedLabel(doc, "due")).toEqual([messages.today]);
   });
 });
+
+describe("out-of-range integer keys (pglite)", () => {
+  let t: TestAdmin;
+  beforeAll(async () => {
+    t = await makeAdmin(pg, {
+      models: {
+        authors: { toString: (row) => String(row.name) },
+        articles: { listDisplay: ["id", "title", "authorId", "views"], listFilter: ["authorId"] },
+      },
+    });
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it("ignores an int4-overflowing FK filter value instead of failing", async () => {
+    const all = await page(t, "/admin/articles/");
+    const { status, doc } = await page(t, "/admin/articles/?f_authorId=3000000000");
+    expect(status).toBe(200);
+    expect(rowsOf(doc).map((r) => r.cells)).toEqual(rowsOf(all.doc).map((r) => r.cells));
+  });
+
+  it.each(["change", "delete"])(
+    "answers an int4-overflowing PK on the %s page with 404",
+    async (view) => {
+      const res = await t.client.get(`/admin/authors/3000000000/${view}/`);
+      expect(res.status).toBe(404);
+    },
+  );
+});

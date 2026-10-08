@@ -93,23 +93,42 @@ export function buildOrderBy(meta: ModelMeta, ordering: OrderItem[]): SQL[] {
   return out;
 }
 
+const INT_RANGES = {
+  int16: [-32768, 32767],
+  int32: [-2147483648, 2147483647],
+} as const;
+const INT64_MIN = -9223372036854775808n;
+const INT64_MAX = 9223372036854775807n;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// Returns null for anything the DB would reject, so callers never send it as a parameter.
 export function parseFieldValue(field: FieldMeta, raw: string): string | number | bigint | null {
   switch (field.kind) {
     case "number": {
       if (field.isInteger) {
         if (!/^-?\d+$/.test(raw)) return null;
         const n = Number(raw);
-        return Number.isSafeInteger(n) ? n : null;
+        if (!Number.isSafeInteger(n)) return null;
+        const range =
+          field.valueCheck === "int16" || field.valueCheck === "int32"
+            ? INT_RANGES[field.valueCheck]
+            : undefined;
+        return range === undefined || (n >= range[0] && n <= range[1]) ? n : null;
       }
       if (!/^-?\d+(\.\d+)?$/.test(raw)) return null;
       const n = Number(raw);
       return Number.isFinite(n) ? n : null;
     }
-    case "bigint":
-      return /^-?\d+$/.test(raw) ? BigInt(raw) : null;
+    case "bigint": {
+      if (!/^-?\d+$/.test(raw)) return null;
+      const n = BigInt(raw);
+      return field.valueCheck === "int64" && (n < INT64_MIN || n > INT64_MAX) ? null : n;
+    }
     case "string":
+      if (raw.includes("\u0000")) return null;
+      return field.valueCheck === "uuid" && !UUID.test(raw) ? null : raw;
     case "enum":
-      return raw;
+      return field.enumValues?.includes(raw) ? raw : null;
     default:
       return null;
   }

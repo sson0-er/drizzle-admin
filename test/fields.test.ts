@@ -1,4 +1,5 @@
 import { sql } from "drizzle-orm";
+import { integer as pgInteger, pgTable, text as pgText } from "drizzle-orm/pg-core";
 import { blob, integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { describe, expect, it } from "vitest";
 import { createAdmin, resolvedModels } from "../src/admin.js";
@@ -34,6 +35,13 @@ const computed = sqliteTable("computed", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   first: text("first").notNull(),
   upper: text("upper").generatedAlwaysAs(sql`upper(first)`),
+});
+
+// A PG table with a non-PK identity column.
+const counted = pgTable("counted", {
+  id: pgInteger("id").primaryKey(),
+  seq: pgInteger("seq").generatedByDefaultAsIdentity(),
+  label: pgText("label"),
 });
 
 type Registration = [
@@ -131,6 +139,12 @@ describe("buildFormGroups: editability", () => {
     expect(model.meta.fields.find((f) => f.key === "upper")?.isGenerated).toBe(true);
     expect(keys(build(model, { mode: "add" }))).toEqual(["first"]);
     expect(field(build(model, { mode: "change" }), "upper").editable).toBe(false);
+  });
+
+  it("omits a non-PK identity column on add and shows it display-only on change", () => {
+    const model = modelOf("postgres", counted);
+    expect(keys(build(model, { mode: "add" }))).toEqual(["id", "label"]);
+    expect(field(build(model, { mode: "change" }), "seq").editable).toBe(false);
   });
 
   it("omits kind unknown on add and shows it display-only on change", () => {

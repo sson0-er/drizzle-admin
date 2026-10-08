@@ -116,19 +116,6 @@ describe("validateSubmission", () => {
     expect(validate).not.toHaveBeenCalled();
   });
 
-  it("stops at zod errors before validate", async () => {
-    const validate = vi.fn();
-    // Coercion accepts this integer, but zod's .int() rejects integers beyond the safe range.
-    const result = await submit({ name: "a", age: "9007199254740993" }, validate);
-    expect(result).toEqual({
-      ok: false,
-      fieldErrors: { age: messages.invalidValue },
-      formErrors: [],
-      values: { name: "a", age: "9007199254740993" },
-    });
-    expect(validate).not.toHaveBeenCalled();
-  });
-
   it("maps validate errors to field errors for editable keys and form errors otherwise", async () => {
     const result = await submit({ name: "a", age: "3" }, () => ({ name: "m1", other: "m2" }));
     expect(result).toEqual({

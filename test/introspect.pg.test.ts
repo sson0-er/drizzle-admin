@@ -1,5 +1,15 @@
 import type { Table } from "drizzle-orm";
-import { integer, pgTable, primaryKey, text } from "drizzle-orm/pg-core";
+import {
+  bigint,
+  integer,
+  pgTable,
+  primaryKey,
+  serial,
+  smallint,
+  text,
+  uuid,
+  varchar,
+} from "drizzle-orm/pg-core";
 import { describe, expect, it } from "vitest";
 import { introspectTable, toSnapshot } from "../src/introspect/index.js";
 import { articles, authors, events, kv, tags } from "./fixtures/schema-pg.js";
@@ -68,6 +78,16 @@ describe("introspectTable (postgres)", () => {
     });
   });
 
+  it("marks non-PK identity columns as generated but not auto-increment", () => {
+    const t = pgTable("ident", {
+      id: serial("id").primaryKey(),
+      byDefault: integer("by_default").generatedByDefaultAsIdentity(),
+      always: integer("always").generatedAlwaysAsIdentity(),
+    });
+    expect(field(t, "byDefault")).toMatchObject({ isGenerated: true, isAutoIncrement: false });
+    expect(field(t, "always")).toMatchObject({ isGenerated: true, isAutoIncrement: false });
+  });
+
   it("maps bigint, json and timestamp", () => {
     expect(field(articles, "big").kind).toBe("bigint");
     expect(field(articles, "meta").kind).toBe("json");
@@ -78,6 +98,34 @@ describe("introspectTable (postgres)", () => {
     const fk = field(articles, "authorId").foreignKey;
     expect(fk?.table).toBe(authors);
     expect(fk?.column).toBe("id");
+  });
+
+  describe("valueCheck", () => {
+    const t = pgTable("domains", {
+      id: serial("id").primaryKey(),
+      small: smallint("small"),
+      int: integer("int"),
+      bigNum: bigint("big_num", { mode: "number" }),
+      bigInt: bigint("big_int", { mode: "bigint" }),
+      uid: uuid("uid"),
+      body: text("body"),
+      label: varchar("label"),
+    });
+
+    it.each([
+      ["id", "int32"],
+      ["small", "int16"],
+      ["int", "int32"],
+      ["bigNum", "int64"],
+      ["bigInt", "int64"],
+      ["uid", "uuid"],
+    ])("%s has valueCheck %s", (key, expected) => {
+      expect(field(t, key).valueCheck).toBe(expected);
+    });
+
+    it.each(["body", "label"])("%s has no valueCheck property", (key) => {
+      expect(field(t, key)).not.toHaveProperty("valueCheck");
+    });
   });
 
   it("rejects a SQLite table", () => {

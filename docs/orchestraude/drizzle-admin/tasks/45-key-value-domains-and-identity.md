@@ -1,7 +1,7 @@
 ---
 id: 45-key-value-domains-and-identity
 depends_on: [44-permission-inheritance-and-hidden-models]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 45: key-value-domains-and-identity
@@ -81,3 +81,16 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact values an
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: blocked
+- New tests were written first and run against the unchanged code; they failed as required. Received values: coerce `"0x1F"`, `"0b11"`, `"1e3"`, `"+5"`, `"9007199254740993"`, int32 `"3000000000"`, int64 `"9223372036854775808"` all accepted (`errors` was `{}`); `parseFieldValue` returned `2147483648`, `-2147483649`, `32768`, `9223372036854775808n`, `-9223372036854775809n` for out-of-range ints, and returned `"abc"`, `"{a0eebc99-...}"`, the hyphen-less string and a NUL string unchanged (uuid / NUL cases) instead of `null`; identity columns had `isGenerated: false` and `valueCheck` was `undefined`; fields test add groups were `["id","seq","label"]`; PG list `?f_authorId=3000000000` and `/authors/3000000000/change|delete/` returned 500; PG add with `views=3000000000` returned no `invalidInteger` error; `views=0x1F` returned 303.
+- Implementation is in place and every new test passes, typecheck, lint and build pass, the SQLite snapshot is unchanged, the PG snapshot diff is only `valueCheck` lines plus `tags.id` `isGenerated` false -> true.
+- Blocked: `scripts/verify.sh` fails on the existing test/schema.test.ts "stops at zod errors before validate" (line ~120). It submits `age: "9007199254740993"` and expects coercion to accept it and zod to answer `messages.invalidValue`. Per this task (forms.md rule 3) coercion now answers `messages.invalidInteger` for that value, so the assertion cannot hold. test/schema.test.ts is outside "Files to touch" and may not be changed.
+
+### Attempt 1 (continued): still blocked on test/schema.test.ts
+- The coordinator allowed rewriting "stops at zod errors before validate" with an input that passes coercion but fails zod. I checked every kind against `coerceForm` and `buildZodSchema`: after this task coercion yields exactly the types zod expects (number: finite, integer and safe for `isInteger`; bigint; boolean; Date, never Invalid Date because the datetime regex is 4-digit; enum from the same `enumValues`; string/json/unknown accept anything; empty and password-on-change cases are skipped consistently in both). No user input reaches a zod rejection any more; the zod layer is now purely defensive, so the test cannot be rewritten with a real input. test/schema.test.ts was left unchanged.
+
+### Attempt 1 (final): done
+- Deleted the test "stops at zod errors before validate" from test/schema.test.ts (coordinator decision). Reason: it relied on coercion accepting `age: "9007199254740993"` and zod's `.int()` rejecting it; after decision 045 coercion rejects that value with `invalidInteger`, and no input passes coercion but fails zod. The ordering "coercion errors stop before zod and validate" stays covered by "stops at coercion errors before zod and validate". No other change in that file.
+- scripts/verify.sh passes (1488 tests passed, 3 skipped; typecheck, lint, build clean).
+- Review round 1: high 0, medium 0, low 6 (see findings.md; includes the dialect ternary in test/form.test.ts:491 and missing int16 lower-bound / no-valueCheck bigint rows). Done.

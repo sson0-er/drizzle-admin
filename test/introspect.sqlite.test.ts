@@ -20,6 +20,16 @@ describe("introspectTable (sqlite)", () => {
     expect(toSnapshot(introspectTable(table, "sqlite"))).toMatchSnapshot();
   });
 
+  it.each([
+    ["authors", authors],
+    ["articles", articles],
+    ["kv", kv],
+  ])("gives no field of %s a valueCheck property", (_name, table) => {
+    for (const f of introspectTable(table, "sqlite").fields) {
+      expect(f, f.key).not.toHaveProperty("valueCheck");
+    }
+  });
+
   it("maps column kinds", () => {
     expect(field(authors, "name").kind).toBe("string");
     expect(field(authors, "active").kind).toBe("boolean");

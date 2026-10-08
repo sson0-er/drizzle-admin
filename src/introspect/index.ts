@@ -20,6 +20,8 @@ export interface FieldMeta {
   /** Calendar-date column: UTC-midnight Date (kind date) or "YYYY-MM-DD" string (kind string). */
   isDateOnly: boolean;
   isGenerated: boolean;
+  /** DB-enforced value domain of a PG integer or uuid column; absent on SQLite and other types. */
+  valueCheck?: "int16" | "int32" | "int64" | "uuid";
   foreignKey?: { table: Table; column: string; slug?: string };
 }
 
@@ -55,6 +57,17 @@ const INTEGER_TYPES = new Set([
   "PgBigSerial53",
 ]);
 const PG_SERIAL_TYPES = new Set(["PgSerial", "PgSmallSerial", "PgBigSerial53", "PgBigSerial64"]);
+const VALUE_CHECKS: Record<string, NonNullable<FieldMeta["valueCheck"]>> = {
+  PgSmallInt: "int16",
+  PgSmallSerial: "int16",
+  PgInteger: "int32",
+  PgSerial: "int32",
+  PgBigInt53: "int64",
+  PgBigSerial53: "int64",
+  PgBigInt64: "int64",
+  PgBigSerial64: "int64",
+  PgUUID: "uuid",
+};
 const PLAIN_KINDS = new Set(["string", "number", "bigint", "boolean", "date", "json"]);
 
 function kindOf(column: Column): Pick<FieldMeta, "kind" | "enumValues"> {
@@ -127,8 +140,11 @@ export function introspectTable(table: Table, dialect: Dialect): ModelMeta {
       isInteger: kind === "number" && INTEGER_TYPES.has(columnType),
       isLongText: kind === "string" && columnType === "PgText",
       isDateOnly: columnType === "PgDate" || columnType === "PgDateString",
-      isGenerated: column.generated !== undefined,
+      // Drizzle leaves `generated` undefined on identity columns, so both are checked.
+      isGenerated: column.generated !== undefined || column.generatedIdentity !== undefined,
     };
+    const valueCheck = VALUE_CHECKS[columnType];
+    if (valueCheck !== undefined) field.valueCheck = valueCheck;
     if (enumValues !== undefined) field.enumValues = enumValues;
     const foreignKey = foreignKeys.get(column);
     if (foreignKey !== undefined) field.foreignKey = foreignKey;
