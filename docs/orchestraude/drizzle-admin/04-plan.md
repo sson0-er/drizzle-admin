@@ -41,6 +41,7 @@
 | 35 | test-gaps-forms-views-auth | 30, 32 | Follow-up, tests only: fields/coerce/widgets/flash/views/types/config/introspect gaps (L121, L128, L136, L137, L106, L108, L111, L116, L118, L117, L034, L129) + JSON truncation pin (L135) |
 | 36 | readme-and-hardening | 27, 28, 32, 34 | Follow-up: README accuracy (L049, L050, L087, L051, L082, L045; body-size limit and `127.0.0.1`/`HOST`, decision 038; password and FK view notes); `describeForLog` name/code sanitization (L046); `safeNext` comment (L004, L080); `run` JSDoc (L045) |
 | 37 | claude-md | 27-36 | Follow-up: expand CLAUDE.md (overview, commands, layout, design and security principles, where docs live, agent workflow), Conventions section kept verbatim |
+| 38 | ui-icons | 28, 32, 35 | Post-v1 enhancement (decision 039, user-approved): fixed inline SVG icon set `src/views/icons.tsx` (`aria-hidden`, `currentColor`), icons on listed buttons/links/flash items, `BooleanMark` for boolean list cells (`cellBoolean`, `Cell.bool`) and `DisplayValue` booleans, icon CSS without `url(` |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -76,6 +77,19 @@ Numeric order satisfies every `depends_on`; tasks 01-26 are done and unchanged. 
 - Design text not yet updated, which the tasks follow anyway (orchestrator to sync):
   - routes-handlers.md List step 5 writes `ordering: refModel.ordering`, while task 27 applies decision 013 item 7 (pk descending fallback);
   - data.md does not yet state the `describeForLog` charset rule of task 36 (L046).
+
+### Post-v1 task 38 (decision 039, UI icons)
+Execution order: 37 → 38
+
+- Tasks 01-37 are done and unchanged. Task 38 implements decision 039 with the Q8-Q10 answers: views.md "Icons", forms.md `DisplayValue`, routes-handlers.md List step 4b, the support.md messages note, and test-strategy.md "Icons (decision 039)".
+- It is kept as one task, as requested, although it touches 11 source and 6 test files. The changes are small and share one new module, and the selector and regression checks only mean something over the whole set.
+- Dependencies come from shared files:
+  - 28: `src/routes/list.ts`;
+  - 32: `src/views/format.ts`, `src/forms/widgets.tsx`, `src/routes/list.ts`;
+  - 35: `test/widgets.test.ts`, `test/format.test.ts`, `test/views.test.ts`.
+  It runs after 37 only because of numeric order. CLAUDE.md is not changed by it.
+- Planner choice: the flash-icon and view-only boolean integration cases go in `test/form.test.ts`. test-strategy.md lists them under its "Integration (`list.test.ts` …)" bullet, but names `form.test.ts` as an option for the view-only case. `form.test.ts` already has the add-then-flash flow and the view-only `authors` setup.
+- Lint gate: the evidence that Biome's `noSvgWithoutTitle` exempts `aria-hidden="true"` SVGs is not confirmed on 2.5.15. If `pnpm lint` rejects the icon `<svg>`, the task is reported blocked. Biome configuration is not relaxed.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes
