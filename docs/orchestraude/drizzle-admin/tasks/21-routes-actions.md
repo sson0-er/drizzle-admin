@@ -1,7 +1,7 @@
 ---
 id: 21-routes-actions
 depends_on: [20-routes-delete]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 21: routes-actions

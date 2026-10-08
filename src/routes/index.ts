@@ -6,6 +6,7 @@ import { createRepository } from "../data/repository.js";
 import { messages } from "../messages.js";
 import { ADMIN_CSS } from "../static/admin-css.js";
 import type { AdminState } from "../types.js";
+import { actionsHandler } from "./actions.js";
 import { type AdminContext, type AdminEnv, errorPage } from "./context.js";
 import { dashboardHandler } from "./dashboard.js";
 import { deleteHandler } from "./delete.js";
@@ -69,6 +70,7 @@ export function buildApp(state: AdminState): Hono {
   // Routes 2-9 (login, logout, list, action, add, change, delete) are registered here, in table
   // order, by tasks 15, 19, 20, 21 and 23. They must stay above the catch-all.
   app.get("/:model/", listHandler); // route 4
+  app.post("/:model/", actionsHandler); // route 5
   app.on(["GET", "POST"], "/:model/add/", addHandler); // route 6
   app.on(["GET", "POST"], "/:model/:pk/change/", changeHandler); // routes 7 and 8
   app.on(["GET", "POST"], "/:model/:pk/delete/", deleteHandler); // route 9

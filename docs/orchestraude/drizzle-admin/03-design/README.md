@@ -67,6 +67,7 @@ Changed 2026-10-07: questions and decisions summaries updated for Q1-Q4, then fo
 Changed 2026-10-07: Q5 answered (decision 023).
 Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisions summary range updated.
 Changed 2026-10-08: decisions 027-029 (task 14 follow-ups) added; summaries updated.
+Changed 2026-10-08: decisions summary range updated for 030 (task 18) and 031 (task 21).
 
 | File | Summary |
 |---|---|
@@ -84,4 +85,4 @@ Changed 2026-10-08: decisions 027-029 (task 14 follow-ups) added; summaries upda
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
 | questions.md | Open: none; resolved: pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404) |
-| decisions-and-evidence.md | Decisions 001-029 and evidence ids referenced by this design |
+| decisions-and-evidence.md | Decisions 001-031 and evidence ids referenced by this design |

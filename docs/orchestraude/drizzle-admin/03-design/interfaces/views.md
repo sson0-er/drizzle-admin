@@ -25,6 +25,7 @@ Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
 
 ### Pages (all take `PageChrome` plus the listed props)
 Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `displayRow` split described (decision 030).
+Changed 2026-10-08: `ConfirmActionPage` gains the required `listHref` prop (decision 031).
 
 | Component | Extra props | Stable selectors used by tests |
 |---|---|---|
@@ -32,7 +33,7 @@ Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `d
 | `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
 | `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?; timeZone` (see below) | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
 | `DeletePage` | `modelLabel; objectLabel; cancelHref` | `form#delete-form`, `p.confirm-text`, `button[type=submit]` |
-| `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; backQuery: string` | `form#action-confirm` (POST to list URL + backQuery) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li` |
+| `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; listHref: string; backQuery: string` (`listHref` = list URL `${prefix}/${slug}/`, required because `PageChrome` has no model slug; `backQuery` = query string with leading `?`, or `""`) | `form#action-confirm` (POST to `listHref + backQuery`) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li`; the cancel link points to `listHref + backQuery` |
 | `LoginPage` | `next; username; error?` | `form#login-form` (POST `${prefix}/login/`), `input[name=username]`, `input[name=password]`, hidden `next`, `p.errornote` |
 | `ErrorPage` | `status; message` | `h1`, `p.error-message` |
 

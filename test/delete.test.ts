@@ -23,9 +23,9 @@ async function docOf(res: Response): Promise<Node> {
 }
 
 /** The first POST needs a session, which any GET issues. */
-async function send(client: Client, path: string) {
+async function send(client: Client, path: string, form: Record<string, string | string[]> = {}) {
   if (client.cookie("da_session") === undefined) await client.get("/admin/");
-  return client.post(path);
+  return client.post(path, form);
 }
 
 describe.each(dialects)("delete ($name)", (fixture) => {
@@ -149,5 +149,98 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     const shown = await flashes(c, res, "error");
     expect(shown).toEqual([messages.hookFailed]);
     expect((await rows("authors")).some((r) => r.id === author.id)).toBe(true);
+  });
+
+  describe("bulk delete (delete_selected)", () => {
+    const bulk = (c: Client, form: Record<string, string | string[]>, query = "") =>
+      send(c, `/admin/authors/${query}`, form);
+
+    it("lists each row's toString on the confirmation page and deletes nothing", async () => {
+      const a = await addAuthor("bulk-a");
+      const b = await addAuthor("bulk-b");
+      const res = await bulk(
+        client,
+        {
+          action: "delete_selected",
+          _selected: [String(a.id), String(b.id)],
+        },
+        "?q=bulk",
+      );
+      expect(res.status).toBe(200);
+      const doc = await docOf(res);
+      const form = qs(doc, { tag: "form", id: "action-confirm" }) as Node;
+      expect(attr(form, "action")).toBe("/admin/authors/?q=bulk");
+      const ul = qs(doc, { tag: "ul", cls: "objects" }) as Node;
+      expect(qsa(ul, { tag: "li" }).map((li) => text(li).trim())).toEqual(["bulk-a", "bulk-b"]);
+      expect(
+        qsa(form, { tag: "input", attrs: { name: "_selected" } }).map((i) => attr(i, "value")),
+      ).toEqual([String(a.id), String(b.id)]);
+      expect((await rows("authors")).filter((r) => r.id === a.id || r.id === b.id)).toHaveLength(2);
+    });
+
+    it("deletes the rows on _confirm=1 and flashes deletedMany", async () => {
+      const a = await addAuthor("gone-a");
+      const b = await addAuthor("gone-b");
+      const res = await bulk(client, {
+        action: "delete_selected",
+        _selected: [String(a.id), String(b.id)],
+        _confirm: "1",
+      });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe("/admin/authors/");
+      expect((await rows("authors")).some((r) => r.id === a.id || r.id === b.id)).toBe(false);
+      expect(await flashes(client, res, "success")).toEqual([messages.deletedMany(2)]);
+    });
+
+    it("calls beforeDelete once per row with mode delete", async () => {
+      const a = await addAuthor("hook-a");
+      const b = await addAuthor("hook-b");
+      const calls: { row: Rec; mode: unknown }[] = [];
+      const c = adminWith({
+        hooks: { beforeDelete: (row, ctx) => void calls.push({ row, mode: ctx.mode }) },
+      });
+      const res = await bulk(c, {
+        action: "delete_selected",
+        _selected: [String(a.id), String(b.id)],
+        _confirm: "1",
+      });
+      expect(res.status).toBe(303);
+      expect(calls.map((x) => x.row.id).sort()).toEqual([a.id, b.id].sort());
+      expect(calls.every((x) => x.mode === "delete")).toBe(true);
+    });
+
+    it("keeps every row when a beforeDelete throws", async () => {
+      const a = await addAuthor("keep-a");
+      const c = adminWith({
+        hooks: {
+          beforeDelete: () => {
+            throw new Error("secret detail");
+          },
+        },
+      });
+      const res = await bulk(c, {
+        action: "delete_selected",
+        _selected: String(a.id),
+        _confirm: "1",
+      });
+      expect(res.status).toBe(303);
+      expect(await flashes(c, res, "error")).toEqual([messages.hookFailed]);
+      expect((await rows("authors")).some((r) => r.id === a.id)).toBe(true);
+    });
+
+    it("flashes dbForeignKey and keeps the rows when an article references one", async () => {
+      const free = await addAuthor("free");
+      // Fixture author 1 owns articles.
+      const res = await bulk(client, {
+        action: "delete_selected",
+        _selected: ["1", String(free.id)],
+        _confirm: "1",
+      });
+      expect(res.status).toBe(303);
+      expect(await flashes(client, res, "error")).toEqual([messages.dbForeignKey]);
+      const ids = (await rows("authors")).map((r) => r.id);
+      expect(ids).toContain(1);
+      expect(ids).toContain(free.id);
+    });
   });
 });

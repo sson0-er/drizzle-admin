@@ -29,17 +29,19 @@ Changed 2026-10-07: custom actions gated by `ACTION_PERMISSION` = `change` (deci
 
 ## Actions (`POST /:model/`)
 Changed 2026-10-07: custom actions require `change` (decision 016).
+Changed 2026-10-08: both `ConfirmActionPage` renders pass `listHref` and `backQuery` (decision 031).
 
-Body: `action`, `_selected` (repeated), optional `_confirm=1`. `back` = list URL + the request's query string.
+Body: `action`, `_selected` (repeated), optional `_confirm=1`. `listUrl` = `${prefix}/${M.slug}/`; `backQuery` = the request's query string (leading `?`, or `""`); `back` = `listUrl + backQuery`.
+Every `ConfirmActionPage` render below passes `modelLabel: M.label`, `action` (the submitted value), `listHref: listUrl` and `backQuery`, plus the props listed in its step.
 1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back.
 2. `action === "delete_selected"`:
    - no `delete` permission → 403.
-   - no `_confirm` → `rows = repo.getMany(...)` → `ConfirmActionPage({ isDelete: true, items: rows.map(r => ({ pk, label: M.toString(r) })) })`, 200.
+   - no `_confirm` → `rows = repo.getMany(...)` → `ConfirmActionPage({ isDelete: true, actionLabel: messages.deleteSelected, items: rows.map(r => ({ pk, label: M.toString(r) })), listHref: listUrl, backQuery })`, 200.
    - `_confirm=1` → `rows = repo.getMany(...)`; for each row `await hooks.beforeDelete?.(row, { ...ctx, mode: "delete" })`; a throw → error flash `hookFailed`, 303 back. Then `n = repo.delete(M.meta, pks of rows)` → success flash `deletedMany(n)`, 303 back. DB error → classify → error flash (`dbForeignKey` for foreignKey, else `dbOther`), 303 back.
 3. Custom action `a` with `a.name === action`:
    - missing → error flash `unknownAction`, 303 back.
    - no `ACTION_PERMISSION` (`change`) → 403.
-   - `a.confirm && !_confirm` → `ConfirmActionPage({ isDelete: false, actionLabel: a.label, items })`, 200.
+   - `a.confirm && !_confirm` → `ConfirmActionPage({ isDelete: false, actionLabel: a.label, items, listHref: listUrl, backQuery })`, 200.
    - else `result = await a.run({ ids, db, user: U })` → success flash `result?.message ?? actionDone`; a throw → error flash `actionFailed`; 303 back.
 
 ## Add (`GET|POST /:model/add/`)

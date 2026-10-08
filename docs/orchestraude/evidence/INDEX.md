@@ -20,3 +20,4 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-trailing-slash-open-redirect | Can the trailing-slash catch-all redirect off-site with basePath "/", and does task 14 code (renderPage, buildApp, catch-all) match the design? | expires 2027-01-06
 - 2026-10-08-trailing-slash-control-char-bypass | Does the decision 029 denylist still redirect off-site via control characters, and how do Hono routes and browsers treat such paths? | expires 2027-01-06
 - 2026-10-08-formpage-timezone-prop | Which props does the task 18 FormPage take, and why does it need a time zone? | expires 2027-01-06
+- 2026-10-08-confirm-action-listhref-prop | Which props does the task 21 ConfirmActionPage take, and how does the actions route fill them? | expires 2027-01-06
