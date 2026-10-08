@@ -1,7 +1,7 @@
 ---
 id: 25-polish-css-and-fk-fallback
 depends_on: [24-security-matrix-and-proxy]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 25: polish-css-and-fk-fallback

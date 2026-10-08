@@ -97,6 +97,33 @@ describe("static modules", () => {
     }
   });
 
+  // The text of the first top-level `@media <query>` block, found by balancing braces.
+  const mediaBlock = (query: string): string => {
+    const start = ADMIN_CSS.indexOf(`@media (${query})`);
+    expect(start, query).toBeGreaterThanOrEqual(0);
+    const open = ADMIN_CSS.indexOf("{", start);
+    let depth = 0;
+    for (let i = open; i < ADMIN_CSS.length; i++) {
+      if (ADMIN_CSS[i] === "{") depth++;
+      else if (ADMIN_CSS[i] === "}" && --depth === 0) return ADMIN_CSS.slice(open + 1, i);
+    }
+    throw new Error(`unbalanced @media block ${query}`);
+  };
+
+  it("ADMIN_CSS redefines custom properties in the dark color scheme", () => {
+    const dark = mediaBlock("prefers-color-scheme: dark");
+    expect(dark).toContain(":root");
+    expect(dark).toMatch(/--[a-z-]+:\s*#/);
+  });
+
+  it("ADMIN_CSS moves the filter above the table on narrow screens", () => {
+    const narrow = mediaBlock("max-width: 767px");
+    expect(narrow).toContain("#changelist-filter");
+    expect(narrow).toMatch(/#changelist-filter\s*\{[^}]*order:\s*-1/);
+    expect(narrow).not.toMatch(/float:\s*right/);
+    expect(ADMIN_CSS).toContain("overflow-x: auto");
+  });
+
   it("ADMIN_CSS_VERSION is 8 hex chars", () => {
     expect(ADMIN_CSS_VERSION).toMatch(/^[0-9a-f]{8}$/);
   });

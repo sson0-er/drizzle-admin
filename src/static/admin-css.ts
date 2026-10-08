@@ -1,5 +1,5 @@
-// Base stylesheet as a string module (decision 007). No external fonts, URLs or @import. The
-// dark-mode and narrow-screen media queries are added in a later task.
+// Stylesheet as a string module (decision 007). No external fonts, URLs or @import. Colors are
+// custom properties so the dark scheme only has to redefine them.
 export const ADMIN_CSS = `
 :root {
   --primary: #417690;
@@ -27,6 +27,36 @@ export const ADMIN_CSS = `
   --warning-bg: #ffc;
   --message-error-bg: #ffefef;
   --selected-bg: #ffc;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --primary: #264b5d;
+    --secondary: #447e9b;
+    --accent: #f5dd5d;
+    --header-bg: #264b5d;
+    --header-fg: #f5dd5d;
+    --breadcrumbs-bg: #1f3a48;
+    --breadcrumbs-fg: #9ec3d6;
+    --body-bg: #121212;
+    --body-fg: #e0e0e0;
+    --body-quiet: #a0a0a0;
+    --border: #3a3a3a;
+    --row-alt: #1b1b1b;
+    --module-header-bg: #264b5d;
+    --module-header-fg: #f0f0f0;
+    --link: #81d4fa;
+    --link-hover: #b3e5fc;
+    --button-bg: #447e9b;
+    --button-fg: #fff;
+    --delete-bg: #ba2121;
+    --error-fg: #ff8a80;
+    --error-bg: #3b1d1d;
+    --success-bg: #1e3a24;
+    --warning-bg: #3d3a1a;
+    --message-error-bg: #3b1d1d;
+    --selected-bg: #3d3a1a;
+  }
 }
 
 * { box-sizing: border-box; }
@@ -138,6 +168,16 @@ a.deletelink, button.deletelink { background: var(--delete-bg); color: var(--but
 
 .paginator { margin: 12px 0; color: var(--body-quiet); }
 .paginator .this-page { font-weight: 700; }
+
+@media (max-width: 767px) {
+  #header { padding: 10px 16px; }
+  .breadcrumbs, .messagelist li { padding-left: 16px; padding-right: 16px; }
+  #content { padding: 16px; }
+  #changelist { flex-direction: column; align-items: stretch; }
+  #changelist-filter { order: -1; flex: 0 0 auto; width: 100%; float: none; }
+  .form-row label { display: block; min-width: 0; margin-bottom: 4px; }
+  .results { overflow-x: auto; }
+}
 `;
 
 // FNV-1a 32-bit. The hash only busts caches; it needs no cryptographic strength.

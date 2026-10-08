@@ -16,7 +16,7 @@ import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 type Rec = Record<string, unknown>;
 type RawDb = {
   select(): { from(table: Table): PromiseLike<Rec[]> };
-  insert(table: Table): { values(rows: Rec): { returning(): PromiseLike<Rec[]> } };
+  insert(table: Table): { values(rows: Rec | Rec[]): { returning(): PromiseLike<Rec[]> } };
   delete(table: Table): { where(cond: unknown): PromiseLike<unknown> };
   execute?(query: unknown): PromiseLike<{ rows: Rec[] }>;
 };
@@ -767,6 +767,54 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const link = qs(rowOf(doc, "authorId"), { tag: "a" });
       expect(link === null ? null : attr(link, "href"), path).toBe("/admin/authors/");
     }
+  });
+
+  // The FK select offers at most 200 choices; past that the form falls back to a PK input. A
+  // database of its own keeps the author count independent of the tests above.
+  describe("FK fallback", () => {
+    let own: TestAdmin;
+    const fillAuthors = async (target: number): Promise<void> => {
+      const have = (await rowsOf(own, "authors")).length;
+      const rows = Array.from({ length: target - have }, (_, i) => ({ name: `fill-${have + i}` }));
+      if (rows.length > 0) await raw(own).insert(tableOf(own, "authors")).values(rows).returning();
+      expect(await rowsOf(own, "authors")).toHaveLength(target);
+    };
+
+    beforeAll(async () => {
+      own = await makeAdmin(fixture, {
+        models: { authors: models.authors ?? null, articles: models.articles ?? null },
+      });
+    });
+    afterAll(async () => {
+      await own.close();
+    });
+
+    it("keeps the select at 200 authors and falls back to a PK input at 201", async () => {
+      await fillAuthors(200);
+      const select = await docOf(await own.client.get("/admin/articles/add/"));
+      const selectRow = rowOf(select, "authorId");
+      expect(qs(selectRow, { tag: "select", attrs: { name: "authorId" } })).not.toBeNull();
+      expect(qs(selectRow, { tag: "a" })).toBeNull();
+
+      await fillAuthors(201);
+      const doc = await docOf(await own.client.get("/admin/articles/add/"));
+      const row = rowOf(doc, "authorId");
+      expect(qs(row, { tag: "select" })).toBeNull();
+      expect(qs(row, { tag: "input", attrs: { type: "number", name: "authorId" } })).not.toBeNull();
+      const link = qs(row, { tag: "a", attrs: { href: "/admin/authors/" } });
+      expect(link).not.toBeNull();
+      expect(link && text(link)).toBe(messages.openRelated);
+    });
+
+    it("creates the row from an author id typed into the fallback input", async () => {
+      await fillAuthors(201);
+      const res = await send(own.client, "/admin/articles/add/", {
+        title: "fk-typed",
+        authorId: "2",
+      });
+      expect(res.status).toBe(303);
+      expect(await rowWhere(own, "articles", "title", "fk-typed")).toMatchObject({ authorId: 2 });
+    });
   });
 
   // Date-only columns exist on PG only (decisions 019, 023). One more admin per time zone over the
