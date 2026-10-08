@@ -107,7 +107,7 @@ export function buildFormGroups(args: {
   canChange: boolean;
   prefix: string;
   /** Keyed by field key; only FK fields whose referenced model is registered. */
-  fkChoices: ReadonlyMap<string, Choice[] | "tooMany">;
+  fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;
   refSlugOf: (key: string) => string | undefined;
 }): FormGroup[] {
   const { model, mode, canChange, prefix, fkChoices, refSlugOf } = args;
@@ -130,16 +130,17 @@ export function buildFormGroups(args: {
       let fkFallbackHref: string | undefined;
 
       if (fk !== undefined && fk.slug !== undefined && fkChoice !== undefined) {
-        // Only a `select` (default or override) is replaced by the plain input; other overrides stay.
-        if (fkChoice === "tooMany") {
+        if (fkChoice === "tooMany" || fkChoice === "noView") {
+          // Only a `select` (default or override) is replaced by the plain input; other overrides stay
+          // and get no fallback link. "noView" never links: the user may not see the referenced list.
           if (override === undefined || override === "select") {
             widget = meta.kind === "number" || meta.kind === "bigint" ? "number" : "text";
+            if (fkChoice === "tooMany") fkFallbackHref = `${prefix}/${refSlugOf(key) ?? fk.slug}/`;
           }
-          fkFallbackHref = `${prefix}/${refSlugOf(key) ?? fk.slug}/`;
         } else if (override === undefined) {
           widget = "select";
         }
-        if (widget === "select" && fkChoice !== "tooMany") {
+        if (widget === "select" && Array.isArray(fkChoice)) {
           choices = withEmptyChoice(meta, fkChoice);
         }
       } else if (widget === "select" && meta.kind === "enum") {

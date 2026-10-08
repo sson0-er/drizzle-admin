@@ -49,15 +49,21 @@ interface FormErrors {
 async function loadFkChoices(
   c: AdminContext,
   model: ResolvedModel,
-): Promise<Map<string, Choice[] | "tooMany">> {
+): Promise<Map<string, Choice[] | "tooMany" | "noView">> {
   const { repo, state } = c.var;
-  const choices = new Map<string, Choice[] | "tooMany">();
+  const user = requireUser(c);
+  const choices = new Map<string, Choice[] | "tooMany" | "noView">();
   const keys = new Set(model.fieldsets.flatMap((fieldset) => fieldset.fields));
   for (const field of model.meta.fields) {
     const slug = field.foreignKey?.slug;
     if (slug === undefined || !keys.has(field.key)) continue;
     const ref = state.models.get(slug);
     if (ref === undefined) continue;
+    // Without `view` on the referenced model its labels must not leak (decision 034).
+    if (!can(ref, "view", user)) {
+      choices.set(field.key, "noView");
+      continue;
+    }
     const options = await repo.options(ref.meta, {
       limit: FK_CHOICE_LIMIT + 1,
       ordering: defaultOrdering(ref),

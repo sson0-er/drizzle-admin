@@ -1,7 +1,7 @@
 ---
 id: 28-fk-reference-view-permission
 depends_on: [27-fk-ordering-and-example]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 28: fk-reference-view-permission
@@ -68,3 +68,5 @@ A user without `view` on a referenced model sees no labels of that model. FK lis
 - Decisions: docs/orchestraude/decisions/034-fk-reference-view-permission.md, docs/orchestraude/decisions/036-triage-behavior-changes.md (item 1), docs/orchestraude/decisions/033-low-findings-recorded-behaviors.md (items 4, 5, 6)
 
 ## History
+- Implemented. No new exports or props. `src/routes/list.ts` gets a module-private `hiddenFkKeys` (keys of FK fields whose registered referenced model the user cannot view), computed once per request and consulted for `f_<key>`, `loadFkLabels`, the FK href and the filter section. An FK to an unregistered table behaves as before. The `fkChoices` type in `buildFormGroups` now includes `"noView"`.
+- Test note: the default label of `authors` is `authors #<id>`, so the auth tests register `authors` with `toString: name` to make a leak visible in the HTML.

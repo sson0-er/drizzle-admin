@@ -636,3 +636,128 @@ describe.each(dialects)("XSS escaping ($name)", (fixture) => {
     expect(value).toBe(SCRIPT);
   });
 });
+
+describe.each(dialects)("FK view permission (decision 034) ($name)", (fixture) => {
+  const NAMES = ["alice", "bob", "carol", "dave"];
+  const articleOptions = {
+    listDisplay: ["id", "title", "authorId"],
+    listFilter: ["authorId"],
+  };
+  // The default label is "authors #<id>", so name the author to make a leak visible in the HTML.
+  const authorOptions = (permissions: Permissions): ModelAdminOptions<Table> => ({
+    permissions,
+    toString: (row) => String((row as { name: unknown }).name),
+  });
+  let hidden: TestAdmin;
+  let visible: Client;
+
+  const htmlOf = async (client: Client, path: string): Promise<string> => {
+    const res = await client.get(path);
+    expect(res.status).toBe(200);
+    return res.text();
+  };
+  const selected = (doc: Node): string[] =>
+    qsa(doc, { tag: "input", attrs: { name: "_selected" } }).map((i) => attr(i, "value") ?? "");
+  /** The `authorId` cell of the row of one article (the add test inserts a row, so no row index). */
+  const authorIdCell = (doc: Node, articleId: string): Node => {
+    const index = qsa(doc, { tag: "th" }).findIndex((th) => attr(th, "data-key") === "authorId");
+    const row = qsa(doc, { tag: "tr" }).find(
+      (tr) => qsa(tr, { tag: "input", attrs: { name: "_selected", value: articleId } }).length > 0,
+    );
+    return qsa(row as Node, { tag: "td" })[index] as Node;
+  };
+  const hasAuthorLink = (doc: Node): boolean =>
+    qsa(doc, { tag: "a" }).some((a) => (attr(a, "href") ?? "").startsWith("/admin/authors/"));
+
+  beforeAll(async () => {
+    hidden = await makeAdmin(fixture, {
+      models: {
+        authors: authorOptions({ view: false }),
+        articles: articleOptions,
+      },
+    });
+    // A second admin over the same database, so one PGlite instance serves both permission sets.
+    const admin = createAdmin({
+      db: hidden.db,
+      dialect: fixture.dialect,
+      basePath: "/admin",
+      secret: TEST_SECRET,
+      auth: {
+        verifyCredentials: async (username, password) =>
+          username === TEST_USER.name && password === TEST_PASSWORD ? TEST_USER : null,
+      },
+    });
+    admin.register(hidden.schema.authors, authorOptions({ view: true }));
+    admin.register(hidden.schema.articles, articleOptions);
+    visible = createClient((req) => admin.fetch(req));
+    expect((await visible.login()).status).toBe(303);
+  });
+  afterAll(async () => {
+    await hidden.close();
+  });
+
+  describe("without view on the referenced model", () => {
+    it("shows the raw id in the FK cell without a link", async () => {
+      const doc = parse(await htmlOf(hidden.client, "/admin/articles/"));
+      const cell = authorIdCell(doc, "1");
+      expect(text(cell)).toBe("1");
+      expect(qsa(cell, { tag: "a" })).toEqual([]);
+    });
+
+    it.each([
+      { page: "list", path: "/admin/articles/" },
+      { page: "add", path: "/admin/articles/add/" },
+      { page: "change", path: "/admin/articles/1/change/" },
+    ])("shows no author name on the $page page", async ({ path }) => {
+      const html = await htmlOf(hidden.client, path);
+      expect(NAMES.filter((name) => html.includes(name))).toEqual([]);
+    });
+
+    it("offers no FK filter", async () => {
+      const doc = parse(await htmlOf(hidden.client, "/admin/articles/"));
+      expect(qs(doc, { tag: "div", attrs: { "data-filter": "authorId" } })).toBeNull();
+    });
+
+    it("ignores f_authorId", async () => {
+      const all = selected(parse(await htmlOf(hidden.client, "/admin/articles/")));
+      const filtered = selected(
+        parse(await htmlOf(hidden.client, "/admin/articles/?f_authorId=1")),
+      );
+      expect(all.length).toBeGreaterThan(2);
+      expect(filtered).toEqual(all);
+    });
+
+    it.each([
+      { page: "add", path: "/admin/articles/add/" },
+      { page: "change", path: "/admin/articles/1/change/" },
+    ])("renders a plain number input on the $page page", async ({ path }) => {
+      const doc = parse(await htmlOf(hidden.client, path));
+      expect(qs(doc, { tag: "input", attrs: { name: "authorId", type: "number" } })).not.toBeNull();
+      expect(qs(doc, { tag: "select", attrs: { name: "authorId" } })).toBeNull();
+      expect(hasAuthorLink(doc)).toBe(false);
+    });
+
+    it("still saves a valid authorId", async () => {
+      const res = await hidden.client.post("/admin/articles/add/", {
+        title: "No view",
+        authorId: "2",
+      });
+      expect(res.status).toBe(303);
+    });
+  });
+
+  describe("with view on the referenced model", () => {
+    it("shows the author label with a link and offers the filter", async () => {
+      const doc = parse(await htmlOf(visible, "/admin/articles/"));
+      const cell = authorIdCell(doc, "1");
+      expect(text(cell)).toBe("alice");
+      expect(attr(qs(cell, { tag: "a" }) as Node, "href")).toBe("/admin/authors/1/change/");
+      expect(qs(doc, { tag: "div", attrs: { "data-filter": "authorId" } })).not.toBeNull();
+    });
+
+    it("renders a select on the add page", async () => {
+      const doc = parse(await htmlOf(visible, "/admin/articles/add/"));
+      expect(qs(doc, { tag: "select", attrs: { name: "authorId" } })).not.toBeNull();
+    });
+  });
+});

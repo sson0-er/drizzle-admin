@@ -3,7 +3,7 @@ import { ACTION_PERMISSION, can } from "../auth/permissions.js";
 import type { DbRow } from "../data/repository.js";
 import type { FieldMeta } from "../introspect/index.js";
 import { messages } from "../messages.js";
-import type { ResolvedModel } from "../types.js";
+import type { AdminUser, ResolvedModel } from "../types.js";
 import { formatCell } from "../views/format.js";
 import { type Cell, ListPage, type ListPageProps } from "../views/list.js";
 import { type SortState, sortHref, withQuery } from "../views/url.js";
@@ -48,17 +48,32 @@ function parsePage(raw: string | null): number {
 
 const isDateFilter = (f: FieldMeta): boolean => f.kind === "date" || f.isDateOnly;
 
+/**
+ * Keys of FK fields whose referenced model is registered but not viewable by the user. Such a
+ * column shows the raw value only: no label, link or filter (decision 034).
+ */
+function hiddenFkKeys(c: AdminContext, model: ResolvedModel, user: AdminUser): Set<string> {
+  const hidden = new Set<string>();
+  for (const field of model.meta.fields) {
+    const slug = field.foreignKey?.slug;
+    const ref = slug === undefined ? undefined : c.var.state.models.get(slug);
+    if (ref !== undefined && !can(ref, "view", user)) hidden.add(field.key);
+  }
+  return hidden;
+}
+
 /** Labels of the referenced rows for each FK column: one `getMany` per column, never per row. */
 async function loadFkLabels(
   c: AdminContext,
   model: ResolvedModel,
   rows: DbRow[],
+  hidden: ReadonlySet<string>,
 ): Promise<Map<string, Map<string, string>>> {
   const { repo, state } = c.var;
   const labels = new Map<string, Map<string, string>>();
   for (const key of model.listDisplay) {
     const slug = model.meta.fields.find((f) => f.key === key)?.foreignKey?.slug;
-    if (slug === undefined || Object.hasOwn(model.formatters, key)) continue;
+    if (slug === undefined || hidden.has(key) || Object.hasOwn(model.formatters, key)) continue;
     const ref = state.models.get(slug);
     if (ref === undefined) continue;
     const values = new Set<string>();
@@ -115,8 +130,10 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   const q = searchable ? (params.get("q") ?? "") : null;
   const userOrdering = parseOrdering(params.get("o"), model.listDisplay);
   const ordering = userOrdering.length > 0 ? userOrdering : defaultOrdering(model);
+  const hiddenFk = hiddenFkKeys(c, model, user);
   const filters: Record<string, string> = {};
   for (const key of model.listFilter) {
+    if (hiddenFk.has(key)) continue;
     const value = params.get(`f_${key}`);
     if (value !== null && value !== "") filters[key] = value;
   }
@@ -131,7 +148,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
     perPage: model.listPerPage,
   });
 
-  const fkLabels = await loadFkLabels(c, model, rows);
+  const fkLabels = await loadFkLabels(c, model, rows, hiddenFk);
   const fieldByKey = new Map(model.meta.fields.map((f) => [f.key, f]));
   const changeHref = (row: DbRow) => `${listUrl}${enc(row[model.meta.pk.key])}/change/`;
 
@@ -155,6 +172,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
       const refSlug = field.foreignKey?.slug;
       if (
         refSlug !== undefined &&
+        !hiddenFk.has(key) &&
         formatter === undefined &&
         value !== null &&
         value !== undefined
@@ -175,10 +193,12 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   const filterProps: ListPageProps["filters"] = [];
   for (const key of model.listFilter) {
     const field = fieldByKey.get(key);
-    if (field === undefined) continue;
+    if (field === undefined || hiddenFk.has(key)) continue;
     const choices = await filterChoices(c, field);
     if (choices === null) continue;
-    // An unknown value is treated as "all" by the repository, so "all" is the active choice then.
+    // For boolean, enum and date filters `buildFilters` ignores an unknown value, so "all" is
+    // right. A valid FK key outside the offered choices still filters while "all" shows as
+    // selected (accepted, decision 033 item 5).
     const active = choices.find((ch) => ch.value === filters[key])?.value ?? null;
     const param = `f_${key}`;
     filterProps.push({

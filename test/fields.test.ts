@@ -67,7 +67,7 @@ function build(
   over: Partial<{
     mode: FormMode;
     canChange: boolean;
-    fkChoices: ReadonlyMap<string, Choice[] | "tooMany">;
+    fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;
   }> = {},
 ): FormGroup[] {
   return buildFormGroups({
@@ -261,12 +261,43 @@ describe("buildFormGroups: widget overrides and the empty choice", () => {
     expect(role.choices).toBeUndefined();
   });
 
-  it("keeps an FK override other than select even when the choices are too many", () => {
-    const model = modelOf("sqlite", sqlite.articles, { widgets: { authorId: "hidden" } }, [
-      sqlite.authors,
-    ]);
-    const f = field(build(model, { fkChoices: new Map([["authorId", "tooMany"]]) }), "authorId");
-    expect(f.widget).toBe("hidden");
+  it.each([
+    { name: "noView, default widget", choice: "noView", override: undefined, widget: "number" },
+    { name: "noView, select override", choice: "noView", override: "select", widget: "number" },
+    { name: "noView, hidden override", choice: "noView", override: "hidden", widget: "hidden" },
+    { name: "noView, number override", choice: "noView", override: "number", widget: "number" },
+    { name: "tooMany, hidden override", choice: "tooMany", override: "hidden", widget: "hidden" },
+    { name: "tooMany, number override", choice: "tooMany", override: "number", widget: "number" },
+  ] as const)(
+    "gives an FK with $name no choices and no fallback link",
+    ({ choice, override, widget }) => {
+      const model = modelOf(
+        "sqlite",
+        sqlite.articles,
+        override === undefined ? undefined : { widgets: { authorId: override } },
+        [sqlite.authors],
+      );
+      const f = field(build(model, { fkChoices: new Map([["authorId", choice]]) }), "authorId");
+      expect(f.widget).toBe(widget);
+      expect(f.choices).toBeUndefined();
+      expect(f.fkFallbackHref).toBeUndefined();
+    },
+  );
+
+  it("falls back to a text input for a noView FK with a non-numeric key", () => {
+    const model = modelOf("sqlite", sqlite.articles, undefined, [sqlite.authors]);
+    const textual = {
+      ...model,
+      meta: {
+        ...model.meta,
+        fields: model.meta.fields.map((f) =>
+          f.key === "authorId" ? { ...f, kind: "string" as const } : f,
+        ),
+      },
+    };
+    const f = field(build(textual, { fkChoices: new Map([["authorId", "noView"]]) }), "authorId");
+    expect(f.widget).toBe("text");
+    expect(f.fkFallbackHref).toBeUndefined();
   });
 
   it("adds the empty choice first only for nullable selects", () => {
