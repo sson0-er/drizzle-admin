@@ -44,6 +44,7 @@ Project-level decisions from low-findings triage. Reviewers read this file and d
 - [tests] FL027 No spy that no getMany/options query runs for a hidden FK — the rendered output is the security property; a spy would couple the test to repository internals. — accepted 2026-10-08, feature drizzle-admin (follow-up)
 - [tests] FL028 Page-wide script assertion implies the form-scoped one — already accepted policy (implied-assertion convention: reviewers report existing ones as C); the DoD wording asked for the form-scoped check. — accepted 2026-10-08, feature drizzle-admin (follow-up)
 - [tests] FL030 Removed README phrases not pinned — already accepted policy (L115: README test precision is low value); the task did not require it. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [quality] Leading union carries a rule tag for cases with no payload (src/views/format.ts:53, task 40) — the reviewer called it acceptable; it meets the single-source requirement and a plain chain is not clearly simpler. — accepted 2026-10-08, feature drizzle-admin (follow-up)
 
 ## Conventions adopted
 - Do not add single-use alias variables such as `const model = found`; use or rename the original binding. — adopted 2026-10-08, feature drizzle-admin

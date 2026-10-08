@@ -45,6 +45,7 @@
 | 39 | dads-restyle | 38 | Post-v1 enhancement (decision 040): `ADMIN_CSS` rewritten per views-style.md (28 tokens in both schemes, typography, button variants by existing selectors, card flash, black/yellow focus ring), attribution as a TS comment only; new `test/admin-css.test.ts`; no markup, selector, messages or test-hook change |
 | 40 | password-hardening-and-cleanup | 36, 38 | Follow-up (decision 037 points 6-7): `password`-widget list columns not sortable (`sortHref: null`, `?o=` drops the key) and no FK link on masked cells (L011, L010); `register()` rejects `password` on the PK / in `searchFields` / in `ordering` (Q12); README external-mode wording (L014) and password notes; shared rule 0-3 precedence helper for `formatCell` / `cellBoolean` (L001); `Icon` guard kept with a why-comment (L007) |
 | 41 | test-precision | 33, 40 | Follow-up, tests only: denied add POST creates no row (L008/L019), unique 403-matrix titles (L012), flash XSS text kept (L022), aria-hidden check per render (L017), one case per `DisplayValue` row (L020), no `?? doc` fallback (L023), 64/65-char name in `describeForLog` (L026) |
+| 42 | register-check-order | 40, 41 | Follow-up (task 40/41 review lows): `register()` password-widget checks moved to a second loop after the `allowedWidgets` loop (admin.md step 5 order), braces on all three, order-pinning test in `test/register.test.ts`; `DisplayValue` time-zone `it.each` rows written out literally in `test/widgets.test.ts` |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -121,6 +122,17 @@ Execution order: 39 → 40 → 41
   - **L014**: the `getUser` row of the README configuration table has the same "every request" inaccuracy as line 232, so task 40 fixes both.
   - **L010**: no test, because test-strategy.md states that the masked-cell FK-link rule has no reachable integration case (`register()` rejects `password` on FK columns). The shared rule "every new or changed behavior has a test" is waived for this one condition by the design. The DoD checks it in the code instead.
 - Decision 041 applies to both DoDs' test-diff rules: editing an existing import line only to add names is allowed.
+
+### Follow-up task 42 (task 40/41 review low findings)
+Execution order: 41 → 42
+
+- Tasks 01-41 are done and unchanged. The source is the "## low" sections of `tasks/40-password-hardening-and-cleanup.findings.md` (spec: password checks inside the `allowedWidgets` loop; quality: braces) and `tasks/41-test-precision.findings.md` (quality: spread + `flatMap` in the `DisplayValue` table).
+- Out of scope: "Leading union carries a rule tag" (src/views/format.ts:53). The reviewer called it acceptable.
+- Scope is src/admin.ts plus test/register.test.ts and test/widgets.test.ts. No design change: the fix makes the code follow admin.md step 5 as written. Only configs with two errors behave differently: the not-allowed-widget error now comes before a password-restriction error.
+- Dependencies come from shared files:
+  - 40 → 42: the `register` widget loop in `src/admin.ts`;
+  - 41 → 42: the `DisplayValue` table in `test/widgets.test.ts`.
+- Decision 041 applies to the test-diff rule.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes

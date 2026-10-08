@@ -253,16 +253,28 @@ describe("DisplayValue", () => {
   const dateOnly = field("date", { kind: "date", isDateOnly: true });
   const json = field("json", { kind: "json" });
   it.each([
-    ...["Asia/Tokyo", "America/New_York"].flatMap((zone) => [
-      {
-        zone,
-        name: "date-only Date",
-        field: dateOnly,
-        value: new Date("2026-10-07T00:00:00Z"),
-        expected: "2026/10/07",
-      },
-      { zone, name: "json value", field: json, value: { a: 1 }, expected: '{"a":1}' },
-    ]),
+    {
+      zone: "Asia/Tokyo",
+      name: "date-only Date",
+      field: dateOnly,
+      value: new Date("2026-10-07T00:00:00Z"),
+      expected: "2026/10/07",
+    },
+    {
+      zone: "America/New_York",
+      name: "date-only Date",
+      field: dateOnly,
+      value: new Date("2026-10-07T00:00:00Z"),
+      expected: "2026/10/07",
+    },
+    { zone: "Asia/Tokyo", name: "json value", field: json, value: { a: 1 }, expected: '{"a":1}' },
+    {
+      zone: "America/New_York",
+      name: "json value",
+      field: json,
+      value: { a: 1 },
+      expected: '{"a":1}',
+    },
   ])("shows a $name the same in $zone", ({ zone, field: f, value, expected }) => {
     expect(text(parse(String(DisplayValue({ field: f, value, timeZone: zone }))))).toBe(expected);
   });

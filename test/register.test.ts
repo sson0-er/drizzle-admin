@@ -481,6 +481,12 @@ describe("register: password widget restrictions", () => {
     expect(registerError(table, options)).toBe(`drizzle-admin: ${message}`);
   });
 
+  it("checks every widget against allowedWidgets before the password restrictions", () => {
+    expect(registerError(kv, { widgets: { key: "password", value: "checkbox" } })).toBe(
+      'drizzle-admin: kv: widget "checkbox" is not allowed for field "value" (kind string)',
+    );
+  });
+
   it("accepts the widget on a field outside searchFields and ordering", () => {
     expect(() =>
       sqliteAdmin().register(authors, {

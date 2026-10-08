@@ -203,9 +203,12 @@ function resolveModel(
     if (!allowedWidgets(field).includes(widget)) {
       fail(`${name}: widget "${widget}" is not allowed for field "${key}" (kind ${field.kind})`);
     }
+  }
+  for (const [key, widget] of widgetEntries) {
     if (widget !== "password") continue;
-    if (key === meta.pk.key)
+    if (key === meta.pk.key) {
       fail(`${name}: the primary key "${key}" cannot use the password widget`);
+    }
     if (searchFields.some((f) => f.key === key)) {
       fail(`${name}: field "${key}" uses the password widget and cannot be in searchFields`);
     }
