@@ -1,6 +1,6 @@
 import type { Context } from "hono";
 import { deleteCookie, getSignedCookie, setSignedCookie } from "hono/cookie";
-import { isSecure } from "./session.js";
+import { cookieAttrs } from "./session.js";
 
 // Flash message types shared with the views.
 export type FlashLevel = "success" | "warning" | "error";
@@ -31,11 +31,8 @@ export async function addFlash(c: Context, o: FlashOpts, msgs: FlashMessage[]): 
   const all = [...(pending.get(c) ?? []), ...msgs.map(({ level, text }) => ({ level, text }))];
   pending.set(c, all);
   await setSignedCookie(c, FLASH_COOKIE, JSON.stringify(all), o.secret, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: o.prefix || "/",
+    ...cookieAttrs(c, o.prefix, o.publicOrigin),
     maxAge: FLASH_MAX_AGE_SEC,
-    secure: isSecure(c, o.publicOrigin),
   });
 }
 
@@ -43,7 +40,7 @@ export async function consumeFlash(c: Context, o: FlashOpts): Promise<FlashMessa
   const raw = await getSignedCookie(c, o.secret, FLASH_COOKIE);
   if (raw === undefined) return [];
   // Delete whenever a cookie was present, so a bad one cannot linger.
-  deleteCookie(c, FLASH_COOKIE, { path: o.prefix || "/" });
+  deleteCookie(c, FLASH_COOKIE, cookieAttrs(c, o.prefix, o.publicOrigin));
   if (raw === false) return [];
   let data: unknown;
   try {

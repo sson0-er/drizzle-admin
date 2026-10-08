@@ -57,6 +57,12 @@ describe.each(dialects)("login, logout and auth guard ($name)", (fixture) => {
       expect(location(res)).toBe("/admin/login/?next=%2Fadmin%2Fauthors%2F%3Fq%3Da");
     });
 
+    it("redirects a logged-out HEAD like the GET", async () => {
+      const res = await fresh().request("/admin/authors/?q=x", { method: "HEAD" });
+      expect(res.status).toBe(302);
+      expect(location(res)).toBe("/admin/login/?next=%2Fadmin%2Fauthors%2F%3Fq%3Dx");
+    });
+
     it("lands on next after logging in", async () => {
       const client = fresh();
       const redirect = await client.get("/admin/authors/?q=a");

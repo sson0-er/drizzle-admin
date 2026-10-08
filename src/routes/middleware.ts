@@ -81,7 +81,8 @@ export const authGuard: Mw = async (c, next) => {
   const target = url.pathname + url.search;
   if (authMode === "builtin") {
     // A form post cannot be replayed through a redirect, so the dashboard is the landing page.
-    return c.redirect(loginRedirectUrl(prefix, method === "GET" ? target : `${prefix}/`), 302);
+    const replayable = method === "GET" || method === "HEAD";
+    return c.redirect(loginRedirectUrl(prefix, replayable ? target : `${prefix}/`), 302);
   }
   if (auth.loginUrl !== undefined) return c.redirect(externalLoginUrl(auth.loginUrl, target), 302);
   return errorPage(c, 401, messages.unauthorized);

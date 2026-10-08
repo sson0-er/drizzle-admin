@@ -54,14 +54,10 @@ describe("flash", () => {
     ]);
   });
 
-  it("consumeFlash deletes the cookie", async () => {
+  it("consumeFlash returns the stored message", async () => {
     const cookie = pair(await app.request("http://localhost/add1"));
-    const { res, body } = await consume(app, cookie);
-    expect(body).toHaveLength(1);
-    const h = res.headers.get("set-cookie") ?? "";
-    expect(h).toContain(`${FLASH_COOKIE}=;`);
-    expect(h).toContain("Path=/admin");
-    expect(h).toMatch(/Max-Age=0/);
+    const { body } = await consume(app, cookie);
+    expect(body).toEqual([{ level: "success", text: "one" }]);
   });
 
   it("returns [] without a cookie", async () => {
@@ -114,5 +110,24 @@ describe("flash", () => {
   ])("Secure flag: publicOrigin=%s url=%s -> %s", async (publicOrigin, url, secure) => {
     const h = (await makeApp({ ...opts, publicOrigin }).request(url)).headers.get("set-cookie");
     expect(/;\s*Secure/i.test(h ?? "")).toBe(secure);
+  });
+});
+
+describe("consumeFlash deletion header", () => {
+  it.each([
+    [null, "http://localhost/consume", false],
+    [null, "https://localhost/consume", true],
+    ["https://admin.example.com", "http://localhost/consume", true],
+    ["http://admin.example.com", "https://localhost/consume", false],
+  ])("publicOrigin=%s url=%s -> Secure %s", async (publicOrigin, url, secure) => {
+    const cookie = pair(await makeApp(opts).request("http://localhost/add1"));
+    const res = await makeApp({ ...opts, publicOrigin }).request(url, { headers: { cookie } });
+    const h = res.headers.get("set-cookie") ?? "";
+    expect(h).toContain(`${FLASH_COOKIE}=;`);
+    expect(h).toContain("Max-Age=0");
+    expect(h).toContain("Path=/admin");
+    expect(h).toContain("HttpOnly");
+    expect(h).toContain("SameSite=Lax");
+    expect(/;\s*Secure/i.test(h)).toBe(secure);
   });
 });

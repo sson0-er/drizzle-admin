@@ -1,7 +1,7 @@
 ---
 id: 30-cookie-deletion-and-head-guard
 depends_on: [12-auth-session-flash-permissions, 23-login-logout-and-auth-guard, 24-security-matrix-and-proxy]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 30: cookie-deletion-and-head-guard
@@ -53,3 +53,5 @@ Deleting the session cookie (logout) and the flash cookie (after it is shown) us
 - Evidence: docs/orchestraude/evidence/2026-10-08-hono-head-cookie-body-node-server.md
 
 ## History
+- New export not in auth.md: `cookieAttrs(c, prefix, publicOrigin)` in `src/auth/session.ts`, returning `{ httpOnly, sameSite: "Lax", path, secure }`. It is used by `writeSession`, `clearSession`, `addFlash` and `consumeFlash` (design should list it under `session.ts`).
+- Removed the old header assertions in `test/session.test.ts` ("clearSession expires the cookie on the same path") and `test/flash.test.ts` ("consumeFlash deletes the cookie"); the new it.each tables cover them. The flash test is renamed "consumeFlash returns the stored message".

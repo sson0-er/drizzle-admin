@@ -29,6 +29,19 @@ export function isSecure(c: Context, publicOrigin: string | null): boolean {
     : new URL(c.req.url).protocol === "https:";
 }
 
+/**
+ * Attributes shared by every set and delete of a session or flash cookie. A delete only removes
+ * the cookie when its attributes match the set, so all four call sites must stay in sync.
+ */
+export function cookieAttrs(c: Context, prefix: string, publicOrigin: string | null) {
+  return {
+    httpOnly: true,
+    sameSite: "Lax",
+    path: prefix || "/",
+    secure: isSecure(c, publicOrigin),
+  } as const;
+}
+
 export function newCsrfToken(): string {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
   let bin = "";
@@ -74,14 +87,11 @@ export async function writeSession(c: Context, o: CookieOpts, s: Session): Promi
   // Explicit key list so extra properties on a caller's object never reach the cookie.
   const value = JSON.stringify({ u: s.u, csrf: s.csrf, iat: s.iat });
   await setSignedCookie(c, SESSION_COOKIE, value, o.secret, {
-    httpOnly: true,
-    sameSite: "Lax",
-    path: o.prefix || "/",
+    ...cookieAttrs(c, o.prefix, o.publicOrigin),
     maxAge: o.maxAgeSec,
-    secure: isSecure(c, o.publicOrigin),
   });
 }
 
 export function clearSession(c: Context, o: CookieOpts): void {
-  deleteCookie(c, SESSION_COOKIE, { path: o.prefix || "/" });
+  deleteCookie(c, SESSION_COOKIE, cookieAttrs(c, o.prefix, o.publicOrigin));
 }

@@ -172,13 +172,6 @@ describe("session cookie attributes", () => {
     expect(h).toContain("Path=/;");
   });
 
-  it("clearSession expires the cookie on the same path", async () => {
-    const h = cookieHeader(await makeApp(opts).request("http://localhost/clear"));
-    expect(h).toContain(`${SESSION_COOKIE}=;`);
-    expect(h).toContain("Path=/admin");
-    expect(h).toMatch(/Max-Age=0/);
-  });
-
   it.each([
     [null, "http://localhost/write", false],
     [null, "https://localhost/write", true],
@@ -186,6 +179,23 @@ describe("session cookie attributes", () => {
     ["http://admin.example.com", "https://localhost/write", false],
   ])("Secure flag: publicOrigin=%s url=%s -> %s", async (publicOrigin, url, secure) => {
     const h = cookieHeader(await makeApp({ ...opts, publicOrigin }).request(url));
+    expect(/;\s*Secure/i.test(h)).toBe(secure);
+  });
+});
+
+describe("clearSession cookie attributes", () => {
+  it.each([
+    [null, "http://localhost/clear", false],
+    [null, "https://localhost/clear", true],
+    ["https://admin.example.com", "http://localhost/clear", true],
+    ["http://admin.example.com", "https://localhost/clear", false],
+  ])("publicOrigin=%s url=%s -> Secure %s", async (publicOrigin, url, secure) => {
+    const h = cookieHeader(await makeApp({ ...opts, publicOrigin }).request(url));
+    expect(h).toContain(`${SESSION_COOKIE}=;`);
+    expect(h).toContain("Max-Age=0");
+    expect(h).toContain("Path=/admin");
+    expect(h).toContain("HttpOnly");
+    expect(h).toContain("SameSite=Lax");
     expect(/;\s*Secure/i.test(h)).toBe(secure);
   });
 });

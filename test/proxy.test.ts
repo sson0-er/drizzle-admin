@@ -67,6 +67,23 @@ describe.each(dialects)("reverse proxy with publicOrigin ($name)", (fixture) => 
     expect(flash).toMatch(/;\s*Secure/i);
   });
 
+  it("deletes the flash cookie with Secure once it is shown", async () => {
+    const c = await loggedIn();
+    await post(c, "/admin/authors/", { action: "delete_selected" }, PUBLIC);
+    const res = await c.get("/admin/authors/");
+    const flash = cookieLine(res, "da_flash");
+    expect(flash).toContain("Max-Age=0");
+    expect(flash).toMatch(/;\s*Secure/i);
+  });
+
+  it("deletes the session cookie with Secure on logout", async () => {
+    const c = await loggedIn();
+    const res = await post(c, "/admin/logout/", {}, PUBLIC);
+    const session = cookieLine(res, "da_session");
+    expect(session).toContain("Max-Age=0");
+    expect(session).toMatch(/;\s*Secure/i);
+  });
+
   it("accepts a POST from the public Origin with a valid token", async () => {
     const c = await loggedIn();
     const res = await post(c, "/admin/authors/", { action: "delete_selected" }, PUBLIC);
