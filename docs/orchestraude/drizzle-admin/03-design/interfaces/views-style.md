@@ -128,7 +128,7 @@ input:hover, select:hover, textarea:hover { border-color: var(--border-hover); }
 .errorlist + input, .errorlist + select, .errorlist + textarea { border-color: var(--error-fg); }
 input[type=checkbox] { width: 20px; height: 20px; margin: 0; vertical-align: middle; accent-color: var(--primary); }
 ```
-The invalid border uses the existing order "`ul.errorlist`, then the input" of `Widget` (forms.md); no `aria-invalid` or `:has()` is needed. No "required" marker is added (Q11).
+The invalid border uses the existing order "`ul.errorlist`, then the input" of `Widget` (forms.md); no `aria-invalid` or `:has()` is needed. No "required" marker is added (Q11 answered: option (a), decision 040).
 
 Buttons. Variants are chosen by existing selectors; no class is added to the markup:
 

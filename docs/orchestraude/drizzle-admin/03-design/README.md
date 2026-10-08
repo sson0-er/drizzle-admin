@@ -78,6 +78,7 @@ Changed 2026-10-08: questions and decisions summaries updated for the low-findin
 Changed 2026-10-08: post-v1 icons (decision 039): views.md summary, open questions Q8-Q10, decisions summary range.
 Changed 2026-10-08: Q8-Q10 answered; questions summary updated.
 Changed 2026-10-08: post-v1 restyle (decision 040): views-style.md added; open question Q11; decisions summary range.
+Changed 2026-10-08: Q11 answered (option (a)); questions summary updated.
 
 | File | Summary |
 |---|---|
@@ -95,5 +96,5 @@ Changed 2026-10-08: post-v1 restyle (decision 040): views-style.md added; open q
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: Q11 (proposal: DADS-style required marker on form labels, not in decision 040); resolved: Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| questions.md | Open: none; resolved: Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
 | decisions-and-evidence.md | Decisions 001-040 and evidence ids referenced by this design |

@@ -16,11 +16,13 @@ Changed 2026-10-08: two section-A fixes approved in the low-findings triage (L08
 Changed 2026-10-08: Q8-Q10 added while designing the post-v1 icons (decision 039). None blocks implementation: the design proceeds with the stated default unless the user answers otherwise.
 Changed 2026-10-08: Q8-Q10 answered by the user and moved to Resolved questions (decision 039).
 Changed 2026-10-08: Q11 added while designing the DADS-inspired restyle (decision 040). It does not block implementation; the design proceeds without the marker unless the user answers otherwise.
+Changed 2026-10-08: Q11 answered by the user (option (a)) and moved to Resolved questions (decision 040).
 
-- **Q11. Required-field marker (proposal, post-v1 restyle).** DADS form labels show a "※必須" requirement marker. `FormPage` already renders `class="required"` on the label of a required field (`src/views/form.tsx`), but nothing is shown. Showing the marker would add UI text, which must come from `src/messages.ts` (a new key such as `messages.required`), and a small markup change in `FormPage` (a `span` after the label text), because CSS `content` text would bypass the messages rule. That goes beyond the requested "look and feel only, keep our markup" scope, so decision 040 does not include it. Options: (a) leave it out (design default); (b) add it as a separate small task after the restyle. Does the user want (b)?
+(None.)
 
 ## Resolved questions
 (Question, answer, date. Move items here once the user has decided.)
+- **Q11. Required-field marker (post-v1 restyle).** DADS form labels show a "※必須" marker; showing it would need a new `messages.ts` key and a `FormPage` markup change (`FormPage` already renders `class="required"` on required labels, `src/views/form.tsx`). Answer: option (a): no marker in the restyle; the label class stays unused by the stylesheet. It may become a separate small task later (2026-10-08; decision 040 point 10; views-style.md).
 - **Q8. "info" flash level (post-v1 icons).** Answer: keep the three levels `success` / `warning` / `error`; no `info` level is added; `error` uses `circle-alert` (2026-10-08; decision 039; views.md Icons).
 - **Q9. Read-only boolean form fields (post-v1 icons).** Answer: yes, changed from the design default: `DisplayValue` renders booleans with `BooleanMark` (colored `check` / `x` plus visually hidden `messages.yes` / `messages.no`), the same as list cells; the password mask still wins (2026-10-08; decision 039 point 5; forms.md, views.md, test-strategy.md).
 - **Q10. Dashboard and remaining controls (post-v1 icons).** Answer: confirmed as designed: the dashboard model rows get icons on their add (`plus`) and change (`pencil`) links, no per-model icon; the action `run` button, the login button, paginator, filter and breadcrumb links stay text-only (2026-10-08; decision 039).

@@ -1,7 +1,7 @@
 ---
 id: 39-dads-restyle
 depends_on: [38-ui-icons]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 39: dads-restyle
@@ -112,3 +112,12 @@ The rules are views-style.md. Only the stylesheet string and the comment above i
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1 (implementer)
+- Outcome: implemented; `scripts/verify.sh` passes (1365 tests passed).
+- `ADMIN_CSS` rewritten to views-style.md: 28 tokens in both `:root` blocks, reference rules group by group, the decision 039 icon rules verbatim, then the focus rules, then the 767px block. The attribution comment sits directly above `export const ADMIN_CSS`, after the decision-007 comment (kept unchanged).
+- Deviations from views-style.md declarations: none.
+- Group notes: the declaration blocks were reformatted one declaration per line for long rules. The base `.results { overflow-x: auto; }` ("Rules that stay") is placed once in the changelist group, in addition to the copy in the 767px block. The form/button/changelist groups are in the order of the document; the object-tools, `#changelist` and table rules come after the button group, before the icon rules.
+- `test/admin-css.test.ts` added (helpers `block`, `tokens`, `declaration`, `token`, `contrast` are local to it; the pair lists carry a length check of 24 text and 9 non-text pairs).
+- Manual browser check of test-strategy.md "Restyle" -> "Manual" (light/dark, desktop and 375px, tab ring, fallback fonts at line-height 1.7) was not done by the implementer: 未確認, for the user.
+- Note: the working tree already had unrelated docs changes (Q11 answer in decision 040, README.md of the design, views-style.md, questions.md) made before or during this attempt; the implementer did not edit them.
