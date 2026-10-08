@@ -1,7 +1,7 @@
 ---
 id: 52-i18n-docs
 depends_on: [49-i18n-dictionaries-and-request-locale, 50-language-switch-route, 51-language-switcher-ui]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 52: i18n-docs
@@ -80,3 +80,6 @@ Write in English. Describe the behavior as implemented in tasks 49-51; read the 
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+- Attempt 1: done. README.md, CHANGELOG.md and CLAUDE.md updated as specified; three cases added to test/readme.test.ts (no removed lines). Before the README edit all three new cases failed (the `### Language` case, the "English and Japanese only" case and, additionally, the `_lang` case, since the README did not mention `_lang`). The `### Language` subsection is a `###` placed last in section 8 (before `## Behavior notes`) so the 12-`##` heading assertion stays unchanged, as the planner decided. No exports or props added.
+- Review round 1: high 0, medium 0, low 2 (quality and tests: the Language subsection test loops inside one it instead of it.each). Done.

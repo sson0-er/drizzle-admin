@@ -3,7 +3,7 @@
 Project guide for contributors and coding agents. The full design lives in `docs/orchestraude/drizzle-admin/03-design/` and decisions in `docs/orchestraude/decisions/`.
 
 ## Overview
-- ESM TypeScript library that turns registered Drizzle tables into a server-rendered, Django-admin-like CRUD UI on Hono. SQLite and PostgreSQL; Japanese UI.
+- ESM TypeScript library that turns registered Drizzle tables into a server-rendered, Django-admin-like CRUD UI on Hono. SQLite and PostgreSQL; English (default) and Japanese UI.
 
 ## Commands
 - `pnpm test` (vitest), `pnpm typecheck`, `pnpm lint` (biome), `pnpm build` (tsc to `dist/`).
@@ -13,22 +13,22 @@ Project guide for contributors and coding agents. The full design lives in `docs
 
 ## Layout
 - `src/introspect/`: Drizzle tables to `ModelMeta` (pg and sqlite). `src/data/`: db access, queries, repository, DB error classification.
-- `src/forms/`: coercion, field and schema building, validation, widgets. `src/auth/`: session, csrf, flash, permissions, `safeNext`.
-- `src/routes/`: Hono handlers and middleware. `src/views/`: JSX pages. `src/static/`: CSS and the one script as TS string modules.
-- `src/messages.ts` (UI strings), `src/time.ts`, `src/types.ts` (public types), `src/admin.ts` (`createAdmin`), `src/index.ts` (exports).
+- `src/forms/`: coercion, field and schema building, validation, widgets. `src/auth/`: session, csrf, flash, locale cookie, permissions, `safeNext`.
+- `src/routes/`: Hono handlers, middleware and the language switch. `src/views/`: JSX pages. `src/static/`: CSS and the one script as TS string modules.
+- `src/messages.ts` (UI strings per locale, `en` and `ja`, and the locale helpers), `src/time.ts`, `src/types.ts` (public types), `src/admin.ts` (`createAdmin`), `src/index.ts` (exports).
 - `test/`: test files are named per module or concern (some modules are split, e.g. `introspect.pg`/`introspect.sqlite`), `helpers/`, `fixtures/`; DB tests run on both dialects via `describe.each(dialects)`.
 - `example/`: runnable demo app. `docs/orchestraude/`: design, decisions, evidence, tasks.
 
 ## Design principles
 - Drizzle column internals are read only in `src/introspect/` and queries are built only in `src/data/`; the rest works on `ModelMeta` (`src/types.ts` and `src/admin.ts` import just the `Table` type).
 - No frontend build: Hono JSX on the server, no bundler.
-- Every UI string lives in `src/messages.ts` (glyph-only literals are exempt, decision 033 item 11).
+- Every UI string lives in `src/messages.ts`, in both the `en` and `ja` dictionaries (a missing key fails typecheck). Code takes texts from the request's dictionary (`c.var.t` in routes, the `t` prop or argument in views and forms), never from a module-level import or constant; user-provided labels are not translated; glyph-only literals are exempt (decision 033 item 11) and the language names live in `LOCALE_NAMES`. Developer-facing errors and log lines are English and stay out of the dictionaries.
 - `src/index.ts` exports only `createAdmin` and the public types.
 
 ## Security rules
-- `Location` headers are path-only and stay under the prefix (the one exception is the configured `auth.loginUrl`); post-login targets go through `safeNext`.
+- `Location` headers are path-only and stay under the prefix (the one exception is the configured `auth.loginUrl`); post-login targets and the language switch's return target go through `safeNext`.
 - Every POST passes the Origin check and the `_csrf` token check.
-- Cookies are signed with keys derived per instance and per cookie (`deriveCookieKey(secret, cookieName, prefix)`, decision 042); the raw `secret` is passed to no cookie function. They are HttpOnly, SameSite=Lax and Secure per `isSecure`; set and delete share `cookieAttrs`.
+- Cookies are signed with keys derived per instance and per cookie (`deriveCookieKey(secret, cookieName, prefix)`, decision 042); the raw `secret` is passed to no cookie function. They are HttpOnly, SameSite=Lax and Secure per `isSecure`; set and delete share `cookieAttrs`. The exception is `da_lang`, an unsigned preference validated against the locale allow-list on read (decision 050); it still uses `cookieAttrs`.
 - Every response carries the Content-Security-Policy from `buildCsp` and `X-Content-Type-Options: nosniff` (decision 044). When `SELECT_ALL_SCRIPT` changes, update `SELECT_ALL_SCRIPT_SHA256` in the same change (a test recomputes it). A new inline script, `style` attribute or external resource needs a policy change and a decision record.
 - Raw DB error messages are never rendered or logged; log through `describeForLog`.
 - Output is escaped by JSX; never inject raw HTML.

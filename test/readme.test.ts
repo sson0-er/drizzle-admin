@@ -93,6 +93,23 @@ describe("README", () => {
     expect(match?.[1]).toContain("publicOrigin");
   });
 
+  it("documents the language choice under a 'Language' heading", () => {
+    const match = /^### Language$([\s\S]*?)(?=^#{2,3} |(?![\s\S]))/m.exec(readme);
+    expect(match).not.toBeNull();
+    for (const text of ["da_lang", "Accept-Language", "English"]) {
+      expect(match?.[1], text).toContain(text);
+    }
+  });
+
+  it("states the language limitation under Known limitations", () => {
+    const section = sections().find((s) => s.title === "Known limitations");
+    expect(section?.body).toContain("English and Japanese only");
+  });
+
+  it("documents the reserved slug `_lang`", () => {
+    expect(documents("_lang")).toBe(true);
+  });
+
   it.each(ADMIN_CONFIG_KEYS)("documents the AdminConfig field %s", (key) => {
     expect(documents(key)).toBe(true);
   });

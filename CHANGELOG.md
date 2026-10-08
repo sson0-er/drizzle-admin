@@ -16,3 +16,6 @@
 - The search text is capped at 200 characters, at most 500 rows can be selected for one action, and `listPerPage` above 500 is rejected by `register()`.
 - Integer fields reject `0x`/`0b`/exponent notation and unsafe integers.
 - `exclude` also removes columns from the default list columns, and identity columns are read-only.
+- **The UI is English by default.** Japanese is available from the "English / 日本語" switcher in the header and on the login page, remembered per browser in the `da_lang` cookie for one year. Existing Japanese-speaking users switch once.
+- The default `siteTitle` follows the language ("Site administration" / "サイト管理").
+- The model slug `_lang` is now reserved (`register()` throws for it); `lang` stays valid.

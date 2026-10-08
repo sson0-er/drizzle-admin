@@ -12,7 +12,7 @@ drizzle-admin is a Django Admin-style CRUD admin for [Drizzle ORM](https://orm.d
 - Built-in login with a signed session cookie, or your own authentication through `getUser`.
 - CSRF protection (Origin check plus a per-session token), security headers and flash messages.
 - SQLite and PostgreSQL.
-- The user interface text is Japanese only.
+- English and Japanese user interface, English by default, with a language switcher in the header.
 
 ## Requirements
 
@@ -92,7 +92,7 @@ serve({ fetch: app.fetch, port: 3000 });
 | `db` | `unknown` | required | A non-null object: the Drizzle database instance (`drizzle(...)`). It is passed to hooks and actions as given. |
 | `dialect` | `"sqlite" \| "postgres"` | required | Must match the dialect of the registered tables, otherwise `register()` throws. |
 | `basePath` | `string` | required | Must start with `/` and must not contain `?`, `#`, `\`, whitespace or `//`. A trailing `/` is removed, and `"/"` mounts the admin at the root. |
-| `siteTitle` | `string` | `"サイト管理"` | Shown in the header and the page titles. |
+| `siteTitle` | `string` | `"Site administration"` (English) or `"サイト管理"` (Japanese), following the visitor's language | Shown in the header and the page titles. A configured title is shown as written and is not translated. |
 | `secret` | `string` | required | At least 32 characters. Signs the session and flash cookies; changing it signs every user out. Use a distinct secret for each admin instance and do not reuse it elsewhere in the host application: the cookie keys are derived from `secret` and `basePath`. |
 | `auth` | `AuthConfig` | required | At least one of `verifyCredentials` and `getUser` must be a function. See below. |
 | `sessionMaxAgeSec` | `number` | `28800` (8 hours) | A positive integer of at most `34560000` (400 days). The expiry is fixed from the time the session was issued (no sliding renewal). |
@@ -117,7 +117,7 @@ serve({ fetch: app.fetch, port: 3000 });
 
 | Option | Default | Meaning and constraints |
 |---|---|---|
-| `slug` | the table name | URL segment of the model. Letters, digits, `_` and `-` only; must be unique; `login`, `logout` and `static` are reserved. |
+| `slug` | the table name | URL segment of the model. Letters, digits, `_` and `-` only; must be unique; `login`, `logout`, `static` and `_lang` are reserved. |
 | `label` | the table name | Name shown in the dashboard, breadcrumbs and page titles. |
 | `listDisplay` | the primary key followed by the first four other columns, in definition order, skipping columns in `exclude` | Columns shown in the list table. Only these columns can be sorted by clicking the header. |
 | `listDisplayLinks` | the first `listDisplay` column | Columns whose cell links to the change page. A foreign-key cell that is not one of these links to the referenced row (when the referenced table is registered) and shows its `toString` label. |
@@ -246,8 +246,9 @@ The admin only sends `safeNext` paths as `next` to `loginUrl`, but your login pa
 |---|---|---|
 | `da_session` | Signed (HMAC-SHA256 with a key derived from `secret`): the user, a CSRF token and the issue time | `sessionMaxAgeSec`, fixed |
 | `da_flash` | Signed: flash messages shown once after a redirect | 60 seconds |
+| `da_lang` | Not signed: the chosen language, `en` or `ja` | one year |
 
-The HMAC key of each cookie is derived per cookie from `secret` and `basePath`, so two admin instances, or the two cookies of one instance, do not accept each other's cookies even when they share a `secret`. Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `Secure` when the request URL (or `publicOrigin`, when set) is `https:`. In external mode the session cookie carries only the CSRF token and issue time (no user); the token is bound to the cookie and expires with `sessionMaxAgeSec`.
+The HMAC key of each cookie is derived per cookie from `secret` and `basePath`, so two admin instances, or the two cookies of one instance, do not accept each other's cookies even when they share a `secret`. `da_lang` follows the same `Path`, `HttpOnly`, `SameSite` and `Secure` rules, but it is not signed: it is a display preference, not a security cookie, and any value other than `en` or `ja` is ignored. The session and flash cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `Secure` when the request URL (or `publicOrigin`, when set) is `https:`. In external mode the session cookie carries only the CSRF token and issue time (no user); the token is bound to the cookie and expires with `sessionMaxAgeSec`.
 
 ### CSRF and headers
 
@@ -297,6 +298,14 @@ Without it, behind such a proxy, form POSTs from browsers that do not send `Sec-
 
 The admin reads each form body fully into memory and has no body size limit of its own. Limit the request body size at the proxy (for example `client_max_body_size` in nginx) or in the host application.
 
+### Language
+
+- English is the default for every visitor. The `Accept-Language` header is not used, and there is no option to change the default.
+- The header has an "English / 日本語" switcher, also on the login page. It is a POST form, so it works without JavaScript. The choice is stored in the `da_lang` cookie for one year, per browser and per `basePath`.
+- These texts are shown as written and are never translated: model labels, field names, action labels, `toString` and formatter output, `validate` messages, the message an action returns, and a configured `siteTitle`.
+- Configuration errors (for example from `createAdmin` and `register()`) and log lines are always in English.
+- Dates and numbers use the same format in both languages.
+
 ## Behavior notes
 
 - **List page.** Query parameters: `q` (search), `p` (page, 1-based), `o` (ordering) and `f_<column>` (filters). Changing the search, a filter or the ordering resets the page. A page number that is not an integer or is below 1 is page 1; a page beyond the last shows an empty table with the pagination.
@@ -320,7 +329,7 @@ The admin reads each form body fully into memory and has no body size limit of i
 - No MySQL; only SQLite and PostgreSQL.
 - No file uploads.
 - No inlines and no change history.
-- The user interface is Japanese only.
+- English and Japanese only; the default language (English) cannot be configured.
 - On SQLite, a foreign-key violation is only reported as an error if foreign key enforcement is on (`PRAGMA foreign_keys = ON`). better-sqlite3 enables it by default.
 - On SQLite, a bigint column is `blob({ mode: "bigint" })` (drizzle's SQLite `integer()` has no bigint mode). SQLite compares such values as BLOBs, so sorting and range comparison on them are not numeric (for example 10 sorts before 9). Equality and foreign-key lookups work. Use `integer()` when numeric order matters.
 - A request path containing a percent-encoded line feed or carriage return (`%0a`, `%0d`) is not routed by Hono, so it gets Hono's (or the host application's) plain 404 instead of the admin 404 page, and without the admin's security headers. No redirect is issued.
