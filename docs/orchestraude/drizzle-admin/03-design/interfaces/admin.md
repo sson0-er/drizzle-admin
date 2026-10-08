@@ -109,6 +109,7 @@ Derived `authMode`: `"external"` if `getUser` is set (it wins over `verifyCreden
 ### `admin.register(table, options = {})`
 Changed 2026-10-07: step 5 checks widget overrides, and finalization checks FK `select` overrides (decision 021).
 Changed 2026-10-07: `listFilter` accepts date-only string fields (PG `date()` string mode; decision 023).
+Changed 2026-10-08: step 5 rejects a `password` widget on the primary key or on a field in `searchFields` or `ordering` (decision 037 point 7, Q12).
 
 Steps, in order:
 1. If finalized → throw `register() must be called before admin.app / admin.fetch is used`.
@@ -117,6 +118,7 @@ Steps, in order:
 4. Column-name checks. Every key below must be a `meta.fields[].key`, otherwise throw `<table>: option "<option>" references unknown column "<key>"`:
    `listDisplay`, `listDisplayLinks`, `searchFields`, `listFilter`, `ordering` (after stripping a leading `-`), `fields`, `exclude`, `readonlyFields`, every `fieldsets[i].fields`, keys of `widgets`, keys of `formatters`.
 5. Extra checks (decision 013 item 13): `listFilter` keys must have kind boolean/enum/date, `isDateOnly` (PG `date()` string mode, decision 023) or a `foreignKey`. `searchFields` kinds must be string/enum. `fields` and `fieldsets` must not both be set. Action names must be unique, non-empty and not `delete_selected`. `listPerPage` must be a positive integer. Every `widgets[key]` must be in `allowedWidgets(field)` (forms.md, decision 021), otherwise throw `<table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
+   Then, for every `widgets[key] === "password"` (decision 037 point 7), in this order: `key` is `meta.pk.key` → throw `<table>: the primary key "<key>" cannot use the password widget`; `key` is in `searchFields` → throw `<table>: field "<key>" uses the password widget and cannot be in searchFields`; `key` appears in `ordering` in either direction (`key` or `-key`) → throw `<table>: field "<key>" uses the password widget and cannot be in ordering`. Only explicit `widgets` entries matter: no default widget is `password` (forms.md).
 6. Build the `ResolvedModel` (below) and store it in insertion order.
 
 ### Finalization (internal `finalize()`, idempotent)

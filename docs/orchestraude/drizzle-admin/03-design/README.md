@@ -79,6 +79,8 @@ Changed 2026-10-08: post-v1 icons (decision 039): views.md summary, open questio
 Changed 2026-10-08: Q8-Q10 answered; questions summary updated.
 Changed 2026-10-08: post-v1 restyle (decision 040): views-style.md added; open question Q11; decisions summary range.
 Changed 2026-10-08: Q11 answered (option (a)); questions summary updated.
+Changed 2026-10-08: follow-up triage answers L011/L010 (decision 037 point 6) and L013 (decision 041) recorded; open question Q12 added; questions and decisions summaries updated.
+Changed 2026-10-08: Q12 answered (decision 037 point 7); questions summary updated.
 
 | File | Summary |
 |---|---|
@@ -96,5 +98,5 @@ Changed 2026-10-08: Q11 answered (option (a)); questions summary updated.
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
-| decisions-and-evidence.md | Decisions 001-040 and evidence ids referenced by this design |
+| questions.md | Open: none; resolved: Q12 (`register()` rejects `password`-widget fields in `searchFields`, `ordering` or as the primary key; decision 037 point 7), L011/L010 (password-widget list columns not sortable, no FK link on masked cells; decision 037 point 6), L013 (DoD import-line exception; decision 041), Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| decisions-and-evidence.md | Decisions 001-041 and evidence ids referenced by this design |

@@ -53,3 +53,4 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - Do not add tests or assertions that another test in the same file already fully implies (typeof checks before a call, a regex next to an exact-message match, `not.toBe` before `toBe`).
 - Small duplication (one-line helpers, option literals, JSX, test setup) in up to three places is acceptable; extract a shared helper only at the fourth copy or when the copies must stay in sync for correctness (e.g. cookie security attributes).
 - Keep helpers and constants module-private unless another module imports them; any export or prop not in the design must be recorded in the task History so the design is updated.
+- Stylesheet tests pin token values and the presence of key rules; selector-match precision, it.each table shape and length-only checks of literal lists in those tests are not raised in review.

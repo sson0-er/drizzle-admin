@@ -17,6 +17,8 @@ Changed 2026-10-08: 037 extended to list cells (Q7 option (b)); 035 rewritten af
 Changed 2026-10-08: 038 item 2 amended after task 36: the example uses `HOST || "127.0.0.1"`, so an empty `HOST` also falls back to loopback; evidence 2026-10-08-node-listen-empty-hostname added.
 Changed 2026-10-08: added 039 (post-v1 user request: UI icons as static inline SVG; Q8-Q10 answers applied, Q9 extends it to `DisplayValue`); evidence 2026-10-08-hono-jsx-inline-svg, -biome-no-svg-without-title, -css-mask-image-support, -icon-color-contrast added.
 Changed 2026-10-08: added 040 (post-v1 user request: DADS-inspired restyle of `ADMIN_CSS`, own dark palette and focus ring); 039 point 6 colors superseded; evidence 2026-10-08-dads-restyle-palette-contrast added.
+Changed 2026-10-08: 037 point 6 added (L011, L010: password-widget columns not sortable, no FK link on masked cells); added 041 (L013: DoD test-diff rule allows import lines that only add names); evidence 2026-10-08-masked-list-column-sort-and-fk-link added.
+Changed 2026-10-08: 037 point 7 added (Q12: `register()` rejects a `password` widget on the primary key or on a field in `searchFields` / `ordering`).
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -55,16 +57,18 @@ Changed 2026-10-08: added 040 (post-v1 user request: DADS-inspired restyle of `A
 - 034-fk-reference-view-permission: without `view` on the referenced model, list FK cells show raw values (no link, no label query), the FK filter is not offered (`f_<key>` ignored), and add/change FK fields are plain key inputs (`"noView"`), no related-list link (L047, L048).
 - 035-field-labels: list column headers, filter headings and form labels stay the raw field key (`authorId`); no humanization and no `labels` option in v1. The humanized first version was superseded by the user (L067).
 - 036-triage-behavior-changes: `tooMany` link only for default/`select` widgets (L062); cookie deletions carry the same attributes incl. `Secure` (L072); custom confirm action with no surviving rows → `noSelection` (L003); single delete removing 0 rows → `alreadyDeleted` warning (L074).
-- 037-password-widget-no-echo: the `password` input renders empty; empty on change keeps the stored value (zod optional, not required); display-only password fields and list cells masked as `********` (Q7 option (b)); amends 013 item 11 and 021.
+- 037-password-widget-no-echo: the `password` input renders empty; empty on change keeps the stored value (zod optional, not required); display-only password fields and list cells masked as `********` (Q7 option (b)); password-widget list columns are not sortable (no header link, `o` drops the key) and masked cells get no FK link (point 6, L011, L010); `register()` rejects a `password` widget on the primary key or on a field in `searchFields` / `ordering` (point 7, Q12); amends 013 item 11 and 021.
 - 038-body-size-and-example-bind: no in-library body limit in v1, README tells deployers to limit it at the proxy; the example binds to `127.0.0.1` unless `HOST` is set to a non-empty value (`HOST || "127.0.0.1"`).
 - 039-ui-icons-inline-svg: post-v1 icons as static inline SVG (`src/views/icons.tsx`, 9 fixed icons, `aria-hidden`, `currentColor`); boolean list cells and read-only boolean form fields (`DisplayValue`, Q9) get a colored mark with visually hidden `messages.yes` / `messages.no`; no `info` flash level (Q8); CSS mask-image, sprite and glyph alternatives rejected.
 - 040-dads-inspired-restyle: post-v1 restyle using DADS token values with our own CSS, selectors and markup; 28 color tokens in both schemes (own dark palette from DADS hues, contrast verified), black/yellow focus ring swapped in dark mode, 16px/1.7 body and 48px controls, denser 14px table, solid/outline/text/danger button mapping via existing selectors, card flash; attribution only as a source comment (views-style.md).
+- 041-dod-test-diff-import-lines: task DoDs that limit removed lines in `git diff test/` allow edits to existing import lines that only add names; task 38's import edits accepted (L013).
 
 ## Evidence referenced
 Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
 Changed 2026-10-08: 2026-10-08-node-listen-empty-hostname added (decision 038 amendment).
 Changed 2026-10-08: four entries for decision 039 (icons) added; they expire 2027-01-06.
 Changed 2026-10-08: DADS research entries (2026-10-08-dads-*) and 2026-10-08-dads-restyle-palette-contrast added for decision 040; they expire 2027-01-06.
+Changed 2026-10-08: 2026-10-08-masked-list-column-sort-and-fk-link added (decision 037 point 6, Q12).
 - 2026-10-07-drizzle-orm-release-lines (research)
 - 2026-10-07-drizzle-column-introspection (research)
 - 2026-10-07-hono-csrf-and-jsx (research)
@@ -97,5 +101,6 @@ Changed 2026-10-08: DADS research entries (2026-10-08-dads-*) and 2026-10-08-dad
 - 2026-10-08-dads-a11y-focus-contrast (research, decision 040): focus ring 4px black outline, 2px offset, 2px yellow-300 halo; link underline 1px/3px, offset 3px; contrast of DADS colors on white.
 - 2026-10-08-dads-icon-terms (research): DADS has no icon font; inline SVGs use `currentcolor` and `aria-hidden`, consistent with decision 039.
 - 2026-10-08-dads-restyle-palette-contrast (design, decision 040): DADS primitives used by the restyle; every light/dark text pair >= 4.5:1 and non-text pair >= 3:1; dark black ring 1.21:1 and red-800 on gray-50 4.11:1 (rejected options).
+- 2026-10-08-masked-list-column-sort-and-fk-link (design, decision 037 point 6): `o` accepts every `listDisplay` key, the list FK link ignores the mask, `allowedWidgets` never offers `password` for FK columns, and `register()` does not check widgets of `searchFields`, `ordering` or the primary key. Expires 2027-01-06.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

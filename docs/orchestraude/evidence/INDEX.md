@@ -34,3 +34,4 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-dads-a11y-focus-contrast | What focus, forced-colors, reduced-motion and contrast conventions do the DADS snippets use? | expires 2027-01-06
 - 2026-10-08-dads-icon-terms | Does DADS define an icon set, and under what license? | expires 2027-01-06
 - 2026-10-08-dads-restyle-palette-contrast | For decision 040, which DADS primitives does the restyle palette use and do all light/dark pairs meet WCAG 4.5:1 / 3:1? | expires 2027-01-06
+- 2026-10-08-masked-list-column-sort-and-fk-link | For L010/L011, can a password-widget list column be sorted or FK-linked, and is password allowed on FK columns? | expires 2027-01-06

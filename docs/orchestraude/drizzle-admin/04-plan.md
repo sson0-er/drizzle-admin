@@ -106,3 +106,4 @@ Execution order: 38 → 39
 - scripts/verify.sh passes
 - Changes stay within the task's declared scope
 - Every new or changed behavior has a test
+- Changed 2026-10-08 (decision 041, L013): where a task DoD limits the removed lines in `git diff test/` to a listed set, editing an existing import line only to add new names is an allowed exception (removing or renaming names, or changing the module, is not). Task 38's import-line edits are accepted under this rule.

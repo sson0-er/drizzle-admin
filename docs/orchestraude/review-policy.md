@@ -34,6 +34,17 @@ Project-level decisions from low-findings triage. Reviewers read this file and d
 - [tests] L133 Explicit notNull checks missing on the SQLite autoincrement pk — covered by snapshots. — accepted 2026-10-08, feature drizzle-admin
 - [tests] L134 Tampered cookie construction is hard to follow — readability only. — accepted 2026-10-08, feature drizzle-admin
 
+- [quality] FL002 Duplicate token values — the values are given by the design; the duplication is intentional. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [quality] FL003 list.test.ts rebuilds an admin inline — already accepted policy (duplication convention, up to three copies). — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [tests] FL025 List test builds a full createAdmin config inline — same as L003; already accepted policy. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [quality] FL006 Typed db cast duplicated between describes — already accepted policy (duplication convention: two copies). — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [quality] FL004 Nullable FK empty-choice case overlaps an existing test — the inputs differ (no entry vs a choices list), so neither test fully implies the other. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [quality] FL005 Template literal without interpolation — cosmetic; lint passes. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [tests] FL021 Flash icon integration only covers success — warning and error are covered at the view level; the reviewer calls it acceptable. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [tests] FL027 No spy that no getMany/options query runs for a hidden FK — the rendered output is the security property; a spy would couple the test to repository internals. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [tests] FL028 Page-wide script assertion implies the form-scoped one — already accepted policy (implied-assertion convention: reviewers report existing ones as C); the DoD wording asked for the form-scoped check. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+- [tests] FL030 Removed README phrases not pinned — already accepted policy (L115: README test precision is low value); the task did not require it. — accepted 2026-10-08, feature drizzle-admin (follow-up)
+
 ## Conventions adopted
 - Do not add single-use alias variables such as `const model = found`; use or rename the original binding. — adopted 2026-10-08, feature drizzle-admin
 - Do not keep guards, branches or throws that the preceding code already makes impossible (re-narrowing, dead fallbacks, `String()` wrappers); use a non-null assertion with a short why-comment when the type system cannot see it. — adopted 2026-10-08, feature drizzle-admin
@@ -41,3 +52,4 @@ Project-level decisions from low-findings triage. Reviewers read this file and d
 - Do not add tests or assertions that another test in the same file already fully implies (typeof checks before a call, a regex next to an exact-message match, `not.toBe` before `toBe`). — adopted 2026-10-08, feature drizzle-admin
 - Small duplication (one-line helpers, option literals, JSX, test setup) in up to three places is acceptable; extract a shared helper only at the fourth copy or when the copies must stay in sync for correctness (e.g. cookie security attributes). — adopted 2026-10-08, feature drizzle-admin
 - Keep helpers and constants module-private unless another module imports them; any export or prop not in the design must be recorded in the task History so the design is updated. — adopted 2026-10-08, feature drizzle-admin
+- Stylesheet tests pin token values and the presence of key rules; selector-match precision, it.each table shape and length-only checks of literal lists in those tests are not raised in review. — adopted 2026-10-08, feature drizzle-admin

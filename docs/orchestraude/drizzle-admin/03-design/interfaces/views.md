@@ -32,11 +32,12 @@ Changed 2026-10-08: `ConfirmActionPage` gains the required `listHref` prop (deci
 Changed 2026-10-08: headers and filter headings keep showing the raw field key; `ListPage` gets no `label` prop (decision 035); `data-sort` reflects only an explicit `o` (decision 033 item 8); display-only hidden-widget fields keep their row and display-only `password` fields are masked (decisions 033 item 9, 037).
 Changed 2026-10-08: icons on buttons and links, `Cell.bool` for boolean list cells; every selector below is unchanged (decision 039, see "Icons").
 Changed 2026-10-08: display-only boolean fields on `FormPage` show `BooleanMark` through `DisplayValue` (user answer to Q9, decision 039).
+Changed 2026-10-08: `ListPage` `columns[].sortHref` is `string | null`; `null` (a `password`-widget column) renders the header key as plain text without `a.sort` (decision 037 point 6, L011).
 
 | Component | Extra props | Stable selectors used by tests |
 |---|---|---|
 | `DashboardPage` | `models: { slug; label; canAdd }[]` | `table#dashboard`, row `tr[data-model=<slug>]` with `a.changelink` (list) and `a.addlink` (add, only if canAdd) |
-| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` (heading = the field key) containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` (text = the field key, decision 035) and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
+| `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` (heading = the field key) containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` (text = the field key, decision 035; absent when `sortHref` is `null`, the `th` then contains only the key as text) and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
 | `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?; timeZone` (see below) | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
 | `DeletePage` | `modelLabel; objectLabel; cancelHref` | `form#delete-form`, `p.confirm-text`, `button[type=submit]` |
 | `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; listHref: string; backQuery: string` (`listHref` = list URL `${prefix}/${slug}/`, required because `PageChrome` has no model slug; `backQuery` = query string with leading `?`, or `""`) | `form#action-confirm` (POST to `listHref + backQuery`) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li`; the cancel link points to `listHref + backQuery` |
@@ -46,7 +47,9 @@ Changed 2026-10-08: display-only boolean fields on `FormPage` show `BooleanMark`
 `ListPage` props:
 ```ts
 {
-  model: { slug; label }; columns: { key; sort: "asc" | "desc" | "none"; sortHref: string }[];
+  model: { slug; label }; columns: { key; sort: "asc" | "desc" | "none"; sortHref: string | null }[];
+  // sortHref null → not sortable: plain-text header, no a.sort, data-sort="none" (password widget,
+  //   decision 037 point 6); the handler decides, ListPage only renders
   // header text = key (decision 035); sort reflects only an explicit `o` parameter:
   // with the default ordering (M.ordering or -pk) every column is "none" (decision 033 item 8)
   rows: { pk: string; cells: Cell[] }[];
