@@ -9,6 +9,8 @@ Developers using Drizzle ORM have no equivalent of Django Admin. drizzle-admin i
 - Intended users and distribution: open source, published on npm for any Drizzle ORM user. The package must be publishable (package metadata, MIT license with a LICENSE file, README, built output). `pnpm build` produces the publishable output. Running `npm publish`, CI and release automation are out of scope.
 
 ## Scope
+Changed 2026-10-09 (scope change requested by the user after v1; the approved text below is kept as approved): the UI was Japanese only; it becomes English and Japanese. English (`en`) is the default and Japanese (`ja`) is selectable from a switcher in the header of every page and on the login page. The choice is kept only in the browser as a cookie (no DB, no session storage, no `Accept-Language` negotiation), there is no `createAdmin` option for the locale, and user-provided labels are not translated. This supersedes the out-of-scope item "i18n beyond a single Japanese messages file", which now reads "locales other than English and Japanese". Design: decisions 049-051.
+
 ### In scope
 - The v1 described in the pre-spec, phases 1-6 (§13): foundation and introspection, list page, add/change, delete and actions, authentication and security, polish (FK select fallback, dark mode, responsive layout, README). All six phases are delivered in this run, in phase order.
 - Public API `createAdmin` / `admin.register` / `admin.app` / `admin.fetch` with the types in §5.

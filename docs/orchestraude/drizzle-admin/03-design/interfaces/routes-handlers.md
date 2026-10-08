@@ -1,9 +1,12 @@
 # Interface: routes (page handlers)
 
-Files: `src/routes/dashboard.ts`, `list.ts`, `actions.ts`, `form.ts`, `delete.ts`, `login.ts`.
+Files: `src/routes/dashboard.ts`, `list.ts`, `actions.ts`, `form.ts`, `delete.ts`, `login.ts`, `lang.ts` (Changed 2026-10-09, decision 051).
 Middleware, context helpers (`renderPage`, `redirectWithFlash`, `modelOr404`) and the route table are in [routes.md](routes.md). Views and their props are in [views.md](views.md).
 Notation: `P` = `prefix`, `M` = resolved model, `U` = current user, `ctx` = `HookCtx` (decision 015), `list URL` = `${P}/${M.slug}/`.
 Changed 2026-10-08: "`M` or 404" in every handler below is `modelOr404` (routes.md), which also answers 404 for a model on which `U` has none of the four permissions (decision 043). The later "or 403" checks are unchanged and only apply to models the user holds at least one permission on.
+
+## Texts (Changed 2026-10-09, decision 049)
+Every message key named in this file (`noSelection`, `added(label)`, `dbForeignKey`, `loginFailed`, ...) is read from `t = c.var.t`, the request's dictionary. Handlers pass `t` to the forms functions that produce error texts (`validateSubmission({ ..., t })`, forms.md). No translated text is bound at module level: the list date-preset choices are built per request from `t.today`, `t.past7`, `t.thisMonth`, `t.thisYear`, the list cells pass `t` to `formatCell` / `cellBoolean` (views.md; for `t.binary`), and the DB-error-kind table in `form.ts` maps each kind to a message key (`unique` → `dbUnique`, `foreignKey` → `dbForeignKey`, `notNull` → `dbNotNull`, `other` → `dbOther`) that is looked up in `t`. User-provided texts (model label, action label, `toString`, an action's returned `message`, `validate` messages) are passed through unchanged.
 
 ## Rendering pages
 Changed 2026-10-08: 200/400 pages use the function form of `renderPage` (decision 027).
@@ -42,11 +45,11 @@ Changed 2026-10-08: no surviving rows → `noSelection` warning for `delete_sele
 
 Body: `action`, `_selected` (repeated), optional `_confirm=1`. `listUrl` = `${prefix}/${M.slug}/`; `backQuery` = the request's query string (leading `?`, or `""`); `back` = `listUrl + backQuery`.
 Every `ConfirmActionPage` render below passes `modelLabel: M.label`, `action` (the submitted value), `listHref: listUrl` and `backQuery`, plus the props listed in its step.
-1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back. Changed 2026-10-08 (decision 045): more than `MAX_SELECTED` ids (`export const MAX_SELECTED = 500` in `src/routes/actions.ts`; exported because `register()` caps `listPerPage` with the same constant, admin.md; design review, security-audit fix round) → warning flash `messages.tooManySelected(500)`, 303 back, with no DB query and no `run`. Both checks run before the action lookup and the permission checks below. Ids that `parsePk` rejects (e.g. out of the column's integer range, data.md) are dropped by `getMany` / `delete`, so they act like vanished rows.
+1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back. Changed 2026-10-08 (decision 045): more than `MAX_SELECTED` ids (`export const MAX_SELECTED = 500` in `src/routes/actions.ts`; exported because `register()` caps `listPerPage` with the same constant, admin.md; design review, security-audit fix round) → warning flash `t.tooManySelected(500)`, 303 back, with no DB query and no `run`. Both checks run before the action lookup and the permission checks below. Ids that `parsePk` rejects (e.g. out of the column's integer range, data.md) are dropped by `getMany` / `delete`, so they act like vanished rows.
 2. `action === "delete_selected"`:
    - no `delete` permission → 403.
    - `rows = repo.getMany(...)` (both steps). `rows` empty (every selected row vanished) → warning flash `noSelection`, 303 back (decision 033 item 3).
-   - no `_confirm` → `ConfirmActionPage({ isDelete: true, actionLabel: messages.deleteSelected, items: rows.map(r => ({ pk, label: M.toString(r) })), listHref: listUrl, backQuery })`, 200.
+   - no `_confirm` → `ConfirmActionPage({ isDelete: true, actionLabel: t.deleteSelected, items: rows.map(r => ({ pk, label: M.toString(r) })), listHref: listUrl, backQuery })`, 200.
    - `_confirm=1` → for each row `await hooks.beforeDelete?.(row, { ...ctx, mode: "delete" })`; a throw → error flash `hookFailed`, 303 back. Then `n = repo.delete(M.meta, pks of rows)` → success flash `deletedMany(n)`, 303 back. DB error → classify → error flash (`dbForeignKey` for foreignKey, else `dbOther`), 303 back.
 3. Custom action `a` with `a.name === action`:
    - missing → error flash `unknownAction`, 303 back.
@@ -88,6 +91,7 @@ Changed 2026-10-08: 0 deleted rows → warning `alreadyDeleted` instead of the s
 3. POST → `beforeDelete(row, { mode: "delete", ... })` (a throw → error flash `hookFailed`, 303 list) → `n = repo.delete(M.meta, [pk])` → `n > 0`: success flash `deleted(label)`, 303 list; `n === 0` (the row vanished after step 1, e.g. a concurrent delete): warning flash `alreadyDeleted(label)`, 303 list (decision 036). DB error → error flash (`dbForeignKey` / `dbOther`), 303 to the list URL (§8: return to the list).
 
 ## Login (`GET|POST /login/`, builtin only)
+Changed 2026-10-09: the login page's chrome sets `currentUrl = loginRedirectUrl(P, next)` (auth.md) with the page's `next` prop, so switching the language keeps the login target, also after a failed POST (decision 051).
 - GET: if `user` is already set → 302 to `safeNext(query.next, P)`. Otherwise `LoginPage({ next: query.next ?? "", username: "" })`, 200.
 - POST: `username`, `password`, `next` from the body. `verifyCredentials(username, password)`:
   - user → `writeSession(newSession(user, now))` (new token), 303 to `safeNext(next, P)`.
@@ -95,7 +99,16 @@ Changed 2026-10-08: 0 deleted rows → warning `alreadyDeleted` instead of the s
   - a throw → 500 through `onError`.
 
 ## Logout (`POST /logout/`, builtin only)
-`clearSession` → 303 to `${P}/login/`.
+`clearSession` → 303 to `${P}/login/`. The `da_lang` cookie is left as is (decision 050).
+
+## Language switch (`POST /_lang/`, both modes; Changed 2026-10-09, decision 051; path per Q15 option (b))
+```ts
+export async function langHandler(c: AdminContext): Promise<Response>;   // src/routes/lang.ts
+```
+Reached only after the Origin check and the `_csrf` token check (routes.md); the auth guard exempts it, so `U` may be null.
+1. `body = c.var.body ?? {}`; `lang` and `next` are used only when they are strings (an array or a `File` counts as missing).
+2. `isLocale(lang)` → `writeLocale(c, { prefix: P, publicOrigin }, lang)` (auth.md). Otherwise (missing, `fr`, `JA`, ...) no cookie is written.
+3. In every case → 303 to `safeNext(next, P)`; a missing or unsafe `next` gives `${P}/`. No flash, no session change, no DB access.
 
 ## Conventions
 Changed 2026-10-07: `HookCtx` fixed (decision 015).

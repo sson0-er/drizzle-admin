@@ -52,6 +52,11 @@
 | 46 | search-and-selection-caps | 44, 45 | Security audit (decision 045 points 2, 3, 5): `q` NUL strip + 200 code points, `MAX_SELECTED = 500` cap with `tooManySelected` warning, `register()` rejects `listPerPage` > 500 |
 | 47 | csp-and-nosniff | 43 | Security audit (decision 044): `SELECT_ALL_SCRIPT_SHA256` + hash pin test, `securityHeaders(csp)` with `buildCsp(authMode)` (no `form-action` in external mode), `nosniff` on every response |
 | 48 | example-host-guard-and-docs | 43, 44, 45, 46, 47 | Security audit (decision 048 + docs of 042-047): `example/host-guard.ts` and server wiring, `prepack`, `CHANGELOG.md`, README updates, CLAUDE.md "Security rules" (derived cookie keys, CSP hash rule) |
+| 49 | i18n-dictionaries-and-request-locale | 48 | i18n (decisions 049, 050 read side): `en` / `ja` dictionaries behind `MESSAGES` (typecheck-complete), `readLocale` (`da_lang`), `c.var.locale` / `c.var.t` in `initVars`, `t` through forms, views and handlers, `<html lang>`, `siteTitle` `null` default; existing tests on `MESSAGES.en` (edits 1, 6-8); `messages` / `locale` / `i18n` tests |
+| 50 | language-switch-route | 49 | i18n (decisions 050 write side, 051 route; Q15 (b)): `writeLocale`, `POST <prefix>/_lang/` (`langHandler`, guard-exempt, `safeNext`), reserved slug `_lang`; switch, rejection, CSRF and slug-`lang` tests |
+| 51 | language-switcher-ui | 49, 50 | i18n (decision 051 points 4-8): `div.header-tools` + `form.lang-switch` in `Layout`, `PageChrome.currentUrl` (login: `loginRedirectUrl`; minimal: `null`), three CSS rules; test edits 2-5 |
+| 52 | i18n-docs | 49, 50, 51 | i18n docs: README (sections 1, 5, 6, 8 cookies, `### Language`, 10), CHANGELOG "Changed", CLAUDE.md per design README "Project rules affected" (user-approved) |
+| 53 | security-low-findings-tests | 49 | Tests only, security-fix low findings A (L007, L009, L010, L008, L013, L016, L018): per-dialect data in the int4 test, dashboard positive control, exact flash lists, boundary rows for `parseFieldValue`, search normalization and host guard |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -164,6 +169,41 @@ Execution order: 42 → 43 → 44 → 45 → 46 → 47 → 48
   - **Planner-added tests**: `canAny` unit rows (44), a `fields.test.ts` case for a non-PK identity column (45), and a `hostGuard` middleware case (48). test-strategy.md does not list them, but each covers a behavior that the shared DoD requires to be tested.
 - Design text not yet updated, which the tasks follow anyway (orchestrator to sync): routes.md describes `buildCsp` as module-private (task 47 exports it); project-setup.md places the Changelog pointer "after section 11" (task 48 places it inside section 11).
 - Manual checks reported as 未確認 until run: the CSP console check of task 47 and the Host-header `curl` check of task 48.
+
+### Internationalization tasks 49-52 (decisions 049-051, Q15) and test task 53 (security-fix low findings)
+Execution order: 48 → 49 → 50 → 51 → 52 → 53
+
+- Tasks 01-48 are done and unchanged. Sources:
+  - decisions 049-051;
+  - the 2026-10-09 changes in 03-design/ (README "Project rules affected", support, auth, routes, routes-handlers, forms, views, views-style, admin, project-setup);
+  - test-strategy.md "Internationalization", including "Migration of existing tests";
+  - questions.md Q15 (option (b): `_lang`);
+  - the 2026-10-09 scope note in 01-requirements.md.
+
+  Task 53 comes from the "A. Fix recommended" items of `07-low-findings-security-triage.md`.
+- Split, following the orchestrator's suggestion, with one planner change. `readLocale` (the cookie read) goes into 49, not 50. Without it, 49 could not test the per-request locale end to end: the `da_lang=ja` integration rows are what catch a text frozen at module level (`DATE_PRESETS`, the DB-error map, `siteTitle`). Task 50 adds the cookie write together with the switch route that is its only caller.
+- Task 49 is large: about 26 source files and 14 migrated test files. The removal of the `messages` export breaks every importer at once, so the migration cannot be split into steps that each compile without a temporary alias that the design does not have. The changes are mechanical, and the DoD limits the test diff to listed shapes.
+- Where the allowed test edits land (test-strategy.md "Migration of existing tests"):
+  - edits 1 (`html lang`), 6 and 7 (`siteTitle` null) and 8 (`messages.test.ts`) in task 49;
+  - edits 2-5 in task 51, because they are caused by the switcher form that the `currentUrl` fixtures turn on;
+  - the `_lang` / `lang` rows in `register.test.ts` are new rows in task 50.
+- Dependencies come from shared files and APIs:
+  - 49 → 50: `src/auth/locale.ts`, `isLocale`, `src/routes/middleware.ts`, `test/i18n.test.ts`, `test/locale.test.ts`;
+  - 49 / 50 → 51: `PageChrome` and the chrome helpers (49); the switcher posts to the route of 50, and the external-401 test needs it;
+  - 49-51 → 52: the docs describe all three;
+  - 49 → 53: the post-i18n message API (`const messages = MESSAGES.en`) in `test/actions.test.ts` and `test/form.test.ts`.
+
+  Task 53 shares no file with 50-52, so its `depends_on` is only 49. Numeric order still runs it last, after the i18n tasks, as requested.
+- Each i18n task's DoD requires its new tests to be run against the pre-task code first. Tests that pass there by nature are named in the task as pins (e.g. the `da_lang=ja` rows in 49, which match the old Japanese UI; `GET /_lang/` → 404 in 50; no script/CSP change in 51).
+- Planner decisions:
+  - **`Client.setCookie` (task 49)**: test/helpers/app.ts gets a jar setter. test-strategy.md says to put `da_lang` "into the jar", but the client has no setter, and a manual `Cookie` header is overwritten by the jar. The addition is recorded in History so that test-strategy.md can name it.
+  - **Logout keeps `da_lang` (task 50)**: a planner-added case in `i18n.test.ts` for decision 050 point 5. test-strategy.md does not list it.
+  - **README "Language" placement (task 52)**: project-setup.md says "New section 'Language' after 8", but `test/readme.test.ts` pins exactly 12 `##` headings, and that assertion is not on the allowed-edit list. The section is a `### Language` subsection, last in section 8, the same approach task 48 used for the Changelog pointer.
+  - **CLAUDE.md (task 52)**: the user approved the edit for this round. Only Overview, Layout, Design principles and Security rules change. If the permission system refuses the edit, the rest of task 52 completes and the item is reported blocked.
+- Design text not yet updated, which the tasks follow anyway (orchestrator to sync):
+  - test-strategy.md "Helpers" does not list `Client.setCookie`;
+  - project-setup.md places "Language" as a section "after 8", where task 52 uses a `###` subsection.
+- Manual check reported as 未確認 until the user runs it: task 51's browser check (switch without JavaScript, focus ring in light and dark mode).
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes

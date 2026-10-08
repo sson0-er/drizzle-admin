@@ -40,3 +40,6 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-prepack-lifecycle | For decision 048, which lifecycle script runs on every npm/pnpm pack and publish? | expires 2027-01-06
 - 2026-10-08-bind-parameter-limits | For decision 045, how many bound parameters can one statement carry on SQLite and PostgreSQL? | expires 2027-01-06
 - 2026-10-08-pg-key-input-domains | For decision 045, which PK/FK inputs make PostgreSQL error, and what are drizzle's column type names? | expires 2027-01-06
+- 2026-10-09-hono-plain-cookie-read | For decision 050, how does hono read and write an unsigned cookie, and does reading ever throw? | expires 2027-01-07
+- 2026-10-09-messages-usage-in-src | For decisions 049-051, where do UI strings, html lang and formatting live in the code, and which strings are bound outside a request? | expires 2027-01-07
+- 2026-10-09-aria-current-and-lang-attribute | For decision 051, may the switcher use aria-current on a button and a lang attribute per language name? | expires 2027-01-07

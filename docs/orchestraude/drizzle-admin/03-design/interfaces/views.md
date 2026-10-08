@@ -1,7 +1,7 @@
 # Interface: views
 
 Files: `src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx`, `src/views/format.ts`, `src/views/url.ts`, `src/static/admin-css.ts`, `src/static/select-all.ts`.
-All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes only from Hono JSX: `raw()` and `dangerouslySetInnerHTML` are forbidden (Biome rule, decision 004). Texts come from `messages` ([support.md](support.md)). Widgets come from [forms.md](forms.md). The stylesheet (`ADMIN_CSS`) is specified in [views-style.md](views-style.md).
+All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes only from Hono JSX: `raw()` and `dangerouslySetInnerHTML` are forbidden (Biome rule, decision 004). Texts come from the request's dictionary, the `t: Messages` prop ([support.md](support.md); Changed 2026-10-09, decision 049): pages read `props.t` from `PageChrome`; no view imports `MESSAGES`. Widgets come from [forms.md](forms.md). The stylesheet (`ADMIN_CSS`) is specified in [views-style.md](views-style.md).
 
 ## Responsibilities
 - Render every page from plain props (no DB access, no Context).
@@ -14,17 +14,31 @@ All components are synchronous Hono JSX functions (`hono/jsx`). Escaping comes o
 ### Layout and common props
 Changed 2026-10-08: the breadcrumb separator glyph is exempt from the messages rule (decision 033 item 11).
 Changed 2026-10-08: the logout button and each flash item start with an icon (decision 039).
+Changed 2026-10-09: `PageChrome` gains `locale`, `t` and `currentUrl`; `<html lang>` follows the locale; the header gets the language switcher (decisions 049, 051).
 ```ts
 interface PageChrome {
-  siteTitle: string; prefix: string; title: string;
+  locale: Locale; t: Messages;                         // request locale and its dictionary (decision 049)
+  currentUrl: string | null;                           // raw path + query of this page, the switcher's `next`;
+                                                       //   null → no switcher (minimal pages, decision 051)
+  siteTitle: string; prefix: string; title: string;   // siteTitle already resolved: config value or t.defaultSiteTitle
   user: AdminUser | null; showLogout: boolean;        // builtin mode and logged in
   csrfToken: string; flash: FlashMessage[];
   breadcrumbs: { label: string; href?: string }[];    // first item is always Home → `${prefix}/`
 }
 export function Layout(props: PageChrome & { children: Child }): JSX.Element;
 ```
-Structure (the breadcrumb separator `›` is a glyph-only literal, exempt from the messages rule, decision 033 item 11): `<html lang="ja">`, `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, `<title>{title} | {siteTitle}</title>`, `<link rel="stylesheet" href={`${prefix}/static/admin.css?v=${ADMIN_CSS_VERSION}`}>`; `<header id="header">` with the site title link and, if `user`, the user name and (if `showLogout`) `<form method="post" action={`${prefix}/logout/`}>` with the CSRF hidden input and `<button type="submit"><Icon name="logout" />{messages.logout}</button>`; `<nav class="breadcrumbs">`; `<ul class="messagelist">` with `<li class={level}><Icon name={FLASH_ICONS[level]} />{text}</li>`; `<main id="content">`.
+Structure (the breadcrumb separator `›` is a glyph-only literal, exempt from the messages rule, decision 033 item 11): `<html lang={locale}>` (Changed 2026-10-09; was `"ja"`), `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, `<title>{title} | {siteTitle}</title>`, `<link rel="stylesheet" href={`${prefix}/static/admin.css?v=${ADMIN_CSS_VERSION}`}>`; `<header id="header">` with the site title link and `div.header-tools` (Changed 2026-10-09, decision 051) containing, in this order, the language switcher (below; only when `currentUrl !== null`) and, if `user`, the existing `div.user-tools` with the user name and (if `showLogout`) `<form method="post" action={`${prefix}/logout/`}>` with the CSRF hidden input and `<button type="submit"><Icon name="logout" />{t.logout}</button>`; `div.header-tools` is rendered even when empty (minimal page without user); `<nav class="breadcrumbs">`; `<ul class="messagelist">` with `<li class={level}><Icon name={FLASH_ICONS[level]} />{text}</li>`; `<main id="content">`.
 Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
+
+Language switcher (Changed 2026-10-09, decision 051), inside `div.header-tools`:
+```html
+<form class="lang-switch" method="post" action="{prefix}/_lang/" aria-label="{t.language}">
+  <input type="hidden" name="_csrf" value="{csrfToken}">
+  <input type="hidden" name="next" value="{currentUrl}">
+  <button type="submit" name="lang" value="en" lang="en" aria-current="true"?>English</button> / <button type="submit" name="lang" value="ja" lang="ja" aria-current="true"?>日本語</button>
+</form>
+```
+One `button` per entry of `LOCALES`, in that order, with text `LOCALE_NAMES[l]` and `lang={l}`; `aria-current="true"` only on the button whose value equals `locale` (the attribute is absent on the other). The ` / ` text between buttons is a glyph-only literal (decision 033 item 11). No icon, no script, no `style` attribute, no inline handler (the CSP is unchanged, decision 044). Stable selectors: `form.lang-switch`, `button[name=lang][value=en|ja]`, `input[name=next]` inside it.
 
 ### Pages (all take `PageChrome` plus the listed props)
 Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `displayRow` split described (decision 030).
@@ -43,6 +57,8 @@ Changed 2026-10-08: `ListPage` `columns[].sortHref` is `string | null`; `null` (
 | `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; listHref: string; backQuery: string` (`listHref` = list URL `${prefix}/${slug}/`, required because `PageChrome` has no model slug; `backQuery` = query string with leading `?`, or `""`) | `form#action-confirm` (POST to `listHref + backQuery`) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li`; the cancel link points to `listHref + backQuery` |
 | `LoginPage` | `next; username; error?` | `form#login-form` (POST `${prefix}/login/`), `input[name=username]`, `input[name=password]`, hidden `next`, `p.errornote` |
 | `ErrorPage` | `status; message` | `h1`, `p.error-message` |
+
+Changed 2026-10-09 (decision 049): every text a page renders itself (button labels, headings, `resultCount`, `formHasErrors`, `confirmDelete(...)`, `confirmAction(...)`, the login labels, ...) is `props.t.<key>`; `FormPage` passes `t` to `Widget` and `DisplayValue`, and `ListPage` passes it to `BooleanMark`. Props carrying user-provided text (`modelLabel`, `objectLabel`, `actionLabel` of a custom action, cell texts, `message` of `ErrorPage`) are rendered as given; the caller has already chosen the locale for any message it passes.
 
 `ListPage` props:
 ```ts
@@ -64,7 +80,7 @@ Changed 2026-10-08: `ListPage` `columns[].sortHref` is `string | null`; `null` (
   page: number; pages: number; total: number; pageHref: (n: number) => string; backQuery: string;
 }
 ```
-Pagination shows previous/next (the glyphs `‹` / `›`, exempt from the messages rule, decision 033 item 11) and up to 5 numbers around the current page, plus `messages.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
+Pagination shows previous/next (the glyphs `‹` / `›`, exempt from the messages rule, decision 033 item 11) and up to 5 numbers around the current page, plus `t.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
 
 `FormPage` props (decision 030):
 ```ts
@@ -95,8 +111,9 @@ Changed 2026-10-07: date-only strings (PG `date()` string mode) are shown as sto
 Changed 2026-10-08: `cellBoolean` added; `formatValue` / `formatCell` unchanged (decision 039).
 
 ```ts
-export function formatValue(field: FieldMeta, value: unknown, tz: string): string;
-export function formatCell(args: { field: FieldMeta; value: unknown; row: DbRow; tz: string;
+export function formatValue(field: FieldMeta, value: unknown, tz: string, t: Messages): string;
+  // t: Changed 2026-10-09 (design review, i18n round): only rule 9 uses it (t.binary)
+export function formatCell(args: { field: FieldMeta; value: unknown; row: DbRow; tz: string; t: Messages;
   formatter?: (v: unknown, row: DbRow) => string; fkLabel?: string;
   masked?: boolean }): string;   // true for a field whose widget is "password" (decision 037)
 export function cellBoolean(args: /* the same argument type as formatCell */): boolean | undefined;
@@ -104,7 +121,7 @@ export function cellBoolean(args: /* the same argument type as formatCell */): b
   // no formatter, value non-null, no fkLabel, typeof value === "boolean"; otherwise undefined
 export const TRUNCATE_AT = 100;
 ```
-Rules, applied in this order (first match wins): (0) `masked` → `********`, regardless of the value (null included), the formatter and `fkLabel`, so neither the value nor whether it is set is shown (decision 037 point 5); (1) a formatter → its string as-is (escaped by JSX); (2) null/undefined → `-`; (3) `fkLabel` given (FK field) → `fkLabel`; (4) boolean → `✓` / `✗`; (5) Date and `field.isDateOnly` → `formatDate(value)` (UTC parts, no time zone; decision 019); (6) Date → `formatDateTime(value, tz)`; (7) kind json → `JSON.stringify`; (8) bigint/number → `String`; (9) `Uint8Array`/Buffer → `[binary]`; (10) other → `String(value)`. Rule 5 applies only to `Date` values. A date-only string (kind string + `isDateOnly`) is not a `Date`, so it falls through to rule 10 and is shown as stored (`2026-10-07`); it is never converted to a `Date` (decision 023). `formatValue` applies rules 2 and 4-10. Truncation: the output of rule 7 (JSON text) and rule 10 (`String(value)`) longer than `TRUNCATE_AT` (100) characters becomes its first 100 characters + `…`; a long JSON value may be cut mid-token. Formatter output (1), `fkLabel` (3), booleans (4), dates (5, 6), numbers (8) and `[binary]` (9) are never truncated (decision 033 item 15).
+Rules, applied in this order (first match wins): (0) `masked` → `********`, regardless of the value (null included), the formatter and `fkLabel`, so neither the value nor whether it is set is shown (decision 037 point 5); (1) a formatter → its string as-is (escaped by JSX); (2) null/undefined → `-`; (3) `fkLabel` given (FK field) → `fkLabel`; (4) boolean → `✓` / `✗`; (5) Date and `field.isDateOnly` → `formatDate(value)` (UTC parts, no time zone; decision 019); (6) Date → `formatDateTime(value, tz)`; (7) kind json → `JSON.stringify`; (8) bigint/number → `String`; (9) `Uint8Array`/Buffer → `t.binary` (`[binary]` / `[バイナリ]`; Changed 2026-10-09); (10) other → `String(value)`. Rule 5 applies only to `Date` values. A date-only string (kind string + `isDateOnly`) is not a `Date`, so it falls through to rule 10 and is shown as stored (`2026-10-07`); it is never converted to a `Date` (decision 023). `formatValue` applies rules 2 and 4-10. Truncation: the output of rule 7 (JSON text) and rule 10 (`String(value)`) longer than `TRUNCATE_AT` (100) characters becomes its first 100 characters + `…`; a long JSON value may be cut mid-token. Formatter output (1), `fkLabel` (3), booleans (4), dates (5, 6), numbers (8) and `[binary]` (9) are never truncated (decision 033 item 15).
 
 ### Icons (`src/views/icons.tsx`)
 Changed 2026-10-08: new section (decision 039, post-v1 enhancement).
@@ -117,12 +134,12 @@ export type IconName = "plus" | "pencil" | "trash" | "check" | "x" | "search" | 
 export const ICON_PATHS: Readonly<Record<IconName, string>>;          // Object.freeze, values below
 export const FLASH_ICONS: Readonly<Record<FlashLevel, IconName>>;     // success → check, warning → triangle-alert, error → circle-alert
 export function Icon(props: { name: IconName }): JSX.Element | null;
-export function BooleanMark(props: { value: boolean }): JSX.Element;
+export function BooleanMark(props: { value: boolean; t: Messages }): JSX.Element;   // t: Changed 2026-10-09, decision 049
 ```
 Not exported from `src/index.ts`; not configurable. `Icon` renders, with every attribute a literal except `data-icon` and `d`:
 `<svg class="icon" data-icon={name} viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d={ICON_PATHS[name]} /></svg>`.
 If `name` is not an own key of `ICON_PATHS` (only possible through a cast), it returns `null`. `aria-hidden="true"` must be a string literal on the `<svg>` element: Biome's recommended `noSvgWithoutTitle` exempts only such decorative SVGs (evidence: 2026-10-08-biome-no-svg-without-title). Hono JSX emits `viewBox` and the kebab-case attributes as written; no `raw()` is used (evidence: 2026-10-08-hono-jsx-inline-svg).
-`BooleanMark` renders `<span class="boolean-mark" data-bool={value ? "true" : "false"}><Icon name={value ? "check" : "x"} /><span class="visually-hidden">{value ? messages.yes : messages.no}</span></span>`.
+`BooleanMark` renders `<span class="boolean-mark" data-bool={value ? "true" : "false"}><Icon name={value ? "check" : "x"} /><span class="visually-hidden">{value ? t.yes : t.no}</span></span>` (Changed 2026-10-09: `t` prop instead of the `messages` import; `icons.tsx` then imports only types from `messages.ts`).
 
 Security rule: icon names are passed only as literals (or via `FLASH_ICONS`, whose keys are the validated `FlashLevel`); no request, config or DB value selects or builds an icon. Path strings contain only SVG path commands, digits, `.`, `-` and spaces.
 

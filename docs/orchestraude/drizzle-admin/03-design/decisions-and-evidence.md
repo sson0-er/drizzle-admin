@@ -20,6 +20,8 @@ Changed 2026-10-08: added 040 (post-v1 user request: DADS-inspired restyle of `A
 Changed 2026-10-08: 037 point 6 added (L011, L010: password-widget columns not sortable, no FK link on masked cells); added 041 (L013: DoD test-diff rule allows import lines that only add names); evidence 2026-10-08-masked-list-column-sort-and-fk-link added.
 Changed 2026-10-08: 037 point 7 added (Q12: `register()` rejects a `password` widget on the primary key or on a field in `searchFields` / `ordering`).
 Changed 2026-10-08: added 042-048 (security audit fixes approved by the user); 007 is extended by 044 (the inline script is now also allowed by its CSP hash), 008 by 042 (derived signing keys), 038 by 048 (example Host check).
+Changed 2026-10-09: 049 and 051 revised after the i18n design review (`binary` key, test-migration list, accepted transient-token 403).
+Changed 2026-10-09: added 049-051 (scope change: English and Japanese UI); 033 item 11 (glyph exemption) now applies to both dictionaries and the switcher's ` / `; evidence 2026-10-09-hono-plain-cookie-read, -messages-usage-in-src and -aria-current-and-lang-attribute added.
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -70,6 +72,9 @@ Changed 2026-10-08: added 042-048 (security audit fixes approved by the user); 0
 - 046-column-exposure-defaults: the default `listDisplay` drops `exclude` keys (first 5 of the remaining `[pk, ...others]`, `[pk]` if none); `isGenerated` covers identity columns, so non-PK identity columns are display-only.
 - 047-external-login-next-safenext: the external-mode login redirect sends `next = safeNext(target, prefix)`; README tells hosts to still validate `next`.
 - 048-example-host-guard-prepack-changelog: `example/host-guard.ts` rejects unexpected Host headers (loopback names for loopback/wildcard binds, IP literals for wildcard binds) with 403; `"prepack": "pnpm build"`; new `CHANGELOG.md` with the audit changes, in `files`.
+- 049-i18n-message-dictionaries: `src/messages.ts` holds module-private `en` (default) and `ja` dictionaries behind `MESSAGES`, `Messages = Readonly<typeof en>` so a missing `ja` key fails typecheck; `initVars` sets `c.var.locale` / `c.var.t`; views get `t` through `PageChrome` (plus `Widget`, `DisplayValue`, `BooleanMark` props and a `formatValue` / `formatCell` argument for the new `binary` key), forms through an argument; no translated text at module level (`siteTitle` default resolved per request); developer-facing errors and logs stay English; user labels and date/number formats unchanged; existing tests use `MESSAGES.en`.
+- 050-locale-cookie: unsigned `da_lang` (`en` / `ja`), `cookieAttrs` plus `Max-Age` 365 days, read in `initVars` with an exact allow-list (anything else → English, not rewritten), written only by the switch, never deleted, no `Accept-Language`.
+- 051-language-switcher-post-form: header form posting `lang` (one button per locale, `aria-current`, `lang` attribute) with `_csrf` and `next` (= raw current path + query; login page: `loginRedirectUrl`) to `POST <prefix>/_lang/` (route 3a, guard-exempt, Origin and token checks apply, reserved slug `_lang`; Changed 2026-10-09: Q15 option (b), was `lang`) → 303 to `safeNext(next)`; no switcher on minimal pages; no script, CSP unchanged.
 
 ## Evidence referenced
 Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
@@ -115,6 +120,9 @@ Changed 2026-10-08: five entries for the security audit fixes (decisions 042, 04
 - 2026-10-08-prepack-lifecycle (design, decision 048): npm runs `prepack` on pack, publish and git-dependency installs, `prepublishOnly` only on publish; pnpm publish lists both; `pnpm pack` running `prepack` is unconfirmed. Expires 2027-01-06.
 - 2026-10-08-bind-parameter-limits (design, decision 045): SQLite allows 32766 parameters since 3.32.0 (999 before); PG's Bind counts parameters in an Int16. Expires 2027-01-06.
 - 2026-10-08-pg-key-input-domains (design, decisions 045, 046): PG int2/int4/int8 ranges and errors; uuid input forms and canonical output; NUL in text errors (22021, audit); drizzle columnType names; identity columns have `generatedIdentity` but no `generated`. Expires 2027-01-06.
+- 2026-10-09-hono-plain-cookie-read (design, decision 050): `getCookie` returns `undefined` when absent, never throws on malformed escapes, takes the first valid pair of a name; `setCookie` appends one header; 400-day `maxAge` limit. Expires 2027-01-07.
+- 2026-10-09-messages-usage-in-src (design, decisions 049-051): 21 modules import `messages`; `siteTitle`, list date presets and the form DB-error map bind text outside a request; only `messages.ts` has Japanese; `<html lang="ja">` hard-coded; date formatting built by hand; 14 test files import `messages`; reserved slugs and slug pattern. Expires 2027-01-07.
+- 2026-10-09-aria-current-and-lang-attribute (design, decision 051): `aria-current="true"` (current item in a set) is allowed on a button; `lang` is a global attribute that sets pronunciation per element. Expires 2027-01-07.
 - 2026-10-08-masked-list-column-sort-and-fk-link (design, decision 037 point 6): `o` accepts every `listDisplay` key, the list FK link ignores the mask, `allowedWidgets` never offers `password` for FK columns, and `register()` does not check widgets of `searchFields`, `ordering` or the primary key. Expires 2027-01-06.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

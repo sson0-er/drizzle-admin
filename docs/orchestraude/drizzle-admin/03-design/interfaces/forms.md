@@ -1,7 +1,7 @@
 # Interface: forms
 
 Files: `src/forms/fields.ts` (layout and widget choice), `src/forms/coerce.ts`, `src/forms/schema.ts` (zod), `src/forms/validate.ts` (pipeline steps 1-4), `src/forms/widgets.tsx` (input rendering).
-Inputs: `ResolvedModel` ([admin.md](admin.md)), `FieldMeta` ([introspect.md](introspect.md)), time helpers and messages ([support.md](support.md)), `parseFieldValue` ([data.md](data.md), pure; Changed 2026-10-08, decision 045).
+Inputs: `ResolvedModel` ([admin.md](admin.md)), `FieldMeta` ([introspect.md](introspect.md)), time helpers and the `Messages` type ([support.md](support.md); Changed 2026-10-09: texts arrive as a `t: Messages` argument or prop, never through an import of `MESSAGES`, decision 049), `parseFieldValue` ([data.md](data.md), pure; Changed 2026-10-08, decision 045).
 
 ## Responsibilities
 - Decide which fields appear on add/change forms, which are editable, and which widget each uses.
@@ -91,8 +91,8 @@ Changed 2026-10-08: integer and bigint input use `parseFieldValue` from `src/dat
 
 ```ts
 export type FormBody = Record<string, string | File | (string | File)[]>; // from c.req.parseBody({ all: true })
-export function coerceForm(fields: FormField[], body: FormBody, mode: FormMode, timeZone: string):
-  { data: Record<string, unknown>; errors: Record<string, string> };
+export function coerceForm(fields: FormField[], body: FormBody, mode: FormMode, timeZone: string, t: Messages):
+  { data: Record<string, unknown>; errors: Record<string, string> };   // t: Changed 2026-10-09, decision 049
 export function rawValues(fields: FormField[], body: FormBody): Record<string, string>; // for re-render
 ```
 Only `fields` (the editable ones) are read; all other body keys are ignored (mass-assignment protection). For multi-valued keys the last string is used, and `File` values count as missing. Strings are not trimmed, except for number/bigint/date parsing and date-only strings.
@@ -103,10 +103,10 @@ Per field, with `raw = body[key]`:
    - widget `password` and `mode === "change"` → key omitted from `data`, so the stored value is kept (decision 037)
    - `!notNull` → `null`
    - `notNull && hasDefault && mode === "add"` → key omitted from `data`
-   - otherwise error `messages.required`
+   - otherwise error `t.required` (every error named in these rules is `t.<key>`; Changed 2026-10-09)
 3. Otherwise by kind (FK fields use their own kind):
-   - number: `t = raw.trim()`; `t === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(t)` must be finite, else `invalidNumber`. Then, for `isInteger` fields (Changed 2026-10-08, decision 045): the value is `parseFieldValue(meta, t)` (data.md); `null` → `invalidInteger`. So only plain decimal digits with an optional leading `-` in the safe-integer range (and, on PG, the column's int2/int4 range) pass: `"0x1F"`, `"0b11"`, `"1e3"`, `"1.5"`, `"+5"` and `"9007199254740993"` are `invalidInteger`, and nothing is rounded. Non-integer number fields keep `Number(t)`.
-   - bigint: `t = raw.trim()`; `parseFieldValue(meta, t)` → the `BigInt`; `null` (not `/^-?\d+$/`, or outside the PG int8 range) → `invalidInteger` (Changed 2026-10-08, decision 045).
+   - number (Changed 2026-10-09: the trimmed input is named `s`, so it does not shadow the `t: Messages` parameter): `s = raw.trim()`; `s === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(s)` must be finite, else `invalidNumber`. Then, for `isInteger` fields (Changed 2026-10-08, decision 045): the value is `parseFieldValue(meta, s)` (data.md); `null` → `invalidInteger`. So only plain decimal digits with an optional leading `-` in the safe-integer range (and, on PG, the column's int2/int4 range) pass: `"0x1F"`, `"0b11"`, `"1e3"`, `"1.5"`, `"+5"` and `"9007199254740993"` are `invalidInteger`, and nothing is rounded. Non-integer number fields keep `Number(s)`.
+   - bigint: `s = raw.trim()`; `parseFieldValue(meta, s)` → the `BigInt`; `null` (not `/^-?\d+$/`, or outside the PG int8 range) → `invalidInteger` (Changed 2026-10-08, decision 045).
    - date: `meta.isDateOnly` → `parseDateOnly(raw.trim())` (UTC midnight, no time zone; decision 019); otherwise `parseDatetimeLocal(raw.trim(), timeZone)`; `null` → `invalidDate`. The time zone must not be applied to date-only values: drizzle stores `toISOString()`'s date part, so a Tokyo midnight would be saved as the previous day (evidence: 2026-10-07-drizzle-pg-date-mapping).
    - json: `JSON.parse`, else `invalidJson`.
    - enum: must be in `enumValues`, else `invalidChoice`.
@@ -117,8 +117,11 @@ Per field, with `raw = body[key]`:
 ### `schema.ts`
 ```ts
 export function buildZodSchema(fields: FormField[], mode: FormMode): z.ZodObject<z.ZodRawShape>;
+export function parseWithSchema(schema: z.ZodObject<z.ZodRawShape>, data: Record<string, unknown>, t: Messages):
+  { ok: true; data: Record<string, unknown> } | { ok: false; errors: Record<string, string> };
+  // Changed 2026-10-09: listed (already in the code) and gains `t` (decision 049)
 ```
-Per editable field: base string → `z.string()` (date-only strings included; coercion has already checked the format); number → `z.number()` (`.int()` when `isInteger`); bigint → `z.bigint()`; boolean → `z.boolean()`; date → `z.date()`; json → `z.unknown()`; enum → `z.enum(enumValues)`. Then `.nullable()` if `!notNull`, and `.optional()` if `mode === "add" && notNull && hasDefault`, or if `mode === "change"` and the widget is `password` (its key may be omitted, decision 037). `safeParse` issues map to `{ [path[0]]: messages.invalidValue }`, first issue per field. zod's own messages are never shown.
+Per editable field: base string → `z.string()` (date-only strings included; coercion has already checked the format); number → `z.number()` (`.int()` when `isInteger`); bigint → `z.bigint()`; boolean → `z.boolean()`; date → `z.date()`; json → `z.unknown()`; enum → `z.enum(enumValues)`. Then `.nullable()` if `!notNull`, and `.optional()` if `mode === "add" && notNull && hasDefault`, or if `mode === "change"` and the widget is `password` (its key may be omitted, decision 037). `parseWithSchema` runs `safeParse`; issues map to `{ [path[0]]: t.invalidValue }`, first issue per field. zod's own messages are never shown.
 
 ### `validate.ts` (§9 steps 1-4)
 ```ts
@@ -127,14 +130,16 @@ export type ValidationResult =
   | { ok: false; fieldErrors: Record<string, string>; formErrors: string[]; values: Record<string, string> };
 export async function validateSubmission(args: {
   model: ResolvedModel; fields: FormField[]; body: FormBody; mode: FormMode; timeZone: string;
+  t: Messages;   // Changed 2026-10-09: passed to coerceForm and parseWithSchema (decision 049)
 }): Promise<ValidationResult>;
 ```
 Order: coerce → if errors, stop → zod → if errors, stop → `model.validate?.(data, { mode })`. Returned keys that are editable field keys become field errors; any other key becomes a form error with the message text. Errors from earlier steps are returned without running later steps. A `validate` that throws is not caught (it is a programming error → 500).
 
 ### `widgets.tsx`
 ```ts
-export function Widget(props: { field: FormField; value: string; error?: string }): JSX.Element;
-export function DisplayValue(props: { field: FormField; value: unknown; timeZone: string }): JSX.Element;
+export function Widget(props: { field: FormField; value: string; error?: string; t: Messages }): JSX.Element;
+export function DisplayValue(props: { field: FormField; value: unknown; timeZone: string; t: Messages }): JSX.Element;
+  // t: Changed 2026-10-09 (decision 049): Widget uses t.openRelated / t.fkTooMany, DisplayValue passes t to BooleanMark
 export function toFormValue(field: FormField, value: unknown, timeZone: string): string;
 ```
 Changed 2026-10-07: `toFormValue` selects by `meta`, not by widget (decisions 019, 021).
@@ -156,10 +161,10 @@ Rendering (`name` and `id` = `id_<key>`):
 | date | `<input type="date">` |
 | datetime | `<input type="datetime-local">` |
 | hidden | `<input type="hidden">` (no label row) |
-`required` attributes are not emitted, so the server-side errors stay observable and testable with plain requests. An error renders `<ul class="errorlist"><li>msg</li></ul>` before the input. `fkFallbackHref` renders `<a href>` with `messages.openRelated` and the `fkTooMany` hint; a field without `fkFallbackHref` (including `"noView"`) renders neither. `DisplayValue` renders `<span class="readonly">` containing, first match: a field whose widget is `password` → the fixed mask `********` (decision 037); `typeof value === "boolean"` → `<BooleanMark value={value} />` from `src/views/icons.tsx` (colored `check` / `x` icon plus visually hidden `messages.yes` / `messages.no`, the same markup as boolean list cells; decision 039); otherwise the formatted value as text (views `formatValue`). `null` / `undefined` stays `-` via `formatValue`. `widgets.tsx` already imports `views/format.ts`; `views/icons.tsx` imports only `messages` and the `FlashLevel` type, so the new import creates no module cycle.
+`required` attributes are not emitted, so the server-side errors stay observable and testable with plain requests. An error renders `<ul class="errorlist"><li>msg</li></ul>` before the input. `fkFallbackHref` renders `<a href>` with `t.openRelated` and the `t.fkTooMany` hint; a field without `fkFallbackHref` (including `"noView"`) renders neither. `DisplayValue` renders `<span class="readonly">` containing, first match: a field whose widget is `password` → the fixed mask `********` (decision 037); `typeof value === "boolean"` → `<BooleanMark value={value} t={t} />` from `src/views/icons.tsx` (`t` added 2026-10-09) (colored `check` / `x` icon plus visually hidden `t.yes` / `t.no`, the same markup as boolean list cells; decision 039); otherwise the formatted value as text (views `formatValue(field.meta, value, timeZone, t)`; `t` added 2026-10-09). `null` / `undefined` stays `-` via `formatValue`. `widgets.tsx` already imports `views/format.ts`; `views/icons.tsx` imports only the `Messages` and `FlashLevel` types (Changed 2026-10-09), so the import creates no module cycle.
 
 ## Data formats
 - Field names in HTML equal `FieldMeta.key`. Reserved body names: `_csrf`, `_save`, `_addanother`, `_continue`.
 
 ## Errors
-- No exceptions for user input; all problems are returned as messages from `support/messages`.
+- No exceptions for user input; all problems are returned as texts from the `t` dictionary passed in (Changed 2026-10-09, decision 049). Texts from the user's `validate` are passed through unchanged.

@@ -3,6 +3,7 @@
 Changed 2026-10-08: new file. Post-v1 restyle closer to the look of the Japanese Digital Agency design system (DADS), using its public token values but our own CSS, markup and selectors (decision 040). It replaces the Django-like palette described in the "CSS requirements" of [views.md](views.md).
 
 Scope: only the string `ADMIN_CSS` changes (and the comment above it). `ADMIN_CSS_VERSION` keeps its FNV-1a definition and changes by itself. No file under `src/views/`, `src/forms/` or `src/messages.ts` changes. Every class, id, `name` and `data-*` hook listed in views.md stays as is, and the decision 039 icon markup is unchanged.
+Changed 2026-10-09: that scope statement describes the restyle task (decision 040). The i18n change adds `div.header-tools` and `form.lang-switch` to the header markup (views.md, decision 051) and three rules for them (section "Language switcher" below); every other rule here is unchanged.
 
 ## Rules that stay from v1 and decision 039
 - No external fonts or URLs: the stylesheet contains no `url(`, `@import`, `@font-face` or `http`.
@@ -215,6 +216,16 @@ tr.selected { background: var(--selected-bg); }
 .paginator .result-count { margin-inline-start: 8px; }
 ```
 Old header-cell fill (`thead th` background) and the `thead th a` color override are removed; sort links are ordinary underlined links. Table text is 14px with 8px/12px cell padding, denser than the DADS dense table (12px/16px), to keep an admin-like row count (decision 040).
+
+Language switcher (Changed 2026-10-09: new rules for the header markup of decision 051; order: after the `#header button` rules, before the focus ring):
+```css
+.header-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+.lang-switch { font-size: 14px; line-height: 1.5; color: var(--body-quiet); }
+#header .lang-switch button[aria-current=true]:not(:focus-visible) { color: var(--body-fg); font-weight: 700; text-decoration: none; }
+```
+- The switch buttons are `#header button`, so they take the text-button variant and the yellow focus fill like the logout button; no new variant. The `/` between them takes `--body-quiet` from the form.
+- The current language is bold `--body-fg` text without underline (`--body-fg` on `--body-bg` is an already verified text pair). Its selector (1,3,1) beats `#header button` and `#header button:hover`; `:not(:focus-visible)` leaves the focus rule below in charge while the button is focused, so the focused current button still gets `--on-focus-fill` on `--focus-fill`.
+- `#header` keeps `justify-content: space-between` with two children (the site title and `.header-tools`); at 767px and below the existing `flex-wrap` moves `.header-tools` under the title, so the narrow-screen block needs no new rule.
 
 Focus ring (order: after every other rule, before the media queries):
 ```css

@@ -1,7 +1,8 @@
 # Interface: admin (public API)
 
 Files: `src/index.ts`, `src/types.ts`, `src/admin.ts`.
-Related: [introspect.md](introspect.md) (`ModelMeta`), [routes.md](routes.md) (`buildApp`), [support.md](support.md) (`resolveTimeZone`, messages).
+Related: [introspect.md](introspect.md) (`ModelMeta`), [routes.md](routes.md) (`buildApp`), [support.md](support.md) (`resolveTimeZone`).
+Changed 2026-10-09: `src/admin.ts` no longer reads any UI string (the `siteTitle` default moved to the request, decision 049). There is no locale option in `AdminConfig` and `src/index.ts` exports no locale type (user decision; decision 049 point 11). Configuration errors stay English.
 
 ## Responsibilities
 - Define and export the public types of §5.2 (unchanged except where noted below).
@@ -102,7 +103,7 @@ Validation (each failure throws `Error("drizzle-admin: <message>")`):
 | auth | at least one of `verifyCredentials`, `getUser` is a function |
 | sessionMaxAgeSec | positive integer of at most `34560000` (400 days) if given, else throw `sessionMaxAgeSec must be a positive integer of at most 34560000 (400 days)` (one message for every failure of this rule); default `28800` (decision 042) |
 | timeZone | valid IANA zone via `resolveTimeZone` (support.md); default: server local zone |
-| siteTitle | default `messages.defaultSiteTitle` |
+| siteTitle | optional; stored as given, or `null` when absent. Changed 2026-10-09 (decision 049): no longer defaulted here; the page chrome shows `config.siteTitle ?? t.defaultSiteTitle` per request ("Site administration" / "サイト管理"), and a configured title is shown unchanged in every locale |
 | publicOrigin | optional. If given: a string containing no `?` or `#` that `new URL()` parses, with protocol `http:` or `https:`, empty username and password, and pathname `/` (no path beyond an optional trailing `/`). Stored normalized as `new URL(v).origin` (e.g. `"https://admin.example.com/"` → `"https://admin.example.com"`, default port dropped). Absent → `null` |
 
 Derived `authMode`: `"external"` if `getUser` is set (it wins over `verifyCredentials`, decision 013 item 8), else `"builtin"`.
@@ -116,7 +117,7 @@ Changed 2026-10-08: step 5 caps `listPerPage` at 500, the bulk-selection cap (de
 Steps, in order:
 1. If finalized → throw `register() must be called before admin.app / admin.fetch is used`.
 2. `meta = introspectTable(table, dialect)`. This throws for a dialect mismatch, no PK or composite PK (introspect.md).
-3. `slug = options.slug ?? meta.tableName`. It must match `/^[A-Za-z0-9_-]+$/`, must not be `login`, `logout` or `static`, and must not be registered already.
+3. `slug = options.slug ?? meta.tableName`. It must match `/^[A-Za-z0-9_-]+$/`, must not be `login`, `logout`, `static` or (Changed 2026-10-09, decision 051; Q15 option (b)) `_lang`, and must not be registered already. The reserved-slug error message is unchanged (`<table>: slug "_lang" is reserved`). `lang` is an ordinary slug.
 4. Column-name checks. Every key below must be a `meta.fields[].key`, otherwise throw `<table>: option "<option>" references unknown column "<key>"`:
    `listDisplay`, `listDisplayLinks`, `searchFields`, `listFilter`, `ordering` (after stripping a leading `-`), `fields`, `exclude`, `readonlyFields`, every `fieldsets[i].fields`, keys of `widgets`, keys of `formatters`.
 5. Extra checks (decision 013 item 13): `listFilter` keys must have kind boolean/enum/date, `isDateOnly` (PG `date()` string mode, decision 023) or a `foreignKey`. `searchFields` kinds must be string/enum. `fields` and `fieldsets` must not both be set. Action names must be unique, non-empty and not `delete_selected`. `listPerPage` must be a positive integer of at most `MAX_SELECTED` (500), imported from `src/routes/actions.ts` (routes-handlers.md Actions step 1), so "select all" on a full page always fits and the two limits cannot drift apart (decision 045 point 5), otherwise throw `` `${table}: listPerPage must be a positive integer of at most ${MAX_SELECTED}` `` (one message for every failure of this rule; `src/admin.ts` already imports from `src/routes/` for `buildApp`). Every `widgets[key]` must be in `allowedWidgets(field)` (forms.md, decision 021), otherwise throw `<table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
@@ -173,7 +174,7 @@ Permissions (decision 043): `view` is resolved first. `add`, `change` and `delet
 Changed 2026-10-07: added `config.publicOrigin` (decision 017).
 ```ts
 interface AdminState {
-  config: { db: unknown; dialect: Dialect; prefix: string; siteTitle: string; secret: string;
+  config: { db: unknown; dialect: Dialect; prefix: string; siteTitle: string | null; secret: string;   // siteTitle: Changed 2026-10-09
             sessionMaxAgeSec: number; timeZone: string; authMode: "builtin" | "external"; auth: AuthConfig;
             publicOrigin: string | null };   // normalized origin, see createAdmin
   models: ReadonlyMap<string, ResolvedModel>;   // by slug, registration order

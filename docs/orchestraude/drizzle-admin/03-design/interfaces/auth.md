@@ -1,7 +1,7 @@
 # Interface: auth
 
-Files: `src/auth/session.ts`, `src/auth/csrf.ts`, `src/auth/flash.ts`, `src/auth/redirect.ts`, `src/auth/permissions.ts`.
-Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `hono/csrf`. Web Crypto only (`crypto.getRandomValues`, and `crypto.subtle` HMAC for `deriveCookieKey`). No `node:` imports.
+Files: `src/auth/session.ts`, `src/auth/csrf.ts`, `src/auth/flash.ts`, `src/auth/redirect.ts`, `src/auth/permissions.ts`, `src/auth/locale.ts` (Changed 2026-10-09, decision 050).
+Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`; `getCookie`, `setCookie` for `da_lang`) and `hono/csrf`. Web Crypto only (`crypto.getRandomValues`, and `crypto.subtle` HMAC for `deriveCookieKey`). No `node:` imports.
 
 ## Responsibilities
 - Signed session cookie (§10) carrying user, CSRF token and issue time.
@@ -9,6 +9,7 @@ Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `h
 - Flash messages across one redirect.
 - Safe `next` handling and login redirect URLs.
 - Permission evaluation.
+- The locale cookie `da_lang` (Changed 2026-10-09, decision 050): it is a preference, not an auth artifact, but it lives here so that every user of `cookieAttrs` stays in one component.
 
 ## API
 
@@ -35,7 +36,7 @@ export function cookieAttrs(c: Context, prefix: string, publicOrigin: string | n
   { readonly httpOnly: true; readonly sameSite: "Lax"; readonly path: string; readonly secure: boolean };
   // { httpOnly: true, sameSite: "Lax", path: prefix || "/", secure: isSecure(c, publicOrigin) } as const
 ```
-- `cookieAttrs` is the single source of the attributes shared by every set and delete of `da_session` and `da_flash` (`writeSession`, `clearSession`, `addFlash`, `consumeFlash`). Deletions must carry the same attributes as sets (decision 036), so the four call sites must not build attributes themselves. Sets spread it and add `maxAge`; deletes pass it unchanged (decision 036, L072).
+- `cookieAttrs` is the single source of the attributes shared by every set and delete of `da_session`, `da_flash` and (Changed 2026-10-09, decision 050) `da_lang` (`writeSession`, `clearSession`, `addFlash`, `consumeFlash`, `writeLocale`). Deletions must carry the same attributes as sets (decision 036), so these call sites must not build attributes themselves. Sets spread it and add `maxAge`; deletes pass it unchanged (decision 036, L072).
 - `deriveCookieKey` uses Web Crypto only: `crypto.subtle.importKey("raw", UTF-8(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])`, then `crypto.subtle.sign("HMAC", key, UTF-8(cookieName + "\0" + prefix))`. `prefix` is the normalized prefix (`""` for basePath `"/"`). The result is passed unchanged as the `secret` argument of hono's `getSignedCookie` / `setSignedCookie`, which accept a `BufferSource` and import it as a raw HMAC key (evidence: 2026-10-08-hono-signed-cookie-key-and-max-age). Consequences (decision 042): instances with different prefixes reject each other's cookies even with the same `secret`; a `da_session` value never verifies as `da_flash` and the reverse; instances with the same `secret` and prefix (replicas) share sessions.
 - `readSession` returns `null` if the cookie is missing, the signature is invalid (`getSignedCookie` → `false`), the JSON is malformed or has the wrong shape (validate: `u` null or `{id: string, name: string}`, `csrf` non-empty string, `iat` finite number), or `now - iat > maxAgeSec` or `iat > now + 60`.
 - `writeSession` cookie attributes: `{ ...cookieAttrs(c, o.prefix, o.publicOrigin), maxAge: o.maxAgeSec }`, i.e. `httpOnly: true`, `sameSite: "Lax"`, `path: prefix || "/"`, `maxAge: maxAgeSec`, `secure: isSecure(c, o.publicOrigin)`.
@@ -99,6 +100,21 @@ The return value is `raw + url.search`: the URL parser's normalized, still-encod
 The URL parser already resolves literal and `%2e` dot segments (`/admin/%2e%2e/x` → `/x`, then step 3 rejects it). It does not resolve segments joined by `%2F` (`/admin/..%2Fx` stays as is), and step 7 exists for those (evidence: 2026-10-08-safenext-decoded-path).
 Callers must pass the raw percent-encoded path in `next`. Hono's `c.req.path` decodes `%20` to a space (evidence: 2026-10-08-safenext-decoded-path), which step 2 rejects, so the auth guard builds `next` from `new URL(c.req.url).pathname` (routes.md, decision 032).
 
+### `locale.ts` (decision 050)
+Changed 2026-10-09: new module.
+```ts
+import { DEFAULT_LOCALE, isLocale, type Locale } from "../messages.js";   // values: Changed 2026-10-09 (design review)
+export const LOCALE_COOKIE = "da_lang";
+export const LOCALE_MAX_AGE_SEC = 31536000;   // 365 days, below hono's 400-day limit
+export function readLocale(c: Context): Locale;
+  // v = getCookie(c, LOCALE_COOKIE) (hono/cookie, unsigned); isLocale(v) ? v : DEFAULT_LOCALE
+export function writeLocale(c: Context, o: { prefix: string; publicOrigin: string | null }, locale: Locale): void;
+  // setCookie(c, LOCALE_COOKIE, locale, { ...cookieAttrs(c, o.prefix, o.publicOrigin), maxAge: LOCALE_MAX_AGE_SEC })
+```
+- Unsigned on purpose: the value carries no secret and only `en` / `ja` can take effect, because `readLocale` accepts nothing else; any other value (missing, empty, `fr`, `JA`, `ja `) reads as `"en"` and is neither rewritten nor deleted (decision 050). `getCookie` never throws and takes the first `da_lang` pair (evidence: 2026-10-09-hono-plain-cookie-read), so `readLocale` is safe in `initVars`, before every other middleware.
+- Set-Cookie attributes: `da_lang=<en|ja>; Max-Age=31536000; Path=<prefix or />; HttpOnly; SameSite=Lax`, plus `Secure` exactly when `isSecure(c, publicOrigin)`.
+- Only the switch handler (routes-handlers.md "Language switch") calls `writeLocale`. Nothing deletes the cookie; `clearSession` (logout) does not touch it. `Accept-Language` is never read.
+
 ### `permissions.ts`
 Changed 2026-10-07: custom-action permission fixed to `change` (decision 016).
 Changed 2026-10-08: `canAny` added for the hidden-model rule (decision 043); the inheritance of unset entries lives in `ResolvedModel.permissions` (admin.md), so `can` is unchanged.
@@ -114,6 +130,7 @@ export const ACTION_PERMISSION: Perm = "change"; // custom actions (decision 016
 Changed 2026-10-08: the HMAC key is the derived per-cookie key, not `secret` (decision 042).
 - Session cookie value: hono signed-cookie format (URL-encoded JSON + `.` + base64 HMAC-SHA256 with the derived session key; tampered → `false`; evidence: 2026-10-07-hono-routing-cookies-script-escaping) of `{"u":...,"csrf":"...","iat":...}`.
 - Flash cookie value: same format with the derived flash key, JSON array of `FlashMessage`.
+- Locale cookie value (Changed 2026-10-09, decision 050): the plain string `en` or `ja`, unsigned.
 
 ## Errors
 - Nothing throws on bad cookies; they read as absent. Token/Origin failures are turned into 403 by routes ([routes.md](routes.md)).
