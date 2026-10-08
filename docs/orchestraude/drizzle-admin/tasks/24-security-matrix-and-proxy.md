@@ -1,7 +1,7 @@
 ---
 id: 24-security-matrix-and-proxy
 depends_on: [23-login-logout-and-auth-guard]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 24: security-matrix-and-proxy

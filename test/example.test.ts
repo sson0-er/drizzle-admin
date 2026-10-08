@@ -34,3 +34,22 @@ describe("example app (phase 3)", () => {
     }
   });
 });
+
+describe("example app (phase 5)", () => {
+  it("serves the login page while logged out", async () => {
+    const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });
+    const res = await createClient((req) => app.fetch(req)).get("/admin/login/");
+    expect(res.status).toBe(200);
+  });
+
+  it("serves the dashboard and every model list after logging in as admin", async () => {
+    const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });
+    const client = createClient((req) => app.fetch(req));
+    const login = await client.login({ username: "admin", password: "x" });
+    expect(login.status).toBe(303);
+    for (const path of ["/admin/", "/admin/users/", "/admin/posts/", "/admin/tags/"]) {
+      const res = await client.get(path);
+      expect(res.status, path).toBe(200);
+    }
+  });
+});

@@ -1,5 +1,7 @@
+import type { Table } from "drizzle-orm";
 import { serializeSigned } from "hono/utils/cookie";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { messages } from "../src/messages.js";
 import type { AdminUser } from "../src/types.js";
 import {
@@ -12,7 +14,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
-import { parse, qs, text } from "./helpers/html.js";
+import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 
 const sqlite = dialects[0] as (typeof dialects)[number];
 
@@ -377,5 +379,260 @@ describe("external auth mode", () => {
     expect(ok.status).toBe(303);
     const missing = await client.post("/admin/authors/1/change/", changeForm, { withToken: false });
     expect(missing.status).toBe(403);
+  });
+});
+
+type Permissions = NonNullable<ModelAdminOptions<Table>["permissions"]>;
+type Perm = keyof Permissions;
+
+const authorForm = {
+  name: "zed",
+  email: "zed@example.com",
+  active: "on",
+  role: "viewer",
+  createdAt: "2026-01-01T09:00",
+};
+
+const docOf = async (res: Response): Promise<Node> => parse(await res.text());
+
+/** Values of the options in `select[name=action]`; `null` when the dropdown is not rendered. */
+function actionOptions(doc: Node): string[] | null {
+  const select = qs(doc, { tag: "select", attrs: { name: "action" } });
+  if (select === null) return null;
+  return qsa(select, { tag: "option" }).map((o) => attr(o, "value") ?? "");
+}
+
+describe.each(dialects)("permissions in routes ($name)", (fixture) => {
+  let t: TestAdmin;
+  const tagRuns: string[][] = [];
+  const actions: NonNullable<ModelAdminOptions<Table>["actions"]> = [
+    {
+      name: "tag",
+      label: "Tag",
+      run: async ({ ids }) => {
+        tagRuns.push(ids);
+        return { message: "Tagged!" };
+      },
+    },
+  ];
+
+  /** Another admin over the same database, so one PGlite instance serves every permission set. */
+  async function clientWith(permissions: Permissions): Promise<Client> {
+    const admin = createAdmin({
+      db: t.db,
+      dialect: fixture.dialect,
+      basePath: "/admin",
+      secret: TEST_SECRET,
+      auth: {
+        verifyCredentials: async (username, password) =>
+          username === TEST_USER.name && password === TEST_PASSWORD ? TEST_USER : null,
+      },
+    });
+    admin.register(t.schema.authors, { permissions, actions });
+    const client = createClient((req) => admin.fetch(req));
+    expect((await client.login()).status).toBe(303);
+    return client;
+  }
+  const without = (perm: Perm): Permissions => ({ [perm]: false });
+
+  beforeAll(async () => {
+    t = await makeAdmin(fixture, { login: false });
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+
+  describe("403 for each missing permission", () => {
+    const cases: {
+      perm: Perm;
+      method: "GET" | "POST";
+      path: string;
+      form?: Record<string, string>;
+    }[] = [
+      { perm: "view", method: "GET", path: "/admin/authors/" },
+      { perm: "view", method: "GET", path: "/admin/authors/1/change/" },
+      { perm: "add", method: "GET", path: "/admin/authors/add/" },
+      { perm: "add", method: "POST", path: "/admin/authors/add/", form: authorForm },
+      { perm: "change", method: "POST", path: "/admin/authors/1/change/", form: authorForm },
+      { perm: "delete", method: "GET", path: "/admin/authors/1/delete/" },
+      { perm: "delete", method: "POST", path: "/admin/authors/1/delete/" },
+      {
+        perm: "delete",
+        method: "POST",
+        path: "/admin/authors/",
+        form: { action: "delete_selected", _selected: "1" },
+      },
+    ];
+
+    it.each(cases)("$perm false: $method $path -> 403", async ({ perm, method, path, form }) => {
+      const denied = await clientWith(without(perm));
+      const res = method === "GET" ? await denied.get(path) : await denied.post(path, form);
+      expect(res.status).toBe(403);
+
+      // Control: with every permission the same request is not refused, so the 403 is the gate.
+      const allowed = await clientWith({});
+      const ok = method === "GET" ? await allowed.get(path) : await allowed.post(path, form);
+      expect(ok.status).not.toBe(403);
+    });
+
+    it("leaves the data alone when delete is refused", async () => {
+      const denied = await clientWith(without("delete"));
+      await denied.post("/admin/authors/1/delete/");
+      await denied.post("/admin/authors/", { action: "delete_selected", _selected: "1" });
+      expect((await (await clientWith({})).get("/admin/authors/1/change/")).status).toBe(200);
+    });
+  });
+
+  describe("hidden controls", () => {
+    it("shows both add links with every permission", async () => {
+      const client = await clientWith({});
+      expect(
+        qs(await docOf(await client.get("/admin/")), { tag: "a", cls: "addlink" }),
+      ).not.toBeNull();
+      expect(
+        qs(await docOf(await client.get("/admin/authors/")), { tag: "a", cls: "addlink" }),
+      ).not.toBeNull();
+    });
+
+    it("hides the dashboard and list add links without add", async () => {
+      const client = await clientWith(without("add"));
+      const dashboard = await client.get("/admin/");
+      expect(dashboard.status).toBe(200);
+      expect(qs(await docOf(dashboard), { tag: "a", cls: "addlink" })).toBeNull();
+      const list = await client.get("/admin/authors/");
+      expect(list.status).toBe(200);
+      expect(qs(await docOf(list), { tag: "a", cls: "addlink" })).toBeNull();
+    });
+
+    it("shows the save buttons and delete link of the change page with every permission", async () => {
+      const doc = await docOf(await (await clientWith({})).get("/admin/authors/1/change/"));
+      for (const name of ["_save", "_addanother", "_continue"]) {
+        expect(qs(doc, { tag: "button", attrs: { name } }), name).not.toBeNull();
+      }
+      expect(qs(doc, { tag: "a", cls: "deletelink" })).not.toBeNull();
+    });
+
+    it("hides the save buttons but keeps the delete link without change", async () => {
+      const res = await (await clientWith(without("change"))).get("/admin/authors/1/change/");
+      expect(res.status).toBe(200);
+      const doc = await docOf(res);
+      for (const name of ["_save", "_addanother", "_continue"]) {
+        expect(qs(doc, { tag: "button", attrs: { name } }), name).toBeNull();
+      }
+      expect(qs(doc, { tag: "a", cls: "deletelink" })).not.toBeNull();
+    });
+
+    it("hides the delete link but keeps the save buttons without delete", async () => {
+      const doc = await docOf(
+        await (await clientWith(without("delete"))).get("/admin/authors/1/change/"),
+      );
+      expect(qs(doc, { tag: "a", cls: "deletelink" })).toBeNull();
+      expect(qs(doc, { tag: "button", attrs: { name: "_save" } })).not.toBeNull();
+    });
+
+    it("gives a view-only user a change page without save buttons", async () => {
+      const client = await clientWith({ add: false, change: false, delete: false });
+      const res = await client.get("/admin/authors/1/change/");
+      expect(res.status).toBe(200);
+      const doc = await docOf(res);
+      expect(qs(doc, { tag: "button", attrs: { name: "_save" } })).toBeNull();
+      expect(qs(doc, { tag: "a", cls: "deletelink" })).toBeNull();
+    });
+
+    it("offers delete_selected in the action dropdown only with delete", async () => {
+      const allowed = await docOf(await (await clientWith({})).get("/admin/authors/"));
+      expect(actionOptions(allowed)).toContain("delete_selected");
+      const denied = await docOf(
+        await (await clientWith(without("delete"))).get("/admin/authors/"),
+      );
+      // The custom action keeps the dropdown rendered, so this is not an absent-select pass.
+      expect(actionOptions(denied)).toContain("tag");
+      expect(actionOptions(denied)).not.toContain("delete_selected");
+    });
+  });
+
+  describe("custom actions need change (decision 016)", () => {
+    it("neither offers nor runs a custom action with change false and delete true", async () => {
+      const client = await clientWith({ change: false, delete: true });
+      const options = actionOptions(await docOf(await client.get("/admin/authors/")));
+      expect(options).toContain("delete_selected");
+      expect(options).not.toContain("tag");
+      const before = tagRuns.length;
+      const res = await client.post("/admin/authors/", { action: "tag", _selected: "1" });
+      expect(res.status).toBe(403);
+      expect(tagRuns).toHaveLength(before);
+    });
+
+    it("offers and runs it with change true, with its flash", async () => {
+      const client = await clientWith({ change: true });
+      expect(actionOptions(await docOf(await client.get("/admin/authors/")))).toContain("tag");
+      const before = tagRuns.length;
+      const res = await client.post("/admin/authors/", { action: "tag", _selected: "1" });
+      expect(res.status).toBe(303);
+      expect(tagRuns.slice(before)).toEqual([["1"]]);
+      const list = await docOf(await client.get(location(res)));
+      const flash = qs(list, { tag: "ul", cls: "messagelist" });
+      expect(flash === null ? "" : text(flash)).toContain("Tagged!");
+    });
+  });
+});
+
+describe.each(dialects)("XSS escaping ($name)", (fixture) => {
+  const SCRIPT = "<script>alert(1)</script>";
+  let t: TestAdmin;
+  let id: string;
+
+  beforeAll(async () => {
+    t = await makeAdmin(fixture, {
+      models: {
+        authors: {
+          listDisplay: ["id", "name", "email"],
+          formatters: { email: () => "<b>x</b>" },
+        },
+      },
+    });
+    const db = t.db as {
+      insert(table: Table): {
+        values(v: object): PromiseLike<unknown>;
+      };
+    };
+    await db.insert(t.schema.authors).values({ name: SCRIPT, email: "x@example.com" });
+    const list = await docOf(await t.client.get("/admin/authors/?q=script"));
+    const link = qsa(list, { tag: "a" }).find((a) => (attr(a, "href") ?? "").includes("/change/"));
+    id = (attr(link as NonNullable<typeof link>, "href") ?? "").split("/").at(-3) ?? "";
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it("renders the list with the name as text and the formatter output escaped", async () => {
+    const res = await t.client.get("/admin/authors/");
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain(SCRIPT);
+    const doc = parse(html);
+    expect(text(doc)).toContain(SCRIPT);
+    // Only the select-all script of the list page may exist.
+    const scripts = qsa(doc, { tag: "script" });
+    expect(scripts).toHaveLength(1);
+    expect(text(scripts[0] as NonNullable<(typeof scripts)[0]>)).not.toContain("alert(1)");
+    expect(qsa(doc, { tag: "b" })).toHaveLength(0);
+    expect(text(doc)).toContain("<b>x</b>");
+  });
+
+  it("renders the change page with the name as a field value, not as markup", async () => {
+    expect(id).not.toBe("");
+    const res = await t.client.get(`/admin/authors/${id}/change/`);
+    expect(res.status).toBe(200);
+    const html = await res.text();
+    expect(html).not.toContain(SCRIPT);
+    const doc = parse(html);
+    expect(qsa(doc, { tag: "script" })).toHaveLength(0);
+    // A text column renders as an input or a textarea depending on the dialect.
+    const field = qs(doc, { attrs: { id: "id_name" } });
+    expect(field).not.toBeNull();
+    const value =
+      attr(field as NonNullable<typeof field>, "value") ?? text(field as NonNullable<typeof field>);
+    expect(value).toBe(SCRIPT);
   });
 });
