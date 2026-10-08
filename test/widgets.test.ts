@@ -244,7 +244,7 @@ describe("DisplayValue", () => {
   it("renders formatted text", () => {
     expect(render(field("text"), "abc")).toBe("abc");
     expect(render(field("text"), null)).toBe("-");
-    expect(render(field("checkbox", { kind: "boolean" }), true)).toBe("✓");
+    expect(render(field("checkbox", { kind: "boolean" }), true)).toBe(messages.yes);
     expect(render(field("datetime", { kind: "date" }), new Date("2026-10-07T00:30:00Z"))).toBe(
       "2026/10/07 09:30",
     );
@@ -267,6 +267,35 @@ describe("DisplayValue", () => {
     );
     expect(text(parse(html))).toBe("********");
     expect(html).not.toContain("stored");
+  });
+
+  const boolean = field("checkbox", { kind: "boolean" });
+  const html = (f: FormField, value: unknown) =>
+    parse(String(DisplayValue({ field: f, value, timeZone: "UTC" })));
+
+  it.each([
+    { value: true, icon: "check", message: messages.yes },
+    { value: false, icon: "x", message: messages.no },
+  ])("renders $value as a boolean mark inside span.readonly", ({ value, icon, message }) => {
+    const doc = html(boolean, value);
+    const readonly = qs(doc, { tag: "span", cls: "readonly" }) as Element;
+    const mark = qsa(readonly, { tag: "span", cls: "boolean-mark" });
+    expect(mark).toHaveLength(1);
+    expect(attr(mark[0] as Element, "data-bool")).toBe(String(value));
+    expect(qsa(mark[0] as Element, { tag: "svg", attrs: { "data-icon": icon } })).toHaveLength(1);
+    expect(text(qs(mark[0] as Element, { cls: "visually-hidden" }) as Element)).toBe(message);
+  });
+
+  it("shows - and no svg for null on a boolean field", () => {
+    const doc = html(boolean, null);
+    expect(text(doc)).toBe("-");
+    expect(qsa(doc, { tag: "svg" })).toEqual([]);
+  });
+
+  it("masks a password-widget field holding true without a mark", () => {
+    const doc = html({ ...boolean, widget: "password" }, true);
+    expect(text(doc)).toBe("********");
+    expect(qsa(doc, { tag: "svg" })).toEqual([]);
   });
 
   it("escapes markup", () => {

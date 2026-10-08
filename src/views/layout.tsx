@@ -3,6 +3,7 @@ import type { FlashMessage } from "../auth/flash.js";
 import { messages } from "../messages.js";
 import { ADMIN_CSS_VERSION } from "../static/admin-css.js";
 import type { AdminUser } from "../types.js";
+import { FLASH_ICONS, Icon } from "./icons.js";
 
 export interface PageChrome {
   siteTitle: string;
@@ -40,7 +41,10 @@ export function Layout(props: PageChrome & { children?: Child }) {
               {showLogout ? (
                 <form method="post" action={`${prefix}/logout/`}>
                   <input type="hidden" name="_csrf" value={csrfToken} />
-                  <button type="submit">{messages.logout}</button>
+                  <button type="submit">
+                    <Icon name="logout" />
+                    {messages.logout}
+                  </button>
                 </form>
               ) : null}
             </div>
@@ -61,7 +65,10 @@ export function Layout(props: PageChrome & { children?: Child }) {
         {flash.length > 0 ? (
           <ul class="messagelist">
             {flash.map((m) => (
-              <li class={m.level}>{m.text}</li>
+              <li class={m.level}>
+                <Icon name={FLASH_ICONS[m.level]} />
+                {m.text}
+              </li>
             ))}
           </ul>
         ) : null}

@@ -1,7 +1,7 @@
 ---
 id: 38-ui-icons
 depends_on: [28-fk-reference-view-permission, 32-password-no-echo, 35-test-gaps-forms-views-auth]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 38: ui-icons
@@ -128,3 +128,19 @@ Pages show decorative inline SVG icons from a fixed internal set of 9 icons (dec
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- `pnpm lint` passes with the unchanged biome.json: the recommended `noSvgWithoutTitle` accepts the `<svg aria-hidden="true">` in `Icon` (confirms the evidence on Biome 2.5.15).
+- New exports: only the five required in `src/views/icons.tsx` (`IconName`, `ICON_PATHS`, `FLASH_ICONS`, `Icon`, `BooleanMark`) and `cellBoolean` in `src/views/format.ts` (design). `Cell.bool` prop (design). The shared argument type of `formatCell` / `cellBoolean` is a module-private `CellArgs` interface (not exported).
+- Path data used as in the views.md table, unchanged.
+- `grep -rn "<Icon" src` (the `icons.tsx:17` hit is the `Record<IconName` type, not a use):
+  - dashboard.tsx:21 `<Icon name="plus" />`, :28 `<Icon name="pencil" />`
+  - list.tsx:82 `<Icon name="plus" />`, :99 `<Icon name="search" />`
+  - layout.tsx:45 `<Icon name="logout" />`, :69 `<Icon name={FLASH_ICONS[m.level]} />`
+  - icons.tsx:64 `<Icon name={value ? "check" : "x"} />`
+  - delete.tsx:20 `<Icon name="trash" />`, :24 `<Icon name="x" />`
+  - confirm-action.tsx:44 `<Icon name={isDelete ? "trash" : "check"} />`, :48 `<Icon name="x" />`
+  - form.tsx:78 check, :82 plus, :86 pencil, :93 trash (all literals)
+- `grep -rnE "raw\(|dangerouslySetInnerHTML" src` finds nothing.
+- Test changes to existing tests: only the `✓` assertion in widgets.test.ts, the `✓` / `✗` assertions and the title of "shows booleans" in list.test.ts, and import lines. The list formatter case is a new `describe.each(dialects)("list page boolean formatter")` (one extra database instance per dialect).
+- `scripts/verify.sh` passes.

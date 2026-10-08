@@ -61,6 +61,17 @@ function rowsOf(doc: Node): Row[] {
   });
 }
 
+/** The `td` of body row `index` under the header `key` (rows keep their document order). */
+function cellNode(doc: Node, index: number, key: string): Node {
+  const table = qs(doc, { tag: "table", id: "result_list" }) as Node;
+  const keys = qsa(table, { tag: "th" }).flatMap((th) => attr(th, "data-key") ?? []);
+  const tr = qsa(qs(table, { tag: "tbody" }) as Node, { tag: "tr" })[index] as Node;
+  return qsa(tr, { tag: "td" })[keys.indexOf(key) + 1] as Node;
+}
+
+const iconNames = (node: Node): string[] =>
+  qsa(node, { tag: "svg" }).map((svg) => attr(svg, "data-icon") ?? "");
+
 const column = (doc: Node, key: string): string[] => rowsOf(doc).map((r) => r.cells[key] ?? "");
 
 function filterBox(doc: Node, key: string): Node {
@@ -263,11 +274,17 @@ describe.each(dialects)("list page ($name)", (fixture) => {
     expect(header(doc, "title").params.has("p")).toBe(false);
   });
 
-  it("shows booleans as check marks and null as a dash", async () => {
+  it("shows booleans as boolean marks and null as a dash", async () => {
     const { doc } = await page(t, "/admin/authors/?o=name");
     const rows = rowsOf(doc);
-    expect(rows[0]?.cells.active).toBe("✓");
-    expect(rows[2]?.cells.active).toBe("✗");
+    expect(rows[0]?.cells.active).toBe(messages.yes);
+    expect(rows[2]?.cells.active).toBe(messages.no);
+    const yes = cellNode(doc, 0, "active");
+    const no = cellNode(doc, 2, "active");
+    expect(qsa(yes, { tag: "span", cls: "boolean-mark" })).toHaveLength(1);
+    expect(iconNames(yes)).toEqual(["check"]);
+    expect(qsa(no, { tag: "span", cls: "boolean-mark" })).toHaveLength(1);
+    expect(iconNames(no)).toEqual(["x"]);
     expect(rows[2]?.cells.email).toBe("-");
     expect(rows[0]?.cells.email).toBe("alice@example.com");
   });
@@ -435,6 +452,26 @@ describe.each(dialects)("list page with extra rows ($name)", (fixture) => {
       expect(link.params.get("o")).toBe("title");
     }
     expect(links[2]?.params.get("f_publishedAt")).toBe("past7");
+  });
+});
+
+describe.each(dialects)("list page boolean formatter ($name)", (fixture) => {
+  let t: TestAdmin;
+  beforeAll(async () => {
+    t = await makeAdmin(fixture, {
+      models: {
+        authors: { listDisplay: ["id", "name", "active"], formatters: { active: () => "on" } },
+      },
+    });
+  });
+  afterAll(async () => {
+    await t.close();
+  });
+
+  it("shows the formatter text without a boolean mark", async () => {
+    const { doc } = await page(t, "/admin/authors/?o=name");
+    expect(rowsOf(doc)[0]?.cells.active).toBe("on");
+    expect(qsa(cellNode(doc, 0, "active"), { tag: "span", cls: "boolean-mark" })).toEqual([]);
   });
 });
 

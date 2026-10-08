@@ -1,5 +1,6 @@
 import { messages } from "../messages.js";
 import { SELECT_ALL_SCRIPT } from "../static/select-all.js";
+import { BooleanMark, Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 import type { SortState } from "./url.js";
 
@@ -7,6 +8,8 @@ export interface Cell {
   text: string;
   /** Change page link (listDisplayLinks) or FK link. */
   href?: string;
+  /** Set for a plain boolean value: rendered as a `BooleanMark` instead of `text` (decision 039). */
+  bool?: boolean;
 }
 
 export interface ListPageProps {
@@ -76,6 +79,7 @@ export function ListPage(props: PageChrome & ListPageProps) {
         <ul class="object-tools">
           <li>
             <a class="addlink" href={`${listUrl}add/`}>
+              <Icon name="plus" />
               {messages.add}
             </a>
           </li>
@@ -91,7 +95,10 @@ export function ListPage(props: PageChrome & ListPageProps) {
                 value={q ?? ""}
                 placeholder={messages.searchPlaceholder}
               />
-              <button type="submit">{messages.search}</button>
+              <button type="submit">
+                <Icon name="search" />
+                {messages.search}
+              </button>
             </form>
           )}
           <form id="changelist-form" method="post" action={`${listUrl}${backQuery}`}>
@@ -136,15 +143,15 @@ export function ListPage(props: PageChrome & ListPageProps) {
                       <td class="action-checkbox">
                         <input type="checkbox" name="_selected" value={row.pk} />
                       </td>
-                      {row.cells.map((cell) => (
-                        <td>
-                          {cell.href === undefined ? (
-                            cell.text
-                          ) : (
-                            <a href={cell.href}>{cell.text}</a>
-                          )}
-                        </td>
-                      ))}
+                      {row.cells.map((cell) => {
+                        const content =
+                          cell.bool === undefined ? cell.text : <BooleanMark value={cell.bool} />;
+                        return (
+                          <td>
+                            {cell.href === undefined ? content : <a href={cell.href}>{content}</a>}
+                          </td>
+                        );
+                      })}
                     </tr>
                   ))}
                 </tbody>

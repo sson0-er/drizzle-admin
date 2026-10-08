@@ -27,6 +27,8 @@ export const ADMIN_CSS = `
   --warning-bg: #ffc;
   --message-error-bg: #ffefef;
   --selected-bg: #ffc;
+  --icon-success: #2e7d32;
+  --icon-warning: #8a6d00;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -56,6 +58,8 @@ export const ADMIN_CSS = `
     --warning-bg: #3d3a1a;
     --message-error-bg: #3b1d1d;
     --selected-bg: #3d3a1a;
+    --icon-success: #81c784;
+    --icon-warning: #f5dd5d;
   }
 }
 
@@ -165,6 +169,13 @@ button, .button {
   font: inherit;
 }
 a.deletelink, button.deletelink { background: var(--delete-bg); color: var(--button-fg); padding: 6px 12px; border-radius: 4px; }
+
+.icon { display: inline-block; width: 1em; height: 1em; vertical-align: -0.125em; margin-inline-end: 0.35em; flex-shrink: 0; }
+.boolean-mark .icon { margin-inline-end: 0; }
+.boolean-mark[data-bool=true], .messagelist .success .icon { color: var(--icon-success); }
+.boolean-mark[data-bool=false], .messagelist .error .icon { color: var(--error-fg); }
+.messagelist .warning .icon { color: var(--icon-warning); }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
 
 .paginator { margin: 12px 0; color: var(--body-quiet); }
 .paginator .this-page { font-weight: 700; }

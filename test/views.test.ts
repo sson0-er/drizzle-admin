@@ -3,14 +3,17 @@ import type { FormField } from "../src/forms/fields.js";
 import { messages } from "../src/messages.js";
 import { ADMIN_CSS, ADMIN_CSS_VERSION } from "../src/static/admin-css.js";
 import { SELECT_ALL_SCRIPT } from "../src/static/select-all.js";
+import { ConfirmActionPage } from "../src/views/confirm-action.js";
 import { DashboardPage } from "../src/views/dashboard.js";
+import { DeletePage } from "../src/views/delete.js";
 import { ErrorPage } from "../src/views/error.js";
-import { FormPage } from "../src/views/form.js";
+import { FormPage, type FormPageProps } from "../src/views/form.js";
+import { FLASH_ICONS, type IconName } from "../src/views/icons.js";
 import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
 import { LoginPage } from "../src/views/login.js";
 import { sortHref, withQuery } from "../src/views/url.js";
-import { attr, parse, qs as q1, qsa, text } from "./helpers/html.js";
+import { attr, type Element, parse, qs as q1, qsa, text } from "./helpers/html.js";
 
 const BASE = "/admin/authors/";
 const qs = (s: string) => new URLSearchParams(s);
@@ -124,6 +127,27 @@ describe("static modules", () => {
     expect(narrow).toMatch(/#changelist-filter\s*\{[^}]*order:\s*-1/);
     expect(narrow).not.toMatch(/float:\s*right/);
     expect(ADMIN_CSS).toContain("overflow-x: auto");
+  });
+
+  it("ADMIN_CSS contains no url( at all", () => {
+    expect(ADMIN_CSS).not.toContain("url(");
+  });
+
+  it.each([
+    { name: "light :root", css: () => ADMIN_CSS.slice(0, ADMIN_CSS.indexOf("@media")) },
+    { name: "dark media block", css: () => mediaBlock("prefers-color-scheme: dark") },
+  ])("ADMIN_CSS defines the icon colors in the $name", ({ css }) => {
+    expect(css()).toMatch(/--icon-success:\s*#[0-9a-f]{6};/);
+    expect(css()).toMatch(/--icon-warning:\s*#[0-9a-f]{6};/);
+  });
+
+  it.each([
+    ".icon {",
+    ".boolean-mark[data-bool=true]",
+    ".boolean-mark[data-bool=false]",
+    ".visually-hidden {",
+  ])("ADMIN_CSS has the %s rule", (selector) => {
+    expect(ADMIN_CSS).toContain(selector);
   });
 
   it("ADMIN_CSS_VERSION is 8 hex chars", () => {
@@ -510,5 +534,199 @@ describe("LoginPage", () => {
     expect(qsa(render(), { tag: "p", cls: "errornote" })).toHaveLength(0);
     const note = q1(render({ error: messages.loginFailed }), { tag: "p", cls: "errornote" });
     expect(note && text(note)).toBe(messages.loginFailed);
+  });
+});
+
+describe("icons on pages", () => {
+  // Every page rendered here is also checked for decorative svgs in the last test.
+  const rendered: string[] = [];
+  const render = (html: unknown) => {
+    rendered.push(String(html));
+    return parse(String(html));
+  };
+  const iconsIn = (el: Element | null | undefined): string[] =>
+    el ? qsa(el, { tag: "svg" }).map((svg) => attr(svg, "data-icon") ?? "") : [];
+
+  it("puts plus and pencil on the dashboard links without changing their text", () => {
+    const doc = render(
+      DashboardPage({ ...chrome, models: [{ slug: "authors", label: "Authors", canAdd: true }] }),
+    );
+    const add = q1(doc, { tag: "a", cls: "addlink" });
+    const change = q1(doc, { tag: "a", cls: "changelink" });
+    expect(iconsIn(add)).toEqual(["plus"]);
+    expect(iconsIn(change)).toEqual(["pencil"]);
+    expect(add && text(add)).toBe(messages.add);
+    expect(change && text(change)).toBe(messages.change);
+  });
+
+  describe("ListPage", () => {
+    const props: ListPageProps = {
+      model: { slug: "authors", label: "Authors" },
+      columns: [{ key: "active", sort: "none", sortHref: "/admin/authors/?o=active" }],
+      rows: [{ pk: "1", cells: [{ text: "x" }] }],
+      q: "",
+      filters: [],
+      actions: [],
+      canAdd: true,
+      page: 1,
+      pages: 1,
+      total: 1,
+      pageHref: () => "/admin/authors/",
+      backQuery: "",
+    };
+    const renderList = (over: Partial<ListPageProps> = {}) =>
+      render(ListPage({ ...chrome, ...props, ...over }));
+    const cellOf = (doc: ReturnType<typeof parse>) =>
+      qsa(doc, { tag: "td" }).find((td) => !qsa(td, { tag: "input" }).length) as Element;
+
+    it("puts plus on the add link and search on the search button", () => {
+      const doc = renderList();
+      expect(iconsIn(q1(doc, { tag: "a", cls: "addlink" }))).toEqual(["plus"]);
+      const search = q1(q1(doc, { tag: "form", id: "changelist-search" }) as Element, {
+        tag: "button",
+      });
+      expect(iconsIn(search)).toEqual(["search"]);
+      expect(search && text(search)).toBe(messages.search);
+    });
+
+    it.each([
+      { bool: true, icon: "check", message: messages.yes },
+      { bool: false, icon: "x", message: messages.no },
+    ])("renders bool: $bool as a boolean mark instead of the text", ({ bool, icon, message }) => {
+      const td = cellOf(renderList({ rows: [{ pk: "1", cells: [{ text: "✓", bool }] }] }));
+      const mark = qsa(td, { tag: "span", cls: "boolean-mark" });
+      expect(mark).toHaveLength(1);
+      expect(attr(mark[0] as Element, "data-bool")).toBe(String(bool));
+      expect(iconsIn(td)).toEqual([icon]);
+      expect(text(td)).toBe(message);
+      expect(text(td)).not.toContain("✓");
+    });
+
+    it("puts the mark inside the link when the cell has an href", () => {
+      const td = cellOf(
+        renderList({
+          rows: [{ pk: "1", cells: [{ text: "✓", bool: true, href: "/admin/authors/1/change/" }] }],
+        }),
+      );
+      const link = q1(td, { tag: "a" }) as Element;
+      expect(attr(link, "href")).toBe("/admin/authors/1/change/");
+      expect(qsa(link, { tag: "span", cls: "boolean-mark" })).toHaveLength(1);
+    });
+
+    it("renders no svg in a cell without bool", () => {
+      const td = cellOf(renderList());
+      expect(iconsIn(td)).toEqual([]);
+      expect(text(td)).toBe("x");
+    });
+
+    it("renders a cell text that looks like an svg as text only", () => {
+      const td = cellOf(
+        renderList({ rows: [{ pk: "1", cells: [{ text: "<svg onload=alert(1)>" }] }] }),
+      );
+      expect(qsa(td, { tag: "svg" })).toEqual([]);
+      expect(text(td)).toBe("<svg onload=alert(1)>");
+    });
+  });
+
+  describe("FormPage", () => {
+    const props: Omit<FormPageProps, "canSave"> = {
+      mode: "change",
+      modelLabel: "Author",
+      groups: [],
+      values: {},
+      fieldErrors: {},
+      formErrors: [],
+      timeZone: "UTC",
+    };
+    const button = (doc: ReturnType<typeof parse>, name: string) =>
+      q1(doc, { tag: "button", attrs: { name } });
+
+    it("puts the icons on the save buttons and the delete link", () => {
+      const doc = render(FormPage({ ...chrome, ...props, canSave: true, deleteHref: "/d/" }));
+      expect(iconsIn(button(doc, "_save"))).toEqual(["check"]);
+      expect(iconsIn(button(doc, "_addanother"))).toEqual(["plus"]);
+      expect(iconsIn(button(doc, "_continue"))).toEqual(["pencil"]);
+      const del = q1(doc, { tag: "a", cls: "deletelink" });
+      expect(iconsIn(del)).toEqual(["trash"]);
+      expect(del && text(del)).toBe(messages.delete);
+    });
+
+    it("renders no button icon when canSave is false", () => {
+      const doc = render(FormPage({ ...chrome, ...props, canSave: false }));
+      const form = q1(doc, { tag: "form", id: "model-form" }) as Element;
+      expect(qsa(form, { tag: "button" })).toEqual([]);
+      expect(qsa(form, { tag: "svg" })).toEqual([]);
+    });
+  });
+
+  it("puts trash and x on the delete page", () => {
+    const doc = render(
+      DeletePage({ ...chrome, modelLabel: "Author", objectLabel: "Ann", cancelHref: "/c/" }),
+    );
+    const form = q1(doc, { tag: "form", id: "delete-form" }) as Element;
+    expect(iconsIn(q1(form, { tag: "button" }))).toEqual(["trash"]);
+    const cancel = q1(form, { tag: "a" });
+    expect(iconsIn(cancel)).toEqual(["x"]);
+    expect(cancel && text(cancel)).toBe(messages.cancel);
+  });
+
+  it.each([
+    { isDelete: true, icon: "trash" },
+    { isDelete: false, icon: "check" },
+  ])("puts $icon on the confirm button when isDelete is $isDelete", ({ isDelete, icon }) => {
+    const doc = render(
+      ConfirmActionPage({
+        ...chrome,
+        modelLabel: "Author",
+        action: "a",
+        actionLabel: "A",
+        isDelete,
+        items: [{ pk: "1", label: "Ann" }],
+        listHref: "/admin/authors/",
+        backQuery: "",
+      }),
+    );
+    const form = q1(doc, { tag: "form", id: "action-confirm" }) as Element;
+    const submit = q1(form, { tag: "button" });
+    expect(iconsIn(submit)).toEqual([icon]);
+    expect(submit && text(submit)).toBe(messages.confirmYes);
+    expect(iconsIn(q1(form, { tag: "a" }))).toEqual(["x"]);
+  });
+
+  describe("Layout", () => {
+    it("puts the logout icon on the logout button and keeps its text", () => {
+      const doc = render(Layout({ ...chrome, children: "" }));
+      const logout = q1(q1(doc, { tag: "header" }) as Element, { tag: "button" });
+      expect(iconsIn(logout)).toEqual(["logout"]);
+      expect(logout && text(logout)).toBe(messages.logout);
+    });
+
+    it.each(["success", "warning", "error"] as const)(
+      "puts the %s flash icon before the message",
+      (level) => {
+        const doc = render(Layout({ ...chrome, flash: [{ level, text: "msg" }], children: "" }));
+        const li = q1(doc, { tag: "li", cls: level }) as Element;
+        const icon: IconName = FLASH_ICONS[level];
+        expect(iconsIn(li)).toEqual([icon]);
+        expect(text(li).trim()).toBe("msg");
+      },
+    );
+
+    it("renders a flash text that looks like an svg as text next to the icon only", () => {
+      const doc = render(
+        Layout({
+          ...chrome,
+          flash: [{ level: "error", text: "<svg onload=alert(1)>" }],
+          children: "",
+        }),
+      );
+      expect(iconsIn(q1(doc, { tag: "li", cls: "error" }))).toEqual(["circle-alert"]);
+    });
+  });
+
+  it("marks every svg rendered above as aria-hidden", () => {
+    const svgs = rendered.flatMap((html) => qsa(parse(html), { tag: "svg" }));
+    expect(svgs.length).toBeGreaterThan(0);
+    expect(svgs.every((svg) => attr(svg, "aria-hidden") === "true")).toBe(true);
   });
 });

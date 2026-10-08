@@ -1,6 +1,7 @@
 import type { FormGroup } from "../forms/fields.js";
 import { DisplayValue, Widget } from "../forms/widgets.js";
 import { messages } from "../messages.js";
+import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
 export interface FormPageProps {
@@ -74,18 +75,22 @@ export function FormPage(props: PageChrome & FormPageProps) {
           {canSave ? (
             <>
               <button type="submit" name="_save">
+                <Icon name="check" />
                 {messages.save}
               </button>
               <button type="submit" name="_addanother">
+                <Icon name="plus" />
                 {messages.saveAndAddAnother}
               </button>
               <button type="submit" name="_continue">
+                <Icon name="pencil" />
                 {messages.saveAndContinue}
               </button>
             </>
           ) : null}
           {deleteHref === undefined ? null : (
             <a class="deletelink" href={deleteHref}>
+              <Icon name="trash" />
               {messages.delete}
             </a>
           )}

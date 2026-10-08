@@ -1,4 +1,5 @@
 import { messages } from "../messages.js";
+import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
 export function DashboardPage(
@@ -17,12 +18,14 @@ export function DashboardPage(
                 <td>
                   {m.canAdd ? (
                     <a class="addlink" href={`${prefix}/${m.slug}/add/`}>
+                      <Icon name="plus" />
                       {messages.add}
                     </a>
                   ) : null}
                 </td>
                 <td>
                   <a class="changelink" href={`${prefix}/${m.slug}/`}>
+                    <Icon name="pencil" />
                     {messages.change}
                   </a>
                 </td>

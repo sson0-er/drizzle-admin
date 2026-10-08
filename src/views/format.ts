@@ -39,7 +39,7 @@ export function formatValue(field: FieldMeta, value: unknown, tz: string): strin
 // Glyph-only literal, not a message (decision 033 item 11).
 const PASSWORD_MASK = "********";
 
-export function formatCell(args: {
+interface CellArgs {
   field: FieldMeta;
   value: unknown;
   row: DbRow;
@@ -48,11 +48,23 @@ export function formatCell(args: {
   fkLabel?: string;
   /** Password-widget field: the value must never reach the HTML (decision 037). */
   masked?: boolean;
-}): string {
+}
+
+export function formatCell(args: CellArgs): string {
   const { field, value, row, tz, formatter, fkLabel, masked } = args;
   if (masked) return PASSWORD_MASK;
   if (formatter) return formatter(value, row);
   if (value === null || value === undefined) return "-";
   if (fkLabel !== undefined) return fkLabel;
   return formatValue(field, value, tz);
+}
+
+/**
+ * The value itself when rule 4 of `formatCell` (boolean) is the first rule that matches, so the
+ * list can draw a mark instead of the glyph (decision 039); `undefined` otherwise.
+ */
+export function cellBoolean(args: CellArgs): boolean | undefined {
+  const { value, formatter, fkLabel, masked } = args;
+  if (masked || formatter || fkLabel !== undefined) return undefined;
+  return typeof value === "boolean" ? value : undefined;
 }

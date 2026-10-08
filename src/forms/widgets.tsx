@@ -1,6 +1,7 @@
 import { messages } from "../messages.js";
 import { toDateOnly, toDatetimeLocal } from "../time.js";
 import { formatValue } from "../views/format.js";
+import { BooleanMark } from "../views/icons.js";
 import type { FormField } from "./fields.js";
 
 /**
@@ -36,11 +37,16 @@ const PASSWORD_MASK = "********";
 
 export function DisplayValue(props: { field: FormField; value: unknown; timeZone: string }) {
   const { field, value, timeZone } = props;
-  return (
-    <span class="readonly">
-      {field.widget === "password" ? PASSWORD_MASK : formatValue(field.meta, value, timeZone)}
-    </span>
-  );
+  // The mask comes first so a password value never reaches the HTML (decision 037).
+  const shown =
+    field.widget === "password" ? (
+      PASSWORD_MASK
+    ) : typeof value === "boolean" ? (
+      <BooleanMark value={value} />
+    ) : (
+      formatValue(field.meta, value, timeZone)
+    );
+  return <span class="readonly">{shown}</span>;
 }
 
 function Input(props: { field: FormField; value: string }) {

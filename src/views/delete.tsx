@@ -1,4 +1,5 @@
 import { messages } from "../messages.js";
+import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
 export interface DeletePageProps {
@@ -15,8 +16,14 @@ export function DeletePage(props: PageChrome & DeletePageProps) {
         <input type="hidden" name="_csrf" value={props.csrfToken} />
         <p class="confirm-text">{messages.confirmDelete(props.objectLabel)}</p>
         <div class="submit-row">
-          <button type="submit">{messages.confirmYes}</button>
-          <a href={props.cancelHref}>{messages.cancel}</a>
+          <button type="submit">
+            <Icon name="trash" />
+            {messages.confirmYes}
+          </button>
+          <a href={props.cancelHref}>
+            <Icon name="x" />
+            {messages.cancel}
+          </a>
         </div>
       </form>
     </Layout>

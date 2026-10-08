@@ -255,6 +255,13 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       ).toBeNull();
     });
 
+    it("shows a check icon on the success flash after an add", async () => {
+      const res = await send(client, "/admin/authors/add/", { name: "flash-icon" });
+      const doc = await docOf(await client.get(res.headers.get("Location") ?? ""));
+      const li = qs(doc, { tag: "li", cls: "success" }) as Node;
+      expect(qsa(li, { tag: "svg", attrs: { "data-icon": "check" } })).toHaveLength(1);
+    });
+
     it("applies column defaults and stores null for empty nullable fields", async () => {
       const res = await send(client, "/admin/authors/add/", { name: "dflt", email: "" });
       expect(res.status).toBe(303);
@@ -756,6 +763,16 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       expect(qs(doc, { tag: "a", cls: "deletelink" })).toBeNull();
       expect(controlOf(doc, "name")).toBeNull();
       expect((await send(c, "/admin/authors/1/change/", { name: "alice" })).status).toBe(403);
+    });
+
+    it("renders a boolean mark for a read-only boolean field of an active author", async () => {
+      const c = await adminOn(t, fixture, { authors: { permissions: { change: false } } });
+      const doc = await docOf(await c.get("/admin/authors/1/change/"));
+      const row = rowOf(doc, "active");
+      expect(qsa(row, { tag: "span", cls: "boolean-mark" })).toHaveLength(1);
+      expect(qsa(row, { tag: "svg", attrs: { "data-icon": "check" } })).toHaveLength(1);
+      expect(text(row)).toContain(messages.yes);
+      expect(text(row)).not.toContain("✓");
     });
 
     it("forbids the change page without view permission", async () => {

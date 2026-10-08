@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { FieldMeta } from "../src/introspect/index.js";
-import { formatCell, formatValue, TRUNCATE_AT } from "../src/views/format.js";
+import { cellBoolean, formatCell, formatValue, TRUNCATE_AT } from "../src/views/format.js";
 
 const TOKYO = "Asia/Tokyo";
 const NY = "America/New_York";
@@ -139,5 +139,29 @@ describe("formatValue", () => {
     expect(formatValue(field(), true, TOKYO)).toBe("✓");
     expect(formatValue(field({ kind: "json" }), [1], TOKYO)).toBe("[1]");
     expect(formatValue(field(), 3, TOKYO)).toBe("3");
+  });
+});
+
+describe("cellBoolean", () => {
+  const bool = (args: Partial<Parameters<typeof formatCell>[0]> & { value: unknown }) =>
+    cellBoolean({ field: field(), row: {}, tz: TOKYO, ...args });
+
+  it.each([
+    { name: "true", value: true },
+    { name: "false", value: false },
+  ])("returns the boolean for $name", ({ value }) => {
+    expect(bool({ value })).toBe(value);
+  });
+
+  it.each([
+    { name: "masked", args: { value: true, masked: true } },
+    { name: "a formatter", args: { value: true, formatter: () => "on" } },
+    { name: "an fkLabel", args: { value: true, fkLabel: "Alice" } },
+    { name: "null", args: { value: null } },
+    { name: "undefined", args: { value: undefined } },
+    { name: "the number 1", args: { value: 1 } },
+    { name: 'the string "true"', args: { value: "true" } },
+  ])("returns undefined for $name", ({ args }) => {
+    expect(bool(args)).toBeUndefined();
   });
 });

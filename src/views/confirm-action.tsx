@@ -1,4 +1,5 @@
 import { messages } from "../messages.js";
+import { Icon } from "./icons.js";
 import { Layout, type PageChrome } from "./layout.js";
 
 export interface ConfirmActionPageProps {
@@ -39,8 +40,14 @@ export function ConfirmActionPage(props: PageChrome & ConfirmActionPageProps) {
           ))}
         </ul>
         <div class="submit-row">
-          <button type="submit">{messages.confirmYes}</button>
-          <a href={`${listHref}${backQuery}`}>{messages.cancel}</a>
+          <button type="submit">
+            <Icon name={isDelete ? "trash" : "check"} />
+            {messages.confirmYes}
+          </button>
+          <a href={`${listHref}${backQuery}`}>
+            <Icon name="x" />
+            {messages.cancel}
+          </a>
         </div>
       </form>
     </Layout>

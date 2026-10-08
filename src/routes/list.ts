@@ -4,7 +4,7 @@ import type { DbRow } from "../data/repository.js";
 import type { FieldMeta } from "../introspect/index.js";
 import { messages } from "../messages.js";
 import type { AdminUser, ResolvedModel } from "../types.js";
-import { formatCell } from "../views/format.js";
+import { cellBoolean, formatCell } from "../views/format.js";
 import { type Cell, ListPage, type ListPageProps } from "../views/list.js";
 import { type SortState, sortHref, withQuery } from "../views/url.js";
 import {
@@ -160,7 +160,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
       const fkLabel =
         value === null || value === undefined ? undefined : fkLabels.get(key)?.get(String(value));
       const formatter = model.formatters[key];
-      const text = formatCell({
+      const cellArgs = {
         field,
         value,
         row,
@@ -168,8 +168,11 @@ export async function listHandler(c: AdminContext): Promise<Response> {
         masked: model.widgets[key] === "password",
         ...(formatter === undefined ? {} : { formatter }),
         ...(fkLabel === undefined ? {} : { fkLabel }),
-      });
-      if (model.listDisplayLinks.includes(key)) return { text, href: changeHref(row) };
+      };
+      const text = formatCell(cellArgs);
+      const bool = cellBoolean(cellArgs);
+      const mark = bool === undefined ? {} : { bool };
+      if (model.listDisplayLinks.includes(key)) return { text, ...mark, href: changeHref(row) };
       const refSlug = field.foreignKey?.slug;
       if (
         refSlug !== undefined &&
@@ -178,9 +181,9 @@ export async function listHandler(c: AdminContext): Promise<Response> {
         value !== null &&
         value !== undefined
       ) {
-        return { text, href: `${prefix}/${refSlug}/${enc(value)}/change/` };
+        return { text, ...mark, href: `${prefix}/${refSlug}/${enc(value)}/change/` };
       }
-      return { text };
+      return { text, ...mark };
     });
     return { pk: String(row[model.meta.pk.key]), cells };
   });
