@@ -16,7 +16,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - `src/forms/`: coercion, field and schema building, validation, widgets. `src/auth/`: session, csrf, flash, permissions, `safeNext`.
 - `src/routes/`: Hono handlers and middleware. `src/views/`: JSX pages. `src/static/`: CSS and the one script as TS string modules.
 - `src/messages.ts` (UI strings), `src/time.ts`, `src/types.ts` (public types), `src/admin.ts` (`createAdmin`), `src/index.ts` (exports).
-- `test/`: one file per module, `helpers/`, `fixtures/`; DB tests run on both dialects via `describe.each(dialects)`.
+- `test/`: test files are named per module or concern (some modules are split, e.g. `introspect.pg`/`introspect.sqlite`), `helpers/`, `fixtures/`; DB tests run on both dialects via `describe.each(dialects)`.
 - `example/`: runnable demo app. `docs/orchestraude/`: design, decisions, evidence, tasks.
 
 ## Design principles
