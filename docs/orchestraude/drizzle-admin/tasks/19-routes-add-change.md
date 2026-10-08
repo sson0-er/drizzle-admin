@@ -1,7 +1,7 @@
 ---
 id: 19-routes-add-change
 depends_on: [15-routes-list, 17-forms-coerce-validate, 18-forms-widgets-and-form-page]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 19: routes-add-change

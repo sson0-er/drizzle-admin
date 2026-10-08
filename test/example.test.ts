@@ -19,3 +19,13 @@ describe("example app (phase 2)", () => {
     }
   });
 });
+
+describe("example app (phase 3)", () => {
+  it("serves the add page of every model", async () => {
+    const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });
+    for (const path of ["/admin/users/add/", "/admin/posts/add/", "/admin/tags/add/"]) {
+      const res = await app.request(path);
+      expect(res.status, path).toBe(200);
+    }
+  });
+});
