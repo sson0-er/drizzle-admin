@@ -450,3 +450,44 @@ describe("ResolvedModel defaults", () => {
     expect([...resolvedModels(admin).keys()]).toEqual(["kv", "authors"]);
   });
 });
+
+describe("register: password widget restrictions", () => {
+  it.each([
+    {
+      name: "the primary key",
+      table: kv,
+      options: { widgets: { key: "password" } },
+      message: 'kv: the primary key "key" cannot use the password widget',
+    },
+    {
+      name: "a searchFields entry",
+      table: authors,
+      options: { widgets: { name: "password" }, searchFields: ["name"] },
+      message: 'authors: field "name" uses the password widget and cannot be in searchFields',
+    },
+    {
+      name: "an ascending ordering entry",
+      table: authors,
+      options: { widgets: { name: "password" }, ordering: ["name"] },
+      message: 'authors: field "name" uses the password widget and cannot be in ordering',
+    },
+    {
+      name: "a descending ordering entry",
+      table: authors,
+      options: { widgets: { name: "password" }, ordering: ["-name"] },
+      message: 'authors: field "name" uses the password widget and cannot be in ordering',
+    },
+  ])("rejects the widget on $name", ({ table, options, message }) => {
+    expect(registerError(table, options)).toBe(`drizzle-admin: ${message}`);
+  });
+
+  it("accepts the widget on a field outside searchFields and ordering", () => {
+    expect(() =>
+      sqliteAdmin().register(authors, {
+        widgets: { name: "password" },
+        searchFields: ["email"],
+        ordering: ["-email"],
+      }),
+    ).not.toThrow();
+  });
+});

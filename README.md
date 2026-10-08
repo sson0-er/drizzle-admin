@@ -104,7 +104,7 @@ serve({ fetch: app.fetch, port: 3000 });
 | Field | Type | Default | Meaning |
 |---|---|---|---|
 | `verifyCredentials` | `(username, password) => Promise<AdminUser \| null>` | not set | Built-in login: return the user, or `null` to reject the credentials. |
-| `getUser` | `(req: Request) => Promise<AdminUser \| null>` | not set | External authentication: called on every request; return the current user or `null` when nobody is logged in. When set, it wins over `verifyCredentials` and the built-in login page is not used. |
+| `getUser` | `(req: Request) => Promise<AdminUser \| null>` | not set | External authentication: called on every page request; return the current user or `null` when nobody is logged in. When set, it wins over `verifyCredentials` and the built-in login page is not used. |
 | `loginUrl` | `string` | not set | External mode only: unauthenticated requests are redirected here (see "Authentication modes"). |
 
 `AdminUser` is `{ id: string; name: string }`.
@@ -139,6 +139,11 @@ serve({ fetch: app.fetch, port: 3000 });
 
 `register()` also rejects duplicate or empty action names, the reserved action name `delete_selected`, and a widget override that is not allowed for the column:
 `drizzle-admin: <table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
+
+`register()` also rejects the `password` widget on the primary key and on a field that is in `searchFields` or `ordering` (in either direction):
+`drizzle-admin: <table>: the primary key "<key>" cannot use the password widget`,
+`drizzle-admin: <table>: field "<key>" uses the password widget and cannot be in searchFields` and
+`drizzle-admin: <table>: field "<key>" uses the password widget and cannot be in ordering`.
 
 ### Widgets
 
@@ -229,7 +234,7 @@ The list page has an action dropdown for the rows selected with the checkboxes.
 
 **Built-in login** (`verifyCredentials`). The login page is at `<basePath>/login/`; unauthenticated requests are redirected there (302) with a `next` parameter, and after a successful login the user is redirected to `next`. A failed login re-renders the form with status 400. `POST <basePath>/logout/` (the header button) deletes the session cookie in the browser; it does not revoke the session (see "Known limitations"). A successful login always issues a fresh session and CSRF token.
 
-**External authentication** (`getUser`). Your function is called on every request and is the only source of the user, so the admin has no login or logout route of its own and no logout button is shown. For a logged-in user `/login/` and `/logout/` return 404. When nobody is logged in, every request, including `/login/` and `/logout/`, is redirected (302) to `loginUrl` with `next=<current path and query>` appended (with `?`, or `&` if `loginUrl` already has a query). Without `loginUrl` the response is a 401 page. If both `getUser` and `verifyCredentials` are set, `getUser` wins.
+**External authentication** (`getUser`). Your function is called on every page request (not for the stylesheet) and is the only source of the user, so the admin has no login or logout route of its own and no logout button is shown. For a logged-in user, `GET` `/login/` and `/logout/` return 404, and a POST to them without a valid `_csrf` token gets 403 first, like every POST. When nobody is logged in, every page request, including `/login/` and `/logout/`, is redirected (302) to `loginUrl` with `next=<current path and query>` appended (with `?`, or `&` if `loginUrl` already has a query). Without `loginUrl` the response is a 401 page. If both `getUser` and `verifyCredentials` are set, `getUser` wins.
 
 **`next` handling.** Only same-site targets inside `basePath` are followed; anything else falls back to the dashboard. A target is rejected when it is empty, does not start with a single `/`, contains `\`, control characters, whitespace or `//` in its path, has a malformed percent escape, contains a `.` or `..` path segment after percent-decoding, or leaves `basePath`. Percent-encoded characters that belong in a path (for example `%20` in a text primary key) are accepted and stay encoded.
 
@@ -286,13 +291,13 @@ The admin reads each form body fully into memory and has no body size limit of i
 - **List page.** Query parameters: `q` (search), `p` (page, 1-based), `o` (ordering) and `f_<column>` (filters). Changing the search, a filter or the ordering resets the page. A page number that is not an integer or is below 1 is page 1; a page beyond the last shows an empty table with the pagination.
 - **Search.** The whole trimmed `q` is one term, matched as a case-insensitive substring in any of the `searchFields` (`ILIKE` on PostgreSQL, `LIKE` on SQLite, with `%`, `_` and `\` escaped). On PostgreSQL every search column is cast to text, so uuid, numeric and enum columns can be searched. SQLite's `LIKE` rules for case folding apply.
 - **Filters.** Boolean columns offer yes/no, enum columns their values, date columns the presets today, past 7 days, this month and this year (computed in `timeZone`), and foreign-key columns the first 200 referenced rows in the referenced model's `ordering` (primary key descending when it is not set).
-- **Sorting.** Clicking a column header cycles that column through ascending, descending and unsorted, and drops other sort keys. A hand-written multi-column `o` is honored. Only `listDisplay` columns can be sorted.
+- **Sorting.** Clicking a column header cycles that column through ascending, descending and unsorted, and drops other sort keys. A hand-written multi-column `o` is honored. Only `listDisplay` columns can be sorted, and a `password` column cannot (see below).
 - **Primary keys.** An auto-increment key is omitted on the add page. Other primary keys can be entered when adding and are display-only when changing (a key cannot be renamed).
 - **Saving.** After a successful save the user is redirected (303) to the list, or to the change page with "save and continue", or to the add page with "save and add another", with a flash message. A failed validation re-renders the form with status 400 and the entered values.
 - **Deleting.** The delete page and the bulk-delete confirmation ask first. A foreign-key violation is shown as an error message on the list.
 - **Missing trailing slash.** A path such as `/admin/users` is redirected (301) to `/admin/users/`. Unknown pages render the admin 404 page.
 - **Foreign keys.** Choices are loaded from the referenced model when it is registered and referenced by its primary key; with more than 200 rows the form falls back to a plain input plus a link to the referenced list. Without the `view` permission on the referenced model, the list shows raw values, the filter is not offered and the form field is a plain key input.
-- **Password widget.** The `password` widget never renders the stored value. An empty submission on the change page keeps the stored value; read-only fields and list cells show `********`. No hashing is added.
+- **Password widget.** The `password` widget never renders the stored value. An empty submission on the change page keeps the stored value; read-only fields and list cells show `********`. A `password` list column cannot be sorted: its header has no sort link and `o` ignores it. No hashing is added.
 
 ## Known limitations
 

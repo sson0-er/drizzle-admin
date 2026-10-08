@@ -35,7 +35,9 @@ export const FLASH_ICONS: Readonly<Record<FlashLevel, IconName>> = Object.freeze
 /** Decorative icon: no text node, hidden from assistive technology (decision 039). */
 export function Icon(props: { name: IconName }) {
   const { name } = props;
-  // Only reachable through a cast; never render a path for an unknown name.
+  // Only reachable through a cast at a call site, but a real boundary (views.md "Icons", decision
+  // 039): an inherited key such as "toString" would make `ICON_PATHS[name]` a function whose source
+  // is rendered into `d`, so only own keys are accepted.
   if (!Object.hasOwn(ICON_PATHS, name)) return null;
   return (
     <svg

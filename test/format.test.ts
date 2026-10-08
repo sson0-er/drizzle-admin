@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { FieldMeta } from "../src/introspect/index.js";
 import { cellBoolean, formatCell, formatValue, TRUNCATE_AT } from "../src/views/format.js";
 
@@ -163,5 +163,21 @@ describe("cellBoolean", () => {
     { name: 'the string "true"', args: { value: "true" } },
   ])("returns undefined for $name", ({ args }) => {
     expect(bool(args)).toBeUndefined();
+  });
+});
+
+describe("formatter calls", () => {
+  it("cellBoolean never calls the formatter", () => {
+    const formatter = vi.fn(() => "x");
+    expect(
+      cellBoolean({ field: field(), row: {}, tz: TOKYO, value: true, formatter }),
+    ).toBeUndefined();
+    expect(formatter).not.toHaveBeenCalled();
+  });
+
+  it("formatCell calls the formatter exactly once", () => {
+    const formatter = vi.fn(() => "x");
+    expect(cell({ value: true, formatter })).toBe("x");
+    expect(formatter).toHaveBeenCalledTimes(1);
   });
 });

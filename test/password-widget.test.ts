@@ -91,6 +91,39 @@ describe.each(dialects)("password widget ($name)", (fixture) => {
     expect(html).not.toContain("s3cret");
   });
 
+  describe("sorting", () => {
+    const listPage = async (query: string) => {
+      const res = await t.client.get(`/admin/kv/${query}`);
+      const table = qs(parse(await res.text()), { tag: "table", id: "result_list" }) as Element;
+      const th = (key: string) => qs(table, { tag: "th", attrs: { "data-key": key } }) as Element;
+      const pks = qsa(qs(table, { tag: "tbody" }) as Element, { tag: "input" }).map((i) =>
+        attr(i, "value"),
+      );
+      return { th, pks, headers: qsa(table, { tag: "th" }).filter((h) => attr(h, "data-key")) };
+    };
+
+    it("renders the password header as plain text and the others as sort links", async () => {
+      const { th } = await listPage("");
+      const value = th("value");
+      expect(text(value).trim()).toBe("value");
+      expect(attr(value, "data-sort")).toBe("none");
+      expect(qs(value, { tag: "a", cls: "sort" })).toBeNull();
+      expect(qs(th("key"), { tag: "a", cls: "sort" })).not.toBeNull();
+    });
+
+    it.each(["value", "-value"])("ignores ?o=%s", async (o) => {
+      const { pks, headers } = await listPage(`?o=${o}`);
+      expect(pks).toEqual(["c", "b", "a"]);
+      expect(headers.map((h) => attr(h, "data-sort"))).toEqual(["none", "none"]);
+    });
+
+    it("still applies the other keys of the same o", async () => {
+      const { pks, th } = await listPage("?o=-value,key");
+      expect(pks).toEqual(["a", "b", "c"]);
+      expect(attr(th("key"), "data-sort")).toBe("asc");
+    });
+  });
+
   it("masks the value on a view-only change page", async () => {
     const res = await viewOnly.client.get("/admin/kv/a/change/");
     expect(res.status).toBe(200);

@@ -14,7 +14,7 @@ export interface Cell {
 
 export interface ListPageProps {
   model: { slug: string; label: string };
-  columns: { key: string; sort: SortState; sortHref: string }[];
+  columns: { key: string; sort: SortState; sortHref: string | null }[];
   rows: { pk: string; cells: Cell[] }[];
   /** null hides the search box. */
   q?: string | null;
@@ -130,9 +130,13 @@ export function ListPage(props: PageChrome & ListPageProps) {
                     </th>
                     {columns.map((c) => (
                       <th data-key={c.key} data-sort={c.sort}>
-                        <a class="sort" href={c.sortHref}>
-                          {c.key}
-                        </a>
+                        {c.sortHref === null ? (
+                          c.key
+                        ) : (
+                          <a class="sort" href={c.sortHref}>
+                            {c.key}
+                          </a>
+                        )}
                       </th>
                     ))}
                   </tr>

@@ -329,6 +329,22 @@ describe("ListPage", () => {
     expect(results && q1(results, { tag: "table", id: "result_list" })).not.toBeNull();
   });
 
+  it("renders a column without sortHref as plain text", () => {
+    const html = render({
+      columns: [
+        { key: "secret", sort: "none", sortHref: null },
+        { key: "name", sort: "none", sortHref: "/admin/authors/?o=name" },
+      ],
+      rows: [],
+    });
+    const secret = q1(html, { tag: "th", attrs: { "data-key": "secret" } }) as Element;
+    expect(text(secret).trim()).toBe("secret");
+    expect(attr(secret, "data-sort")).toBe("none");
+    expect(q1(secret, { tag: "a" })).toBeNull();
+    const name = q1(html, { tag: "th", attrs: { "data-key": "name" } }) as Element;
+    expect(q1(name, { tag: "a", cls: "sort" })).not.toBeNull();
+  });
+
   it("renders row checkboxes, cell links and the action form", () => {
     const boxes = qsa(doc, { tag: "input", attrs: { name: "_selected" } });
     expect(boxes.map((b) => attr(b, "value"))).toEqual(["1", "a b"]);

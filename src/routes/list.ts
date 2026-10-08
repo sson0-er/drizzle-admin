@@ -128,7 +128,12 @@ export async function listHandler(c: AdminContext): Promise<Response> {
 
   const searchable = model.searchFields.length > 0;
   const q = searchable ? (params.get("q") ?? "") : null;
-  const userOrdering = parseOrdering(params.get("o"), model.listDisplay);
+  // Password columns are neither sortable nor linked: one source for `o`, the cells and the headers.
+  const masked = new Set(model.listDisplay.filter((key) => model.widgets[key] === "password"));
+  const userOrdering = parseOrdering(
+    params.get("o"),
+    model.listDisplay.filter((key) => !masked.has(key)),
+  );
   const ordering = userOrdering.length > 0 ? userOrdering : defaultOrdering(model);
   const hiddenFk = hiddenFkKeys(c, model, user);
   const filters: Record<string, string> = {};
@@ -165,7 +170,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
         value,
         row,
         tz: timeZone,
-        masked: model.widgets[key] === "password",
+        masked: masked.has(key),
         ...(formatter === undefined ? {} : { formatter }),
         ...(fkLabel === undefined ? {} : { fkLabel }),
       };
@@ -177,6 +182,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
       if (
         refSlug !== undefined &&
         !hiddenFk.has(key) &&
+        !masked.has(key) &&
         formatter === undefined &&
         value !== null &&
         value !== undefined
@@ -189,6 +195,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   });
 
   const columns = model.listDisplay.map((key) => {
+    if (masked.has(key)) return { key, sort: "none" as const, sortHref: null };
     const entry = userOrdering.find((i) => i.key === key);
     const sort: SortState = entry === undefined ? "none" : entry.desc ? "desc" : "asc";
     return { key, sort, sortHref: sortHref(listUrl, params, key, sort) };

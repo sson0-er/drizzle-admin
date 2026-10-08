@@ -50,13 +50,35 @@ interface CellArgs {
   masked?: boolean;
 }
 
+type Leading =
+  | { rule: "masked" | "null" }
+  | { rule: "formatter"; formatter: NonNullable<CellArgs["formatter"]> }
+  | { rule: "fkLabel"; fkLabel: string };
+
+/** The first of rules 0-3 that matches, without calling the formatter; `undefined` if none. */
+function leadingRule({ value, formatter, fkLabel, masked }: CellArgs): Leading | undefined {
+  if (masked) return { rule: "masked" };
+  if (formatter) return { rule: "formatter", formatter };
+  if (value === null || value === undefined) return { rule: "null" };
+  if (fkLabel !== undefined) return { rule: "fkLabel", fkLabel };
+  return undefined;
+}
+
 export function formatCell(args: CellArgs): string {
-  const { field, value, row, tz, formatter, fkLabel, masked } = args;
-  if (masked) return PASSWORD_MASK;
-  if (formatter) return formatter(value, row);
-  if (value === null || value === undefined) return "-";
-  if (fkLabel !== undefined) return fkLabel;
-  return formatValue(field, value, tz);
+  const { field, value, row, tz } = args;
+  const leading = leadingRule(args);
+  switch (leading?.rule) {
+    case "masked":
+      return PASSWORD_MASK;
+    case "formatter":
+      return leading.formatter(value, row);
+    case "null":
+      return "-";
+    case "fkLabel":
+      return leading.fkLabel;
+    case undefined:
+      return formatValue(field, value, tz);
+  }
 }
 
 /**
@@ -64,7 +86,7 @@ export function formatCell(args: CellArgs): string {
  * list can draw a mark instead of the glyph (decision 039); `undefined` otherwise.
  */
 export function cellBoolean(args: CellArgs): boolean | undefined {
-  const { value, formatter, fkLabel, masked } = args;
-  if (masked || formatter || fkLabel !== undefined) return undefined;
-  return typeof value === "boolean" ? value : undefined;
+  return leadingRule(args) === undefined && typeof args.value === "boolean"
+    ? args.value
+    : undefined;
 }

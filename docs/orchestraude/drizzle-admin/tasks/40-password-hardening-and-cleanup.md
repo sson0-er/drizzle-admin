@@ -1,7 +1,7 @@
 ---
 id: 40-password-hardening-and-cleanup
 depends_on: [36-readme-and-hardening, 38-ui-icons]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 40: password-hardening-and-cleanup
@@ -114,3 +114,4 @@ This task touches 10 files (more than the usual 1-5). The orchestrator asked for
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+- Attempt 1: implemented. `ListPageProps.columns[].sortHref` is now `string | null` (already in the design). No new export or prop. `format.ts` got a module-private `leadingRule` helper returning a tagged result so no non-null assertion is needed. verify.sh passes.
