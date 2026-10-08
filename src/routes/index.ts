@@ -8,6 +8,7 @@ import { ADMIN_CSS } from "../static/admin-css.js";
 import type { AdminState } from "../types.js";
 import { type AdminContext, type AdminEnv, errorPage } from "./context.js";
 import { dashboardHandler } from "./dashboard.js";
+import { deleteHandler } from "./delete.js";
 import { addHandler, changeHandler } from "./form.js";
 import { listHandler } from "./list.js";
 import {
@@ -70,6 +71,7 @@ export function buildApp(state: AdminState): Hono {
   app.get("/:model/", listHandler); // route 4
   app.on(["GET", "POST"], "/:model/add/", addHandler); // route 6
   app.on(["GET", "POST"], "/:model/:pk/change/", changeHandler); // routes 7 and 8
+  app.on(["GET", "POST"], "/:model/:pk/delete/", deleteHandler); // route 9
 
   app.get("/*", catchAll(config.prefix));
   app.all("/*", notFound);

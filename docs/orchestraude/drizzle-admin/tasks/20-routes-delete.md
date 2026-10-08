@@ -1,7 +1,7 @@
 ---
 id: 20-routes-delete
 depends_on: [19-routes-add-change]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 20: routes-delete
