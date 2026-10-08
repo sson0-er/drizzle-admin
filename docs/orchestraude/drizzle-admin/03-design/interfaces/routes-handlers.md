@@ -43,10 +43,12 @@ Body: `action`, `_selected` (repeated), optional `_confirm=1`. `back` = list URL
    - else `result = await a.run({ ids, db, user: U })` → success flash `result?.message ?? actionDone`; a throw → error flash `actionFailed`; 303 back.
 
 ## Add (`GET|POST /:model/add/`)
+Changed 2026-10-08: every `FormPage` render passes `timeZone: state.config.timeZone` (decision 030).
+
 1. `M` or 404; `add` permission or 403.
 2. FK choices: for each form FK field with `slug`: `opts = repo.options(refMeta, { limit: 201, ... })` → `opts.length > 200 ? "tooMany" : opts`.
-3. GET → `FormPage({ mode: "add", groups, values: {} })`, 200.
-4. POST → `validateSubmission({ mode: "add", ... })`. On error → `FormPage` with `values`, `fieldErrors`, `formErrors`, status 400.
+3. GET → `FormPage({ mode: "add", groups, values: {}, timeZone })`, 200. `timeZone` is always `state.config.timeZone` (the resolved `AdminConfig.timeZone`, admin.md `AdminState`); the same value is passed to `validateSubmission` and `toFormValue`. No `displayRow` (add has no stored row and no display-only fields, forms.md).
+4. POST → `validateSubmission({ mode: "add", ... })`. On error → `FormPage` with `values` (echoed request strings), `fieldErrors`, `formErrors`, `timeZone`, status 400.
 5. `data = hooks.beforeSave ? await hooks.beforeSave(data, { ...ctx, mode: "add" }) : data`; a throw → form error `hookFailed`, 400.
 6. `row = await repo.create(M.meta, data)`; DB error → form error by class (`dbUnique`, `dbForeignKey`, `dbNotNull`, `dbOther`), 400.
 7. `await hooks.afterSave?.(row, { ...ctx, mode: "add" })`; a throw → extra warning flash `afterSaveFailed`.
@@ -54,11 +56,12 @@ Body: `action`, `_selected` (repeated), optional `_confirm=1`. `back` = list URL
 
 ## Change (`GET|POST /:model/:pk/change/`)
 Changed 2026-10-07: FK choices are computed as in Add step 2 (review finding).
+Changed 2026-10-08: `FormPage` gets `displayRow: row` and `timeZone: state.config.timeZone` on GET and on the 400 re-render (decision 030).
 
 1. `M` or 404; GET needs `view`, POST needs `change` (else 403). `row = repo.get(M.meta, pk)` → 404 if null.
 2. FK choices exactly as Add step 2 (GET and POST; `buildFormGroups` needs them for both). `canChange = can(M, "change", U)`; groups with `canChange` (all display-only when false). Save buttons only if `canChange`; delete link only if `can(M, "delete", U)`.
-3. GET → values = `toFormValue` of each editable field from `row`, 200.
-4. POST → as Add steps 4-7 with `mode: "change"` and `repo.update(M.meta, pk, data)`; `null` → 404.
+3. GET → `FormPage({ mode: "change", groups, values, displayRow: row, timeZone, canSave: canChange, deleteHref? })` with `values` = `toFormValue(field, row[key], timeZone)` of each editable field, 200.
+4. POST → as Add steps 4-7 with `mode: "change"` and `repo.update(M.meta, pk, data)`; `null` → 404. The 400 re-render passes the echoed request strings as `values` and the stored `row` (from step 1) as `displayRow`, plus `timeZone`.
 5. Success flash `changed(...)`; 303 to: `_continue` → the same change URL; `_addanother` → add URL; otherwise list URL.
 
 ## Delete (`GET|POST /:model/:pk/delete/`)

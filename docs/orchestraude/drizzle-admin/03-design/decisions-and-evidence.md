@@ -8,6 +8,7 @@ Changed 2026-10-07: added 026 (user answer to the SQLite blob-bigint question fr
 Changed 2026-10-08: added 027-029 (user decisions after task 14: `renderPage` flash callback, `buildApp` return type, trailing-slash open-redirect guard); 006 updated to point to 029.
 Changed 2026-10-08: 029 amended to an allowlist after a tab-character bypass; evidence 2026-10-08-trailing-slash-control-char-bypass added.
 Changed 2026-10-08: 029 amended again: whitespace excluded; decoded LF/CR 404 accepted as a known limitation (Q6).
+Changed 2026-10-08: added 030 (task 18 gap: `FormPage` `timeZone` prop, `values` / `displayRow` split); evidence 2026-10-08-formpage-timezone-prop added.
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -38,6 +39,7 @@ Changed 2026-10-08: 029 amended again: whitespace excluded; decoded LF/CR 404 ac
 - 027-render-page-flash-callback: `renderPage` accepts `JSX.Element | ((flash) => JSX.Element)`; flash is consumed only for 200/400 non-minimal pages and passed to the function form, so 200/400 pages show the consumed messages.
 - 028-build-app-plain-hono: `buildApp(state): Hono`; built as `Hono<AdminEnv>` and cast, because `Admin.app` is a public plain `Hono`.
 - 029-trailing-slash-redirect-guard: the catch-all redirects only when the path after the prefix is empty or a single leading `/` followed by non-empty segments with no `\`, control character or whitespace (allowlist; the first denylist version was bypassed with `%09`); otherwise 404 without `Location`; paths with a decoded LF/CR get Hono's / the host's plain 404 (accepted known limitation, no `notFound` handler); every `Location` is a single-slash path under the prefix (open redirect with basePath "/", task 14 review).
+- 030-formpage-timezone-prop: `FormPage` takes a required `timeZone` (display-only date-times via `DisplayValue`); `values` are form strings for editable fields, `displayRow` is the stored row for display-only fields; add/change handlers pass `state.config.timeZone`, change also passes `displayRow: row` (task 18 implementation adopted).
 
 ## Evidence referenced
 - 2026-10-07-drizzle-orm-release-lines (research)
@@ -57,5 +59,6 @@ Changed 2026-10-08: 029 amended again: whitespace excluded; decoded LF/CR 404 ac
 - 2026-10-07-sqlite-blob-bigint-ordering (design, decision 026): SQLite `integer()` has no bigint mode; `blob({mode:"bigint"})` stores decimal digits as BLOB bytes; `order by` is bytewise (-5, 10, 100, 9), a numeric bound matches every row, equality works. Expires 2027-01-05.
 - 2026-10-08-trailing-slash-open-redirect (design, decisions 027-029): with prefix `""` the old catch-all redirected `//evil.example` and `/%5Cevil.example` off-site; the fixed rule returns 404 without Location for basePath "/" and "/admin" while ordinary paths still 301; task 14 `renderPage` / `buildApp` signatures confirmed. Expires 2027-01-06.
 - 2026-10-08-trailing-slash-control-char-bypass (design, decision 029 amendment): Hono decodes `%09` to a tab and the denylist redirected to `/\t/evil.example/`, which WHATWG URL parsing resolves to `https://evil.example/`; Hono's `/*` and `*` middleware do not match decoded LF/CR paths (Hono or host 404); a mounted sub-app's `notFound` is ignored; the allowlist gives 404 without `Location` for the attack paths and 301 for `/users?a=1`. Expires 2027-01-06.
+- 2026-10-08-formpage-timezone-prop (design, decision 030): task 18 `FormPageProps` include a required `timeZone`; editable fields read `values`, display-only fields read `displayRow` through `DisplayValue` = `formatValue(meta, value, timeZone)`. Expires 2027-01-06.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

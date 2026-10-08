@@ -1,7 +1,7 @@
 ---
 id: 18-forms-widgets-and-form-page
 depends_on: [16-forms-fields, 11-views-layout-and-list-pages]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 18: forms-widgets-and-form-page
@@ -39,3 +39,4 @@ Each widget renders the correct input element, stored values are converted to fo
 - Decisions: docs/orchestraude/decisions/013-unspecified-page-behaviors.md (item 11), 019-date-only-calendar-dates.md, 021-widget-override-compatibility.md, 023-pg-date-string-mode-support.md
 
 ## History
+- Implemented. `FormPage` takes an extra required `timeZone` prop (not in the views.md table) because display-only date-times need a zone; `values` holds form strings and `displayRow` the stored row. A widget "hidden" field renders its input without a `div.form-row`.

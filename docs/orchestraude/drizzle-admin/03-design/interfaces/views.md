@@ -24,11 +24,13 @@ Structure: `<html lang="ja">`, `<meta charset="utf-8">`, `<meta name="viewport" 
 Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
 
 ### Pages (all take `PageChrome` plus the listed props)
+Changed 2026-10-08: `FormPage` gains the required `timeZone` prop; `values` / `displayRow` split described (decision 030).
+
 | Component | Extra props | Stable selectors used by tests |
 |---|---|---|
 | `DashboardPage` | `models: { slug; label; canAdd }[]` | `table#dashboard`, row `tr[data-model=<slug>]` with `a.changelink` (list) and `a.addlink` (add, only if canAdd) |
 | `ListPage` | see below | `form#changelist-search` (GET; `input[name=q]`), `aside#changelist-filter` with `div[data-filter=<key>]` containing `a` links and `.selected` on the active choice, `form#changelist-form` (POST), `select[name=action]`, `button[name=index]` ("run"), `table#result_list`, `th[data-key=<key>]` with a sort link `a.sort` and `data-sort="asc|desc|none"`, `input[name=_selected][value=<pk>]`, `input#action-toggle` (select all), `p.paginator` with `span.this-page` and `.result-count`, `a.addlink` |
-| `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?` | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
+| `FormPage` | `mode; modelLabel; groups: FormGroup[]; values; fieldErrors; formErrors; canSave; deleteHref?; displayRow?; timeZone` (see below) | `form#model-form` (POST), `fieldset.module` per group (`h2` for the title), `div.form-row[data-field=<key>]`, `p.errornote` (shown when there are any errors), `ul.errorlist`, buttons `button[name=_save]`, `button[name=_addanother]`, `button[name=_continue]`, `a.deletelink` |
 | `DeletePage` | `modelLabel; objectLabel; cancelHref` | `form#delete-form`, `p.confirm-text`, `button[type=submit]` |
 | `ConfirmActionPage` | `modelLabel; action: string; actionLabel; isDelete; items: { pk; label }[]; backQuery: string` | `form#action-confirm` (POST to list URL + backQuery) with hidden `action`, `_confirm=1`, one hidden `_selected` per item, `ul.objects li` |
 | `LoginPage` | `next; username; error?` | `form#login-form` (POST `${prefix}/login/`), `input[name=username]`, `input[name=password]`, hidden `next`, `p.errornote` |
@@ -47,6 +49,20 @@ Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
 }
 ```
 Pagination shows previous/next and up to 5 numbers around the current page, plus `messages.resultCount(total)`. JS-free: every control is a link or a form submit. Only `#action-toggle` needs JS.
+
+`FormPage` props (decision 030):
+```ts
+{
+  mode: "add" | "change"; modelLabel: string; groups: FormGroup[];
+  values: Record<string, string>;        // form strings by field key, for editable fields only
+  fieldErrors: Record<string, string>; formErrors: string[];
+  canSave: boolean;                      // false → no save buttons (read-only page)
+  deleteHref?: string;                   // set → a.deletelink
+  displayRow?: Record<string, unknown>;  // stored row, for display-only fields only
+  timeZone: string;                      // resolved AdminConfig.timeZone, for display-only date-times
+}
+```
+Two value sources, never mixed: an editable field renders `Widget` with `values[key] ?? ""` (strings already converted by `toFormValue` on GET, or echoed from the request body on a 400 re-render); a display-only field renders `DisplayValue({ field, value: displayRow?.[key], timeZone })` from the stored row (forms.md), so it always shows the stored value even when the re-rendered form shows rejected input. `timeZone` is required because `DisplayValue` formats date-times with it (`formatValue`, rule 6 in `format.ts` below). A field with widget `hidden` (editable) renders only its input, without a `div.form-row` ("no label row", forms.md).
 
 ### `url.ts`
 ```ts
