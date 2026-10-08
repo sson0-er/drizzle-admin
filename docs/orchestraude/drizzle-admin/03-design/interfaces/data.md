@@ -23,6 +23,7 @@ export function asQueryDb(db: unknown): QueryDb; // single cast, reasoned biome-
 Changed 2026-10-07: PG search casts every column to `::text` (decision 018). Date presets on date-only fields use `calendarPresetRange` (decision 019).
 Changed 2026-10-07: date presets also apply to date-only strings (PG `date()` string mode), with string bounds (decision 023).
 Changed 2026-10-07: SQLite blob-bigint columns sort and compare as BLOBs, not numerically (decision 026).
+Changed 2026-10-08: `parseFieldValue` rejects values outside the column's DB domain (PG integer ranges, uuid, NUL, enum values; decision 045).
 
 ```ts
 export function escapeLike(s: string): string;            // "\" -> "\\", "%" -> "\%", "_" -> "\_"
@@ -36,7 +37,7 @@ export function parseFieldValue(field: FieldMeta, raw: string): string | number 
 export type OrderItem = { key: string; desc: boolean };
 ```
 Rules:
-- `buildSearch`: `q` is trimmed; empty or `searchFields` empty → `undefined`. Pattern = `%${escapeLike(q)}%`. PG → ``or(...searchFields.map(k => ilike(sql`${col}::text`, pattern)))``. The cast is required because uuid, numeric, interval, `date()`, string-mode timestamp and pgEnum columns have no `ilike` operator (SQLSTATE 42883). With the cast, all of them and text work (evidence: 2026-10-07-pg-search-non-text-columns). SQLite → ``or(...searchFields.map(k => sql`${col} like ${pattern} escape '\'`))``. Columns come from `meta.table[key]` (decision 009). SQLite has no default LIKE escape character, and PG uses backslash (evidence: 2026-10-07-drizzle-driver-runtime-behavior). SQLite LIKE needs no cast; it matched a numeric column (evidence: 2026-10-07-pg-search-non-text-columns).
+- `buildSearch`: `q` is trimmed; empty or `searchFields` empty → `undefined`. (The list handler has already removed NUL characters and capped `q` at 200 code points, decision 045; `buildSearch` does not repeat that.) Pattern = `%${escapeLike(q)}%`. PG → ``or(...searchFields.map(k => ilike(sql`${col}::text`, pattern)))``. The cast is required because uuid, numeric, interval, `date()`, string-mode timestamp and pgEnum columns have no `ilike` operator (SQLSTATE 42883). With the cast, all of them and text work (evidence: 2026-10-07-pg-search-non-text-columns). SQLite → ``or(...searchFields.map(k => sql`${col} like ${pattern} escape '\'`))``. Columns come from `meta.table[key]` (decision 009). SQLite has no default LIKE escape character, and PG uses backslash (evidence: 2026-10-07-drizzle-driver-runtime-behavior). SQLite LIKE needs no cast; it matched a numeric column (evidence: 2026-10-07-pg-search-non-text-columns).
 - `buildFilters`: called only with keys from `listFilter` (routes whitelist them). Per field:
   - boolean: `"1"` → `eq(col, true)`, `"0"` → `eq(col, false)`, else ignored.
   - enum: value in `enumValues` → `eq(col, value)`, else ignored.
@@ -49,7 +50,13 @@ Rules:
   - Invalid values are silently ignored (the page shows "all").
 - `buildOrderBy`: `desc(col)` / `asc(col)` per item, then `asc(pk)` appended if the PK is not present. Keys are already whitelisted by routes.
 - SQLite blob-bigint (`blob({ mode: "bigint" })`, kind bigint; decision 026): no special case. Drizzle stores the decimal digits as BLOB bytes, so `buildOrderBy` on such a column sorts bytewise, not numerically (9, 10, -5, 100 sort as -5, 10, 100, 9), and any range comparison (`gt`/`lt`) on it is bytewise too. Equality (`eq`, `inArray`) works, so FK filters, `get`/`getMany` and PK lookups are correct (evidence: 2026-10-07-sqlite-blob-bigint-ordering). No numeric range filter exists in this design. SQLite tests must not assert numeric ordering or range filtering on blob-bigint columns; PG `bigint({mode:"bigint"})` orders numerically.
-- `parsePk` / `parseFieldValue` by `field.kind`: number → `/^-?\d+$/` and `Number.isSafeInteger` for integer fields (`/^-?\d+(\.\d+)?$/` otherwise) → number; bigint → `/^-?\d+$/` → `BigInt`; string/enum → raw; anything else → `null`.
+- `parsePk` / `parseFieldValue` by `field.kind` (Changed 2026-10-08: values outside the column's DB domain return `null` instead of reaching the DB, decision 045):
+  - number: integer fields (`isInteger`) → `/^-?\d+$/` and `Number.isSafeInteger`, then by `field.valueCheck`: `"int16"` → -32768..32767, `"int32"` → -2147483648..2147483647 (inclusive), otherwise no further bound; other number fields → `/^-?\d+(\.\d+)?$/` and finite. → number.
+  - bigint: `/^-?\d+$/` → `BigInt`; with `valueCheck === "int64"` it must lie in -9223372036854775808n..9223372036854775807n.
+  - string: `null` if it contains U+0000 (both dialects; PG rejects NUL in text parameters, evidence: 2026-10-08-pg-key-input-domains); with `valueCheck === "uuid"` it must match `/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i` (the canonical form PG outputs, so every URL the admin builds passes; braces or missing hyphens, which PG would also accept, return `null`). → raw.
+  - enum: raw only if it is one of `field.enumValues`, else `null`.
+  - anything else → `null`.
+  Callers already map `null` to "not found" (`get` / `update` → `null` → 404) or "skipped" (`getMany`, `delete`, FK filter ignored), so a PG int4 key `3000000000`, a non-uuid string for a uuid key or a NUL byte no longer becomes a 500 (SQLSTATE 22003 / 22P02 / 22021; evidence: 2026-10-08-pg-key-input-domains). `coerceForm` also uses `parseFieldValue` for integer input (forms.md), so both share one rule.
 
 ### `src/data/repository.ts`
 ```ts
@@ -116,4 +123,5 @@ Changed 2026-10-07: SQLite blob-bigint storage noted (decision 026).
 
 ## Errors
 - Repository methods throw the driver/Drizzle error unchanged on DB failure.
-- Invalid PK strings never reach SQL: `get` → `null`, `update` → `null`, `getMany` / `delete` → skipped.
+- Invalid PK strings never reach SQL: `get` → `null`, `update` → `null`, `getMany` / `delete` → skipped. Changed 2026-10-08: "invalid" includes values outside the column's DB domain (`valueCheck`, NUL, enum values; decision 045).
+- `getMany` and `delete` bind one parameter per id. Callers keep the count bounded: the actions handler caps selections at 500 ids, below SQLite's parameter limit (32766, or 999 before 3.32.0) and PostgreSQL's (evidence: 2026-10-08-bind-parameter-limits; decision 045). FK label lookups bind at most `listPerPage` values, which `register()` caps at 500 (decision 045 point 5).

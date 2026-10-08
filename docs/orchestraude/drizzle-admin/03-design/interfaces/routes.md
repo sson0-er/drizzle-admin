@@ -22,6 +22,7 @@ export function buildApp(state: AdminState): Hono;
 export interface AdminVars {
   state: AdminState;
   repo: Repository;
+  cookieKeys: { session: ArrayBuffer; flash: ArrayBuffer };  // derived signing keys, set by the session middleware (decision 042)
   session: Session;          // always set after the session middleware (possibly anonymous)
   user: AdminUser | null;    // builtin: session.u; external: await getUser(c.req.raw)
   body: FormBody | null;     // parsed once by the csrfToken middleware for POST; null for GET
@@ -31,6 +32,10 @@ export type AdminContext = Context<AdminEnv>;   // handlers and middleware type 
 
 export function requireUser(c: AdminContext): AdminUser;   // throws if null (guard guarantees non-null)
 export function modelOr404(c: AdminContext, slug: string): ResolvedModel | Response;
+  // 404 page (messages.notFound) when the slug is unknown OR the model is hidden from the user:
+  // !canAny(model, requireUser(c)) (decision 043). Both cases give the identical response.
+export function cookieOpts(c: AdminContext): CookieOpts;   // { key: c.var.cookieKeys.session, prefix, maxAgeSec, publicOrigin }
+export function flashOpts(c: AdminContext): FlashOpts;     // { key: c.var.cookieKeys.flash, prefix, publicOrigin }
 export async function renderPage(
   c: AdminContext,
   status: 200 | 400 | 401 | 403 | 404 | 500,
@@ -49,20 +54,34 @@ export async function redirectWithFlash(c: AdminContext, location: string, msgs:
 Rule for callers: every 200 or 400 page that is not `minimal` passes the function form and puts its `flash` argument into the page's `PageChrome`. Passing a ready element for such a page would consume the flash without displaying it.
 `context.ts` may also export helpers that build the `PageChrome` (`pageChrome(c, title, trail?, flash?)`) and a synchronous `errorPage(c, status, message, opts?)` that never consumes flash; these are internal conveniences, not part of the contract above.
 The repository is created once per `buildApp` with `createRepository({ db, dialect, timeZone })`.
+Changed 2026-10-08: `modelOr404` hides models without any permission (decision 043); `cookieOpts` / `flashOpts` take the context and use the derived keys (decision 042).
+
+Cookie keys (decision 042; Changed 2026-10-08 after the design review: derived lazily, on the first request, inside the session middleware): `buildApp` holds a memo `let keys: Promise<{ session: ArrayBuffer; flash: ArrayBuffer }> | undefined` and a closure `getCookieKeys = () => (keys ??= Promise.all([deriveCookieKey(secret, SESSION_COOKIE, prefix), deriveCookieKey(secret, FLASH_COOKIE, prefix)]).then(([session, flash]) => ({ session, flash })))` (auth.md), passed to `sessionMiddleware(state, getCookieKeys)`. The promise is created only when the session middleware calls it and is awaited in the same call, so a rejection can never be unhandled; it propagates through `next()` to `onError` (500, `minimal`), and because the session middleware runs inside `securityHeaders`, that 500 carries the security headers like any other response. The session middleware sets `c.var.cookieKeys` before reading the session, so every later middleware, handler and `renderPage` / `redirectWithFlash` reads the keys through `cookieOpts(c)` / `flashOpts(c)`. Nothing before the session middleware touches cookies (the static route, `originCheck` and its `minimal` 403). The raw `secret` is passed to no cookie function. A derivation failure is not expected (Web Crypto HMAC over a validated string secret), so a rejected memo is not retried.
+
+Hidden models (decision 043): every model route (routes 4-9) calls `modelOr404` first. A model for which the user has none of `view`, `add`, `change`, `delete` answers exactly like an unknown slug, before any selection, body or permission check of the handler. A model with at least one granted permission keeps the per-route 403 for a missing permission.
 
 ## Middleware order (`app.use("*", ...)` in this order)
 Changed 2026-10-07: originCheck uses `publicOrigin` (decision 017); external-mode session use fixed (decision 014).
+Changed 2026-10-08: `initVars` (already in the code) listed as step 0; the session middleware derives the cookie keys (decision 042); securityHeaders adds CSP and nosniff (decision 044); the external-mode `next` goes through `safeNext` (decision 047).
 
-1. **securityHeaders**: `await next()`, then on the final response set `X-Frame-Options: DENY` and `Referrer-Policy: same-origin`. Set `Cache-Control: no-store` unless the response already has a `Cache-Control` header (only the static route sets one).
+0. **initVars** (listed 2026-10-08; unchanged code): sets `state`, `repo` and `body: null`, so every later middleware, handler and `onError` can read them.
+1. **securityHeaders** (`securityHeaders(csp)`; Changed 2026-10-08: CSP and nosniff added, decision 044): `await next()`, then on the final response set `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: <csp>`, all unconditionally (replacing any value already set). Set `Cache-Control: no-store` unless the response already has a `Cache-Control` header (only the static route sets one). These headers reach every response that passes through the middleware: pages, redirects, 401/403/404 pages, `onError` pages and the stylesheet.
+   `csp` is built once in `buildApp` (module-private `buildCsp(authMode)` in `middleware.ts`). Builtin mode:
+   ```
+   default-src 'none'; script-src 'sha256-<SELECT_ALL_SCRIPT_SHA256>'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+   ```
+   External mode: the same string without the `form-action 'self'; ` directive. Changed 2026-10-08 (design review): `form-action` is omitted in external mode instead of being widened by the `loginUrl` origin. Why: there a form submitted after the host session expired is redirected (302) to `loginUrl`, typical SSO setups redirect again to an identity provider on another origin, and Chrome checks every hop against `form-action` (evidence: 2026-10-08-csp-hash-and-form-action); `form-action` is defense in depth only, because the admin has no HTML injection path (decision 044). Nothing parses `auth.loginUrl`, so `createAdmin` does not validate it.
+   `SELECT_ALL_SCRIPT_SHA256` comes from `src/static/select-all.ts` (views.md).
+   The admin loads only its stylesheet (`style-src 'self'`) and the inline select-all script; it uses no images, fonts, fetches, `<base>`, `style` attributes or inline event handlers, so `default-src 'none'` blocks nothing it needs. Any new resource type or inline script requires a policy change (decision 044).
 2. **static**: `GET /static/admin.css` is registered as a route before the auth middleware runs for it (see "Auth exemptions"). Response: `ADMIN_CSS`, `Content-Type: text/css; charset=utf-8`, `Cache-Control: public, max-age=31536000, immutable`.
 3. **originCheck** (`originCheck(config.publicOrigin)`, auth.md): for unsafe-method form posts, passes when `Sec-Fetch-Site: same-origin` or Origin equals the expected origin; otherwise 403 (evidence: 2026-10-07-hono-csrf-and-jsx). The expected origin is `config.publicOrigin` when set, else the request URL origin (evidence: 2026-10-07-hono-csrf-origin-option).
-4. **session**: `readSession` with `CookieOpts { secret, prefix, maxAgeSec: sessionMaxAgeSec, publicOrigin }`. If `null`: for GET/HEAD, create `newSession(null, now)` and `writeSession`; for other methods keep a transient anonymous session without writing it (its token cannot match, so the token check fails with 403). Set `c.var.session`. This is identical in both auth modes; in external mode the session always has `u: null` and only carries the CSRF token and issue time (decision 014).
+4. **session** (`sessionMiddleware(state, getCookieKeys)`): first `c.set("cookieKeys", await getCookieKeys())` (see "Cookie keys" above), then `readSession` with `cookieOpts(c)` = `CookieOpts { key: cookieKeys.session, prefix, maxAgeSec: sessionMaxAgeSec, publicOrigin }` (Changed 2026-10-08: derived key, decision 042). If `null`: for GET/HEAD, create `newSession(null, now)` and `writeSession`; for other methods keep a transient anonymous session without writing it (its token cannot match, so the token check fails with 403). Set `c.var.session`. This is identical in both auth modes; in external mode the session always has `u: null` and only carries the CSRF token and issue time (decision 014).
 5. **user**: builtin → `session.u`; external → `await auth.getUser(c.req.raw)` (`session.u` ignored). Set `c.var.user`. In external mode the token is not rotated when `getUser` starts returning a different user; it rotates only when the session expires (decision 014).
 6. **authGuard** (skipped for exemptions): if `user === null`:
    Changed 2026-10-08: `path` below is the raw percent-encoded pathname `new URL(c.req.url).pathname`, not `c.req.path` (which decodes `%20` to a space that `safeNext` rejects), and `search` is `new URL(c.req.url).search` (decision 032).
    Changed 2026-10-08: HEAD is treated like GET (decision 033 item 7).
    - builtin → `302` to `loginRedirectUrl(prefix, path + search)` for GET and HEAD; for other methods use `next = <prefix>/`. Hono dispatches HEAD through the GET routes but `c.req.method` stays `"HEAD"` (evidence: 2026-10-08-hono-head-cookie-body-node-server), so the guard checks both methods explicitly.
-   - external with `loginUrl` → `302` to `externalLoginUrl(loginUrl, path + search)`.
+   - external with `loginUrl` → `302` to `externalLoginUrl(loginUrl, safeNext(path + search, prefix))` (Changed 2026-10-08, decision 047: an unsafe target such as `//evil.com/` with basePath `"/"` becomes `${prefix}/`; every method, as before).
    - external without `loginUrl` → 401 error page.
 7. **csrfToken**: for POST, parse the body once (`c.req.parseBody({ all: true })`, kept in a context variable for handlers) and require `typeof body._csrf === "string" && tokensEqual(body._csrf, session.csrf)`; otherwise 403 error page (`messages.csrfFailed`).
 
@@ -78,7 +97,7 @@ Order matters: the first registered matching handler wins, and a mounted `"/"` r
 | 1 | GET | `/static/admin.css` | static | none |
 | 2 | GET, POST | `/login/` | login (builtin only; external → 404) | none |
 | 3 | POST | `/logout/` | logout (builtin only; external → 404) | logged in |
-| 4 | GET | `/:model/` | list | view |
+| 4 | GET | `/:model/` | list | view (routes 4-9: a model with no permission for the user → 404, decision 043) |
 | 5 | POST | `/:model/` | action | per action |
 | 6 | GET, POST | `/:model/add/` | add | add |
 | 7 | GET | `/:model/:pk/change/` | change (read-only without change perm) | view |
@@ -110,9 +129,9 @@ Any other method/path → route 11 → 404 page. A sub-app's `notFound` is not r
 
 Slugs `login`, `logout` and `static` are reserved (admin.md), so routes 2-3 never shadow a model.
 
-Flash cookie options passed by `renderPage` / `redirectWithFlash`: `FlashOpts { secret, prefix, publicOrigin }` from `state.config`.
+Flash cookie options passed by `renderPage` / `redirectWithFlash`: `flashOpts(c)` = `FlashOpts { key: c.var.cookieKeys.flash, prefix, publicOrigin }` (Changed 2026-10-08, decision 042).
 All `Location` headers built by routes and the catch-all are path-only (`${prefix}/...`), so they are correct behind a reverse proxy without using `publicOrigin`.
-Invariant (Changed 2026-10-08, decision 029; Changed 2026-10-08: control characters added after the tab bypass): every `Location` is a single-slash path under the prefix. It starts with `${prefix}/`, never starts with `//`, and never contains `\` or a control character (U+0000-U+001F, U+007F). User-supplied targets (`next`) go through `safeNext` (auth.md), and the catch-all applies the rule above. The only exception is the external-mode login redirect to the operator-configured `auth.loginUrl` (authGuard step 6), which is configuration, not request input.
+Invariant (Changed 2026-10-08, decision 029; Changed 2026-10-08: control characters added after the tab bypass): every `Location` is a single-slash path under the prefix. It starts with `${prefix}/`, never starts with `//`, and never contains `\` or a control character (U+0000-U+001F, U+007F). User-supplied targets (`next`) go through `safeNext` (auth.md), and the catch-all applies the rule above. The only exception is the external-mode login redirect to the operator-configured `auth.loginUrl` (authGuard step 6), which is configuration, not request input; its `next` value is a `safeNext` result, so it satisfies this invariant too (decision 047).
 
 ## Error handling
 Changed 2026-10-07: `HTTPException` renders the layout error page; full logging for non-DB errors (decision 022).
@@ -122,4 +141,4 @@ Changed 2026-10-07: `HTTPException` renders the layout error page; full logging 
   - Anything else → log, then the 500 error page. Log `console.error("drizzle-admin:", describeForLog(err))` when `isDbError(err)` (data.md), because DB errors may carry SQL and bound parameters. Otherwise log `console.error("drizzle-admin:", err)` in full (message and stack), for example for bugs in formatters, `toString`, `validate` or `getUser`.
   - Pages rendered from `onError` must not assume that the middleware ran (the Origin check runs before the session). They use a minimal chrome: `user: null`, `showLogout: false`, `csrfToken: ""`, and no flash read or consumed. `renderPage` takes an optional `{ minimal: true }` for this.
 - 404 page: `ErrorPage` with `messages.notFound`. 403 page: `messages.forbidden` or `messages.csrfFailed`.
-- Permission checks happen inside handlers through `can()` before any DB write or data read for that model.
+- Permission checks happen inside handlers through `can()` before any DB write or data read for that model. A model hidden from the user (no permission at all) is a 404 from `modelOr404`, never a 403 (Changed 2026-10-08, decision 043).

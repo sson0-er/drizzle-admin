@@ -142,16 +142,21 @@ The path data is a reference drawing (not render-checked); the implementer may r
 
 ### Static modules
 Changed 2026-10-08: `ADMIN_CSS` restyled after DADS values (decision 040); the rules moved to [views-style.md](views-style.md); the exports are unchanged.
+Changed 2026-10-08: `SELECT_ALL_SCRIPT_SHA256` added for the Content-Security-Policy (decision 044).
 ```ts
 // src/static/admin-css.ts
 export const ADMIN_CSS: string;
 export const ADMIN_CSS_VERSION: string; // FNV-1a 32-bit hex of ADMIN_CSS, computed at module load
 // src/static/select-all.ts
 export const SELECT_ALL_SCRIPT: string;  // must not contain & < > " ' (decision 007)
+export const SELECT_ALL_SCRIPT_SHA256: string;
+  // base64 SHA-256 of the UTF-8 bytes of SELECT_ALL_SCRIPT, a literal constant (currently
+  // "v/peDHOfIZWrfvqqPHbyzhkt2GMZ+0UvE0ARRSfmSAU="); used in `script-src 'sha256-...'` (routes.md, decision 044)
 ```
 The script goes inside `ListPage` as `<script>{SELECT_ALL_SCRIPT}</script>`. Example body:
 ``const t = document.getElementById(`action-toggle`); if (t) { t.hidden = false; t.addEventListener(`change`, function () { for (const c of document.querySelectorAll(`input[name=_selected]`)) { c.checked = t.checked } }) }``
 `#action-toggle` is rendered with the `hidden` attribute, and the script removes it (`t.hidden = false`), so without JS the checkbox does not appear.
+The CSP allows the script only by `SELECT_ALL_SCRIPT_SHA256` (decision 044). The hash covers the element's text exactly, which equals `SELECT_ALL_SCRIPT` because the decision 007 character rule means JSX escapes nothing; whoever edits the script must update the constant (a unit test recomputes it with `node:crypto`). Views render no other inline script, no `style` attribute and no inline event handler, and must not add any without changing the policy.
 
 Changed 2026-10-08: the Django-like palette and look are replaced by the DADS-inspired restyle in [views-style.md](views-style.md) (decision 040), which is normative for tokens, rules and focus ring. The structural requirements in the next paragraph still hold.
 

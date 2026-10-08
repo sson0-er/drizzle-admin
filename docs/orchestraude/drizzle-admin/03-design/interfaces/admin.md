@@ -90,6 +90,7 @@ export interface Admin {
 
 ### `createAdmin(config: AdminConfig): Admin`
 Changed 2026-10-07: added the `publicOrigin` rule (decision 017).
+Changed 2026-10-08: `sessionMaxAgeSec` is capped at 34560000, hono's cookie Max-Age limit (decision 042).
 
 Validation (each failure throws `Error("drizzle-admin: <message>")`):
 | Check | Rule |
@@ -99,7 +100,7 @@ Validation (each failure throws `Error("drizzle-admin: <message>")`):
 | secret | string, `length >= 32` |
 | basePath | starts with `/`; no `?`, `#`, `\`, whitespace or `//`; trailing `/` removed. The result is `prefix` (`"/"` → `""`) |
 | auth | at least one of `verifyCredentials`, `getUser` is a function |
-| sessionMaxAgeSec | positive integer if given; default `28800` |
+| sessionMaxAgeSec | positive integer of at most `34560000` (400 days) if given, else throw `sessionMaxAgeSec must be a positive integer of at most 34560000 (400 days)` (one message for every failure of this rule); default `28800` (decision 042) |
 | timeZone | valid IANA zone via `resolveTimeZone` (support.md); default: server local zone |
 | siteTitle | default `messages.defaultSiteTitle` |
 | publicOrigin | optional. If given: a string containing no `?` or `#` that `new URL()` parses, with protocol `http:` or `https:`, empty username and password, and pathname `/` (no path beyond an optional trailing `/`). Stored normalized as `new URL(v).origin` (e.g. `"https://admin.example.com/"` → `"https://admin.example.com"`, default port dropped). Absent → `null` |
@@ -110,6 +111,7 @@ Derived `authMode`: `"external"` if `getUser` is set (it wins over `verifyCreden
 Changed 2026-10-07: step 5 checks widget overrides, and finalization checks FK `select` overrides (decision 021).
 Changed 2026-10-07: `listFilter` accepts date-only string fields (PG `date()` string mode; decision 023).
 Changed 2026-10-08: step 5 rejects a `password` widget on the primary key or on a field in `searchFields` or `ordering` (decision 037 point 7, Q12).
+Changed 2026-10-08: step 5 caps `listPerPage` at 500, the bulk-selection cap (decision 045 point 5, Q13).
 
 Steps, in order:
 1. If finalized → throw `register() must be called before admin.app / admin.fetch is used`.
@@ -117,7 +119,7 @@ Steps, in order:
 3. `slug = options.slug ?? meta.tableName`. It must match `/^[A-Za-z0-9_-]+$/`, must not be `login`, `logout` or `static`, and must not be registered already.
 4. Column-name checks. Every key below must be a `meta.fields[].key`, otherwise throw `<table>: option "<option>" references unknown column "<key>"`:
    `listDisplay`, `listDisplayLinks`, `searchFields`, `listFilter`, `ordering` (after stripping a leading `-`), `fields`, `exclude`, `readonlyFields`, every `fieldsets[i].fields`, keys of `widgets`, keys of `formatters`.
-5. Extra checks (decision 013 item 13): `listFilter` keys must have kind boolean/enum/date, `isDateOnly` (PG `date()` string mode, decision 023) or a `foreignKey`. `searchFields` kinds must be string/enum. `fields` and `fieldsets` must not both be set. Action names must be unique, non-empty and not `delete_selected`. `listPerPage` must be a positive integer. Every `widgets[key]` must be in `allowedWidgets(field)` (forms.md, decision 021), otherwise throw `<table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
+5. Extra checks (decision 013 item 13): `listFilter` keys must have kind boolean/enum/date, `isDateOnly` (PG `date()` string mode, decision 023) or a `foreignKey`. `searchFields` kinds must be string/enum. `fields` and `fieldsets` must not both be set. Action names must be unique, non-empty and not `delete_selected`. `listPerPage` must be a positive integer of at most `MAX_SELECTED` (500), imported from `src/routes/actions.ts` (routes-handlers.md Actions step 1), so "select all" on a full page always fits and the two limits cannot drift apart (decision 045 point 5), otherwise throw `` `${table}: listPerPage must be a positive integer of at most ${MAX_SELECTED}` `` (one message for every failure of this rule; `src/admin.ts` already imports from `src/routes/` for `buildApp`). Every `widgets[key]` must be in `allowedWidgets(field)` (forms.md, decision 021), otherwise throw `<table>: widget "<w>" is not allowed for field "<key>" (kind <kind>)`.
    Then, for every `widgets[key] === "password"` (decision 037 point 7), in this order: `key` is `meta.pk.key` → throw `<table>: the primary key "<key>" cannot use the password widget`; `key` is in `searchFields` → throw `<table>: field "<key>" uses the password widget and cannot be in searchFields`; `key` appears in `ordering` in either direction (`key` or `-key`) → throw `<table>: field "<key>" uses the password widget and cannot be in ordering`. Only explicit `widgets` entries matter: no default widget is `password` (forms.md).
 6. Build the `ResolvedModel` (below) and store it in insertion order.
 
@@ -134,12 +136,14 @@ Changed 2026-10-08: a failed finalization leaves the registry open and is retrie
 ## Data formats
 
 ### `ResolvedModel` (internal, `src/types.ts` or `src/admin.ts`)
+Changed 2026-10-08: the default `listDisplay` skips `exclude` keys (decision 046); unset `add` / `change` / `delete` permissions take the resolved `view` (decision 043).
+
 ```ts
 interface ResolvedModel {
   slug: string;
   label: string;                         // options.label ?? meta.tableName
   meta: ModelMeta;
-  listDisplay: string[];                 // default: [pk.key, ...first 4 non-pk field keys]
+  listDisplay: string[];                 // options.listDisplay as given; default: see below (decision 046)
   listDisplayLinks: string[];            // default: [listDisplay[0]]
   searchFields: string[];                // default []
   listFilter: string[];                  // default []
@@ -156,10 +160,14 @@ interface ResolvedModel {
     Promise<Record<string, string> | void> | Record<string, string> | void;
   hooks: { beforeSave?; afterSave?; beforeDelete? };  // same signatures as §5.2 with Row widened
   permissions: Record<"view" | "add" | "change" | "delete", (user: AdminUser) => boolean>;
-      // boolean b → () => b ; undefined → () => true
+      // boolean b → () => b ; function f → f ; undefined: view → () => true,
+      // add / change / delete → the resolved view function (decision 043)
   actions: AdminAction<Table>[];         // custom actions only; built-in delete is added by routes
 }
 ```
+Default `listDisplay` (decision 046), when `options.listDisplay` is unset: candidates `[meta.pk.key, ...keys of the other fields in definition order]`, minus every key in `options.exclude`, first 5 kept; an empty result becomes `[meta.pk.key]`. With nothing excluded this is the primary key plus the first four other columns, as before. An explicit `listDisplay` is not filtered by `exclude`.
+
+Permissions (decision 043): `view` is resolved first. `add`, `change` and `delete` reuse the resolved `view` function when their entry is `undefined`, so `permissions: { view: false }` denies everything and `{}` allows everything. Explicit entries (`true`, `false` or a function) are used as given, whatever `view` is.
 
 ### `AdminState` (passed to `buildApp`)
 Changed 2026-10-07: added `config.publicOrigin` (decision 017).

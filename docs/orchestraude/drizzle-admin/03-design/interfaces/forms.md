@@ -1,7 +1,7 @@
 # Interface: forms
 
 Files: `src/forms/fields.ts` (layout and widget choice), `src/forms/coerce.ts`, `src/forms/schema.ts` (zod), `src/forms/validate.ts` (pipeline steps 1-4), `src/forms/widgets.tsx` (input rendering).
-Inputs: `ResolvedModel` ([admin.md](admin.md)), `FieldMeta` ([introspect.md](introspect.md)), time helpers and messages ([support.md](support.md)).
+Inputs: `ResolvedModel` ([admin.md](admin.md)), `FieldMeta` ([introspect.md](introspect.md)), time helpers and messages ([support.md](support.md)), `parseFieldValue` ([data.md](data.md), pure; Changed 2026-10-08, decision 045).
 
 ## Responsibilities
 - Decide which fields appear on add/change forms, which are editable, and which widget each uses.
@@ -62,7 +62,7 @@ Inclusion and editability (iterate `model.fieldsets`, empty groups dropped):
 |---|---|---|
 | auto-increment PK | omitted | display-only |
 | other PK | editable | display-only (decision 013 item 2) |
-| in `readonlyFields`, `isGenerated`, or kind `unknown` | omitted | display-only |
+| in `readonlyFields`, `isGenerated` (generated and, Changed 2026-10-08, identity columns; decision 046), or kind `unknown` | omitted | display-only |
 | other | editable | editable if `canChange`, else display-only |
 
 Changed 2026-10-07: overrides are restricted per field kind, and data handling never depends on the widget (decision 021).
@@ -87,6 +87,7 @@ Default widget (an explicit `model.widgets[key]` wins; `register()` has already 
 Changed 2026-10-07: rule 1 keys on kind only (decision 021); date-only parsing uses UTC calendar dates (decision 019).
 Changed 2026-10-07: date-only strings (kind string + `isDateOnly`) are validated as `YYYY-MM-DD` and kept as strings (decision 023).
 Changed 2026-10-08: rule 2's "empty" is exactly missing or `""`, so whitespace-only number input is `invalidNumber` (decision 033 item 17); an empty `password` widget in change mode keeps the stored value (decision 037); `rawValues` output specified (decision 033 item 12).
+Changed 2026-10-08: integer and bigint input use `parseFieldValue` from `src/data/query.ts`, the same rule as URL keys and filters (decision 045).
 
 ```ts
 export type FormBody = Record<string, string | File | (string | File)[]>; // from c.req.parseBody({ all: true })
@@ -104,8 +105,8 @@ Per field, with `raw = body[key]`:
    - `notNull && hasDefault && mode === "add"` → key omitted from `data`
    - otherwise error `messages.required`
 3. Otherwise by kind (FK fields use their own kind):
-   - number: `t = raw.trim()`; `t === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(t)` must be finite, else `invalidNumber`; `isInteger` and not an integer → `invalidInteger`.
-   - bigint: `/^-?\d+$/` → `BigInt`, else `invalidInteger`.
+   - number: `t = raw.trim()`; `t === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(t)` must be finite, else `invalidNumber`. Then, for `isInteger` fields (Changed 2026-10-08, decision 045): the value is `parseFieldValue(meta, t)` (data.md); `null` → `invalidInteger`. So only plain decimal digits with an optional leading `-` in the safe-integer range (and, on PG, the column's int2/int4 range) pass: `"0x1F"`, `"0b11"`, `"1e3"`, `"1.5"`, `"+5"` and `"9007199254740993"` are `invalidInteger`, and nothing is rounded. Non-integer number fields keep `Number(t)`.
+   - bigint: `t = raw.trim()`; `parseFieldValue(meta, t)` → the `BigInt`; `null` (not `/^-?\d+$/`, or outside the PG int8 range) → `invalidInteger` (Changed 2026-10-08, decision 045).
    - date: `meta.isDateOnly` → `parseDateOnly(raw.trim())` (UTC midnight, no time zone; decision 019); otherwise `parseDatetimeLocal(raw.trim(), timeZone)`; `null` → `invalidDate`. The time zone must not be applied to date-only values: drizzle stores `toISOString()`'s date part, so a Tokyo midnight would be saved as the previous day (evidence: 2026-10-07-drizzle-pg-date-mapping).
    - json: `JSON.parse`, else `invalidJson`.
    - enum: must be in `enumValues`, else `invalidChoice`.

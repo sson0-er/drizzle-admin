@@ -1,6 +1,6 @@
 # Interface: example app
 
-Files: `example/schema.ts`, `example/seed.ts`, `example/app.ts`, `example/server.ts` (`app.ts` is an addition to §4 so the smoke test can build the app without listening on a port). It imports the library from `../src/index.js` (run with tsx; decision 005). It uses SQLite through better-sqlite3 so it runs with no external services.
+Files: `example/schema.ts`, `example/seed.ts`, `example/app.ts`, `example/host-guard.ts`, `example/server.ts` (`app.ts` is an addition to §4 so the smoke test can build the app without listening on a port; `host-guard.ts` is an addition from decision 048 so the Host check can be unit-tested without starting the server). It imports the library from `../src/index.js` (run with tsx; decision 005). It uses SQLite through better-sqlite3 so it runs with no external services.
 
 ## Responsibilities
 - Demonstrate §5.1 usage, with users, posts (author → users) and tags.
@@ -57,7 +57,17 @@ Changed 2026-10-08: `hostname = process.env.HOST || "127.0.0.1"`, so an empty `H
   - users: the §5.1 options (listDisplay id/email/isActive/createdAt, searchFields email/name, listFilter isActive and role, ordering `-createdAt`, readonlyFields createdAt, toString email). Action `deactivate` sets `isActive = false` for the ids and has `confirm: true`. Action `activate` does the opposite without confirmation.
   - posts: listDisplay id/title/authorId/status/publishedAt, searchFields title, listFilter status/authorId/publishedAt, listPerPage 20, toString title.
   - tags: defaults only.
-- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` served by `@hono/node-server` with `serve({ fetch: app.fetch, port, hostname })`, where `port = Number(process.env.PORT ?? 3000)` and `hostname = process.env.HOST || "127.0.0.1"` (`||`, not `??`: an unset or empty `HOST` both give `127.0.0.1`). `serve` passes `hostname` to `server.listen(port, hostname)` (evidence: 2026-10-08-hono-head-cookie-body-node-server), and Node listens on all interfaces for an empty hostname (evidence: 2026-10-08-node-listen-empty-hostname), so by default the demo with its default password is reachable only from the local machine. Prints the URL built from `hostname` and `port` (an IPv6 literal in brackets) and the login hint (decision 038).
+- `const app = new Hono(); app.get("/", c => c.redirect("/admin/")); app.route("/admin", admin.app);` (in `app.ts`). Changed 2026-10-08 (decision 048): `server.ts` wraps it as `const root = new Hono(); root.use("*", hostGuard(hostname, port)); root.route("/", app);` and serves `root`, so it is served by `@hono/node-server` with `serve({ fetch: root.fetch, port, hostname })`, where `port = Number(process.env.PORT ?? 3000)` and `hostname = process.env.HOST || "127.0.0.1"` (`||`, not `??`: an unset or empty `HOST` both give `127.0.0.1`). `serve` passes `hostname` to `server.listen(port, hostname)` (evidence: 2026-10-08-hono-head-cookie-body-node-server), and Node listens on all interfaces for an empty hostname (evidence: 2026-10-08-node-listen-empty-hostname), so by default the demo with its default password is reachable only from the local machine. Prints the URL built from `hostname` and `port` (an IPv6 literal in brackets) and the login hint (decision 038).
+
+### `example/host-guard.ts` (decision 048)
+Changed 2026-10-08: new module; DNS-rebinding protection for the demo (security audit, views.findings).
+```ts
+export function isAllowedHost(requestUrl: string, bindHost: string, port: number): boolean;
+export function hostGuard(bindHost: string, port: number): MiddlewareHandler;
+```
+- `isAllowedHost`: `u = new URL(requestUrl)`; `h = u.hostname` (lowercase, IPv6 in brackets); effective port = `Number(u.port)`, or 443 for `https:` / 80 otherwise when `u.port` is `""`. `b` = `bindHost.toLowerCase()`, wrapped in `[...]` when it contains `:`. Loopback names: `localhost`, `127.0.0.1`, `[::1]`. Wildcards: `0.0.0.0`, `[::]`. Returns true only when the effective port equals `port` and at least one holds: `h === b`; `b` is a loopback name or a wildcard and `h` is a loopback name; `b` is a wildcard and `h` is an IP literal (`/^\d{1,3}(\.\d{1,3}){3}$/` or starting with `[`). An IP-literal Host cannot come from DNS rebinding, which needs an attacker-controlled name, so LAN access by IP keeps working under `HOST=0.0.0.0`.
+- `hostGuard`: middleware; when `isAllowedHost(c.req.url, bindHost, port)` is false it returns `c.text("Forbidden: unexpected Host header", 403)` and does not call `next`. `@hono/node-server` builds `c.req.url` from the Host header (evidence: 2026-10-08-hono-head-cookie-body-node-server). The text is example code, not a library UI string, so it is not in `src/messages.ts`.
+- `createExampleApp` does not use it (the smoke tests call `app.request` with `http://localhost/`).
 
 ## Data formats
 Run instructions (also in the README "Development" section):

@@ -24,3 +24,4 @@
 
 ## Consequences
 - Behind a TLS-terminating reverse proxy, the request URL may be http: Secure is then not set and `hono/csrf`'s origin may mismatch. Addressed by `AdminConfig.publicOrigin` (decision 017).
+- Changed 2026-10-08: the session and flash cookies are signed with keys derived from `secret`, the cookie name and the prefix instead of `secret` itself, and `sessionMaxAgeSec` is capped at 34560000 (decision 042).

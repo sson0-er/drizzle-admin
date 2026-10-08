@@ -1,6 +1,6 @@
 # Interface: project setup and packaging
 
-Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`, `biome.json`, `vitest.config.ts`, `.gitignore`, `LICENSE`, `README.md`. `mise.toml` already pins `node = "24.21.0"` and `pnpm = "12.10.0"` (user-managed, decision 001); it is not modified.
+Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`, `biome.json`, `vitest.config.ts`, `.gitignore`, `LICENSE`, `README.md`, `CHANGELOG.md` (Changed 2026-10-08: added by decision 048). `mise.toml` already pins `node = "24.21.0"` and `pnpm = "12.10.0"` (user-managed, decision 001); it is not modified.
 
 ## Responsibilities
 - Make `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm build` work from a clean checkout after `pnpm install` (run under mise).
@@ -15,6 +15,7 @@ Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`,
 | `pnpm build` | `node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json` | `dist/index.js` and `dist/index.d.ts` plus per-module files |
 | `pnpm example` | `tsx example/server.ts` | demo server (example.md) |
 | `pnpm format` | `biome check --write .` | convenience |
+| (lifecycle) `prepack` | `pnpm build` | Changed 2026-10-08 (decision 048): runs before every `npm pack` / `npm publish` and in `pnpm publish`, so the tarball's `dist/` is always built from the current `src/` (evidence: 2026-10-08-prepack-lifecycle) |
 
 ## Data formats
 
@@ -29,7 +30,7 @@ Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`,
   "type": "module",
   "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],   // CHANGELOG.md: decision 048
   "sideEffects": false,
   "keywords": ["drizzle", "drizzle-orm", "admin", "hono", "crud"],
   "scripts": { /* table above */ },
@@ -88,6 +89,10 @@ Allowed `any` only in `src/introspect/**` and `src/data/**`, each with `// biome
 ### LICENSE
 MIT License text, `Copyright (c) 2026 Shoma Sonoda`.
 
+### CHANGELOG.md (decision 048)
+Changed 2026-10-08: new file.
+English, newest first. It starts with `# Changelog` and an `## Unreleased` section with two lists. "Security": sessions and flash messages are signed with keys derived from `secret` and `basePath`, so instances no longer accept each other's cookies, and **every user is signed out once after upgrading** (decision 042); responses carry a Content-Security-Policy and `X-Content-Type-Options: nosniff` (decision 044); malformed or out-of-range keys, NUL bytes and oversized selections no longer cause 500 errors (decision 045); the external-mode `next` passed to `loginUrl` is sanitized (decision 047). "Changed": unset `add` / `change` / `delete` permissions follow `view`, and a model with no permission for the user answers 404 (decision 043); `sessionMaxAgeSec` above 34560000 (400 days) is rejected (decision 042); the search text is capped at 200 characters, at most 500 rows can be selected for one action and `listPerPage` above 500 is rejected by `register()`, and integer fields reject `0x`/`0b`/exponent notation and unsafe integers (decision 045); `exclude` also removes columns from the default list columns, and identity columns are read-only (decision 046).
+
 ### README.md outline (written in phase 6; English)
 Changed 2026-10-07: section 10 lists the SQLite blob-bigint ordering limitation (decision 026).
 Changed 2026-10-08: section 10 lists the decoded LF/CR 404 limitation (decision 029).
@@ -95,6 +100,7 @@ Changed 2026-10-08: sections 8 and 10 tell deployers to limit the request body s
 Changed 2026-10-08: section 8 states the Origin check scope (form-like unsafe requests only) and that such a request with neither `Sec-Fetch-Site: same-origin` nor a matching `Origin` gets 403 (task 36, L050, L087; evidence: 2026-10-07-hono-csrf-and-jsx); section 11 notes that an empty `HOST` falls back to `127.0.0.1` (decision 038 item 2).
 Changed 2026-10-08: section 9 notes that `password`-widget list columns cannot be sorted (decision 037 point 6, L011).
 Changed 2026-10-08: section 6 lists the `password` widget restrictions of `register()` (decision 037 point 7, Q12).
+Changed 2026-10-08: security audit fixes (decisions 042-048), by section. 5: the `secret` row recommends a distinct secret per admin instance (and not reused elsewhere in the host) and says the cookie keys are derived from `secret` and `basePath`; the `sessionMaxAgeSec` row states the 34560000 (400 days) maximum. 6: the `listDisplay` default skips `exclude` columns, the `exclude` row says it also affects the default list columns, the `readonlyFields` row adds identity columns to the always-display-only list, the `permissions` row says unset `add` / `change` / `delete` follow `view` (unset everything: all allowed). 6 also: the `listPerPage` row says "a positive integer of at most 500" (decision 045 point 5, Q13). 7: at most 500 rows can be selected for one action; more gives a warning and runs nothing. 8: "Authentication modes" says the host's login page must still validate `next` (the admin sends only `safeNext` paths, decision 047); the cookies table says the HMAC key is derived per cookie from `secret` and `basePath`; "CSRF and headers" lists `X-Content-Type-Options: nosniff` and the CSP of routes.md (no `form-action` in external mode, so SSO redirect chains work) and says a host app that adds its own CSP must allow the same sources; "Permissions" says a model without any permission for the user answers 404 like an unknown page, and that granting `change` or `delete` without `view` shows row labels and read-only values on those pages. 9: search text has NUL characters removed and is cut to 200 characters; a malformed or out-of-range key in a URL is a 404 and in a filter is ignored. 11: the example rejects requests whose Host is not the bound host (loopback names allowed for loopback and wildcard binds, IP literals for wildcard binds; decision 048). A "Changelog" pointer to `CHANGELOG.md` is added after section 11.
 
 Changed 2026-10-07: section 6 points at all sources of `register()` constraints (decisions 013 item 13, 021, 023; admin.md step 5).
 

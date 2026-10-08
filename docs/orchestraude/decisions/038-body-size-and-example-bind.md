@@ -23,3 +23,4 @@ Hono's `parseBody` reads the full body with `arrayBuffer()` and has no limit; Ho
 ## Consequences
 - project-setup.md README outline (sections 8 and 10), example.md (`HOST`, printed URL, run instructions).
 - Follow-up changes in `README.md` and `example/server.ts`.
+- Changed 2026-10-08: the example server also rejects requests whose Host header is not an expected name for the bound host and port (DNS rebinding; decision 048).

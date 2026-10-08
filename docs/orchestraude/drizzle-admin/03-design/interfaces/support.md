@@ -10,6 +10,7 @@ Files: `src/messages.ts`, `src/time.ts`. No dependencies. Web-standard APIs only
 
 ### `src/messages.ts`
 Changed 2026-10-08: `alreadyDeleted` added for a single delete that removed 0 rows (decision 036).
+Changed 2026-10-08: `tooManySelected` added for the bulk-selection cap (decision 045).
 ```ts
 export const messages = {
   defaultSiteTitle: "サイト管理",
@@ -21,6 +22,7 @@ export const messages = {
   action: "操作", run: "実行", selectAll: "すべて選択", deleteSelected: "選択された項目の削除",
   resultCount: (n: number) => `${n} 件`, noSelection: "操作を実行するには、項目を選択してください。",
   unknownAction: "不明な操作です。",
+  tooManySelected: (max: number) => `一度に操作できるのは ${max} 件までです。`,   // warning, decision 045
   // forms
   save: "保存", saveAndAddAnother: "保存してもう一つ追加", saveAndContinue: "保存して編集を続ける",
   required: "このフィールドは必須です。", invalidNumber: "数値を入力してください。",

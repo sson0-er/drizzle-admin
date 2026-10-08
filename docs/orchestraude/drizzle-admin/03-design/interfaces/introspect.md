@@ -28,6 +28,7 @@ interface DialectAdapter {
 Sources: `getTableColumns(table)` and `getTableName(table)` from `drizzle-orm`; `getTableConfig` from `drizzle-orm/sqlite-core` or `drizzle-orm/pg-core`.
 
 ## Data formats
+Changed 2026-10-08: `valueCheck` added and `isGenerated` widened (decisions 045, 046).
 ```ts
 interface FieldMeta {
   key: string;            // property name (key of getTableColumns)
@@ -41,7 +42,8 @@ interface FieldMeta {
   isInteger: boolean;     // addition (decision 010)
   isLongText: boolean;    // addition
   isDateOnly: boolean;    // addition: calendar-date column; value is a UTC-midnight Date (kind date) or a "YYYY-MM-DD" string (kind string)
-  isGenerated: boolean;   // addition
+  isGenerated: boolean;   // addition: generated or identity column (decision 046)
+  valueCheck?: "int16" | "int32" | "int64" | "uuid";  // addition (decision 045): DB-enforced value domain; PG only
   foreignKey?: { table: Table; column: string; slug?: string };
 }
 interface ModelMeta { table: Table; tableName: string; pk: FieldMeta; fields: FieldMeta[] } // fields in definition order
@@ -51,6 +53,7 @@ interface ModelMeta { table: Table; tableName: string; pk: FieldMeta; fields: Fi
 Changed 2026-10-07: values of `isDateOnly` fields are UTC-midnight Dates (decision 019).
 Changed 2026-10-07: `isDateOnly` also covers PG `date()` string mode, which keeps kind string (decision 023).
 Changed 2026-10-07: SQLite `blob({mode:"bigint"})` is the SQLite bigint column and maps to kind bigint (decision 026).
+Changed 2026-10-08: `isGenerated` also covers identity columns (decision 046); new optional `valueCheck` for PG integer and uuid columns (decision 045).
 
 | Input | Result |
 |---|---|
@@ -60,7 +63,8 @@ Changed 2026-10-07: SQLite `blob({mode:"bigint"})` is the SQLite bigint column a
 | `isInteger` | kind number and columnType in SQLiteInteger, PgInteger, PgSmallInt, PgBigInt53, PgSerial, PgSmallSerial, PgBigSerial53 |
 | `isLongText` | kind string and columnType `PgText` |
 | `isDateOnly` | columnType `PgDate` (kind date) or `PgDateString` (kind string). For PgDate, drizzle returns and expects UTC-midnight Dates; for PgDateString it passes `YYYY-MM-DD` strings through unchanged. Other components must not apply the time zone to either, and must branch on `kind` to know the value type (decisions 019, 023; evidence: 2026-10-07-drizzle-pg-date-mapping, 2026-10-07-pg-date-string-mode-filtering) |
-| `isGenerated` | `column.generated` is defined |
+| `isGenerated` | `column.generated` is defined **or** `column.generatedIdentity` is defined (Changed 2026-10-08, decision 046: identity columns, PK or not, e.g. `integer().generatedByDefaultAsIdentity()`, which has `generated === undefined`; evidence: 2026-10-08-pg-key-input-domains). For an identity PK this changes only the flag, not the forms (it is already `isAutoIncrement`) |
+| `valueCheck` | Changed 2026-10-08 (decision 045): set only for these PG columnTypes, absent otherwise (all SQLite columns included): `PgSmallInt`, `PgSmallSerial` → `"int16"`; `PgInteger`, `PgSerial` → `"int32"`; `PgBigInt53`, `PgBigSerial53`, `PgBigInt64`, `PgBigSerial64` → `"int64"`; `PgUUID` → `"uuid"` (evidence: 2026-10-08-pg-key-input-domains). Used by `parseFieldValue` (data.md). `toSnapshot` copies it like other fields (the snapshots of PG integer and uuid columns gain it) |
 | PK set | columns with `primary === true` ∪ `getConfig().primaryKeyColumns` (by identity) |
 | `isAutoIncrement` | PK and (columnType `SQLiteInteger` **or** columnType in PgSerial, PgSmallSerial, PgBigSerial53, PgBigSerial64 **or** `column.generatedIdentity` defined) |
 | `foreignKey` | for FKs with exactly one column: `{ table: foreignTable, column: <key of foreignColumns[0] in getTableColumns(foreignTable)> }`. Multi-column FKs are ignored. `slug` is filled at finalization (admin.md) |

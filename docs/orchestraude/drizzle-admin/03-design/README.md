@@ -8,19 +8,20 @@ Pre-spec references "§N" point to `docs/pre-specs.md`. The pre-spec remains nor
 ## Components and responsibilities
 Changed 2026-10-08: views also own the fixed icon set, `src/views/icons.tsx` (decision 039).
 Changed 2026-10-08: the stylesheet has its own interface file, views-style.md (DADS-inspired restyle, decision 040).
+Changed 2026-10-08: security audit fixes (decisions 042-048): forms uses data's pure `parseFieldValue`; the example gains `host-guard.ts`; project setup gains `CHANGELOG.md` and a `prepack` build.
 
 | Component | Responsibility | Depends on | Interface file |
 |---|---|---|---|
 | admin (public API) | Public types, `createAdmin`, `register` validation, option defaults (`ResolvedModel`), registry finalization, `admin.app` / `admin.fetch` | introspect, routes, support | interfaces/admin.md |
 | introspect | Drizzle table → `ModelMeta` / `FieldMeta`; the only code touching Drizzle column internals | drizzle-orm | interfaces/introspect.md |
 | data | Repository (list/count/get/getMany/create/update/delete/options), query-condition builders, DB error classification | introspect types, support/time, drizzle-orm | interfaces/data.md |
-| forms | Form field layout, widget choice, coercion, zod schema, validation pipeline, widget rendering | introspect types, admin types, support | interfaces/forms.md |
+| forms | Form field layout, widget choice, coercion, zod schema, validation pipeline, widget rendering | introspect types, admin types, support, data (`parseFieldValue` only) | interfaces/forms.md |
 | auth | Session cookie, CSRF token check, flash cookie, safe `next`, login redirects, permission evaluation | hono/cookie, hono/csrf | interfaces/auth.md |
 | routes | Hono app assembly: middleware chain, every page/handler in §8, actions, PRG | admin, data, forms, auth, views | interfaces/routes.md, interfaces/routes-handlers.md |
 | views | Hono JSX pages, cell formatting, decorative icon set, CSS module, select-all script | support, forms (widgets) | interfaces/views.md, interfaces/views-style.md (stylesheet) |
 | support | `messages.ts` (all Japanese UI strings), `time.ts` (time-zone math) | none | interfaces/support.md |
-| project setup | package.json, tsconfig, Biome, vitest config, scripts, LICENSE, README content | none | interfaces/project-setup.md |
-| example | `example/` demo app (users, posts, tags), seed, server, run instructions | public API | interfaces/example.md |
+| project setup | package.json, tsconfig, Biome, vitest config, scripts, LICENSE, README content, CHANGELOG | none | interfaces/project-setup.md |
+| example | `example/` demo app (users, posts, tags), seed, server, Host check, run instructions | public API | interfaces/example.md |
 
 Source layout (§4 plus additions from decisions 006, 007 and this design):
 ```
@@ -32,17 +33,18 @@ src/auth/{session,csrf,flash,redirect,permissions}.ts
 src/routes/{index,middleware,context,dashboard,list,actions,form,delete,login}.ts
 src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx  src/views/{format,render,url}.ts
 src/static/admin-css.ts  src/static/select-all.ts
-example/{schema,seed,app,server}.ts
+example/{schema,seed,app,host-guard,server}.ts  CHANGELOG.md
 test/...
 ```
 
 ## Data flow
 Changed 2026-10-07: Origin check and cookie `Secure` flag follow `AdminConfig.publicOrigin` when set (decision 017); external mode keeps the CSRF token in the same session cookie (decision 014).
+Changed 2026-10-08: cookie keys derived per instance (decision 042), CSP and nosniff headers (decision 044), hidden models (decision 043), safe external `next` (decision 047).
 
 1. Setup: `createAdmin(config)` validates config → `admin.register(table, opts)` → `introspectTable(table, dialect)` → `ModelMeta` → option validation → `ResolvedModel` stored by slug.
-2. First access of `admin.app` / `admin.fetch` → `finalize()` resolves `foreignKey.slug`, validates cross-model options, freezes the registry → `buildApp(adminState)` creates the Hono app.
-3. Request: security headers (wrap) → static CSS route (no auth) → `hono/csrf` Origin check (unsafe form posts; expected origin = `publicOrigin` if configured, else the request URL origin) → session load/issue (signed cookie, `Secure` per `publicOrigin` or request scheme; `u: null` in external mode) → resolve user (session or `getUser`) → auth guard (redirect to login / `loginUrl`) → POST `_csrf` token check → handler.
-4. Handler: resolve model by slug (404) → permission check (403) → parse query/body → repository and forms → either render HTML (200 / 400) via `renderPage` (function form receiving the consumed flash, decision 027), or set flash + 303 redirect (PRG).
+2. First access of `admin.app` / `admin.fetch` → `finalize()` resolves `foreignKey.slug`, validates cross-model options, freezes the registry → `buildApp(adminState)` creates the Hono app, builds the CSP string once and prepares a memoized derivation of the session and flash signing keys from `secret`, cookie name and prefix, run on the first request (decisions 042, 044).
+3. Request: context init → security headers (wrap; incl. CSP and `nosniff`) → static CSS route (no auth) → `hono/csrf` Origin check (unsafe form posts; expected origin = `publicOrigin` if configured, else the request URL origin) → session load/issue (awaits the derived cookie keys; signed cookie, `Secure` per `publicOrigin` or request scheme; `u: null` in external mode) → resolve user (session or `getUser`) → auth guard (redirect to login / `loginUrl` with a `safeNext` target) → POST `_csrf` token check → handler.
+4. Handler: resolve model by slug (404, also for a model with no permission for the user) → permission check (403) → parse query/body → repository and forms → either render HTML (200 / 400) via `renderPage` (function form receiving the consumed flash, decision 027), or set flash + 303 redirect (PRG).
 5. List rendering: one count query, one page query, one batched `getMany` per FK column shown, and option queries per FK filter. The number of queries does not depend on the row count (no N+1).
 
 ## Error handling
@@ -52,18 +54,22 @@ Changed 2026-10-08: the trailing-slash redirect never leaves the prefix (decisio
 Changed 2026-10-08: allowlist instead of denylist after a tab-character bypass (decision 029).
 Changed 2026-10-08: whitespace excluded from the allowlist; decoded LF/CR 404 accepted as a known limitation (decision 029, former Q6).
 Changed 2026-10-08: vanished rows on delete and actions, non-DB errors on create/update, FK labels gated by `view` on the referenced model, password values never rendered (decisions 033, 034, 036, 037).
+Changed 2026-10-08: security audit fixes: hidden models are 404, input outside DB domains and oversized selections are not 500s, search text capped, `sessionMaxAgeSec` capped, excluded columns kept out of the default list (decisions 042, 043, 045, 046).
 
 - Configuration errors (`createAdmin`, `register`, finalization): throw `Error` with message prefix `drizzle-admin: ` naming the table/option/key. Never deferred to request time.
-- Unknown model slug, invalid or unknown primary key → 404 HTML page.
+- Unknown model slug, invalid or unknown primary key → 404 HTML page. A registered model on which the user has none of `view` / `add` / `change` / `delete` answers the same 404 on every model route, so its name is not revealed (decision 043). A primary key outside the column's DB domain (PG int2/int4/int8 range, non-uuid string for a uuid key, NUL character, value not in an enum) is an invalid key → 404; such an FK filter value is ignored and such `_selected` ids are skipped (decision 045).
 - Unmatched path with any method → 404 HTML page via an explicit all-methods fallback route, which also works when `admin.app` is mounted.
 - Unslashed GET path → 301 to the slashed path only when the path after the prefix is empty or a `/segment/...` shape with non-empty segments and no `\`, control character or whitespace (allowlist); anything else → 404 without `Location`, so no `Location` can point off-site, including with `basePath: "/"` (decision 029). Known limitation: paths with a decoded LF/CR never reach the admin routes, so they get Hono's (or the host's) plain 404 without `Location` and without the admin's security headers (decision 029).
-- Missing permission → 403 HTML page. Missing/invalid CSRF token or failed Origin check → 403 HTML page (layout, `messages.csrfFailed`).
+- Missing permission on a model that grants the user at least one permission → 403 HTML page. Unset `add` / `change` / `delete` follow `view` (decision 043). Missing/invalid CSRF token or failed Origin check → 403 HTML page (layout, `messages.csrfFailed`).
 - Unauthenticated → 302 redirect to `<prefix>/login/?next=...` (built-in) or `loginUrl?next=...` (external); external without `loginUrl` → 401.
 - Form problems (coercion, zod, `validate`, DB constraint, `beforeSave` failure) → 400 with the form re-rendered, raw submitted values kept, field and form-level errors shown.
+- More than 500 selected ids for a bulk action → warning flash `tooManySelected` + 303 back, no query (decision 045). The search text has NUL characters removed and is cut to 200 code points (decision 045).
 - Delete/action failures (FK violation, hook/action throw) → error flash + 303 to list. Rows that vanished concurrently: bulk delete or a confirm action with no surviving rows → `noSelection` warning + 303; a single delete that removes 0 rows → `alreadyDeleted` warning + 303 (decisions 033, 036).
 - Non-DB errors thrown by `repo.create` / `repo.update` are not form errors: they go to `onError` → 500 (decision 033).
 - Information the user may not see is not rendered: FK labels, links, filters and select choices of a referenced model need `view` on it (decision 034); `password`-widget values never appear in the HTML: inputs render empty, display-only fields and list cells show `********` (decision 037).
 - DB errors are classified by code (decision 011); raw messages are never rendered. Unexpected errors → `app.onError` → 500 generic page + `console.error`: redacted (`describeForLog`) for DB errors, full error otherwise.
+- `listPerPage` above 500 throws at `register()`, so a full page always fits the bulk-selection cap (decision 045 point 5).
+- `sessionMaxAgeSec` above 34560000 throws at `createAdmin`, because hono refuses to write such a cookie and every page would answer 500 (decision 042).
 - Configurations that used to fail at query time are prevented: PG search casts every column to text (decision 018), and incompatible widget overrides are rejected by `register()` (decision 021).
 - Date-only values (PG `date({mode:"date"})`) are UTC-midnight calendar dates everywhere, so the configured time zone never shifts the stored day (decision 019).
 - Date-only strings (PG `date()` string mode) stay `YYYY-MM-DD` strings everywhere; malformed or impossible dates are rejected by coercion as `invalidDate` instead of reaching the DB (decision 023).
@@ -81,22 +87,24 @@ Changed 2026-10-08: post-v1 restyle (decision 040): views-style.md added; open q
 Changed 2026-10-08: Q11 answered (option (a)); questions summary updated.
 Changed 2026-10-08: follow-up triage answers L011/L010 (decision 037 point 6) and L013 (decision 041) recorded; open question Q12 added; questions and decisions summaries updated.
 Changed 2026-10-08: Q12 answered (decision 037 point 7); questions summary updated.
+Changed 2026-10-08: security audit fixes (decisions 042-048): summaries of admin, auth, routes, routes-handlers, data, introspect, forms, views, support, example and project-setup updated; open questions Q13-Q14 added; decisions summary range updated.
+Changed 2026-10-08: Q13 (listPerPage capped at 500) and Q14 (full key-check scope kept) answered (decision 045); questions summary updated.
 
 | File | Summary |
 |---|---|
 | README.md | This overview: components, layout, data flow, error handling |
-| interfaces/admin.md | Public API types (§5.2 plus additions), createAdmin/register validation, ResolvedModel, finalization |
-| interfaces/introspect.md | `introspectTable`, ModelMeta/FieldMeta, kind and flag mapping, PK/FK rules, snapshot projection |
-| interfaces/data.md | Repository API, query builders (search/filter/order/pk parsing), DB error classification, Drizzle boundary |
-| interfaces/forms.md | Form field layout, widget defaults, coercion rules, zod schema, validation pipeline, widget rendering |
-| interfaces/auth.md | Session/flash cookies, CSRF check, safe `next`, login redirects, permission helper |
-| interfaces/routes.md | App assembly: AdminVars context, middleware order, route table, catch-all, error handling |
-| interfaces/routes-handlers.md | Per-page handler behavior: dashboard, list, actions, add/change (PRG, hooks), delete, login/logout |
-| interfaces/views.md | JSX page components and their props, stable selectors for tests, cell formatting, icon set and placement (decision 039), CSS and script modules |
+| interfaces/admin.md | Public API types (§5.2 plus additions), createAdmin/register validation (incl. `sessionMaxAgeSec` cap), ResolvedModel (default `listDisplay` without `exclude` keys, permission inheritance from `view`), finalization |
+| interfaces/introspect.md | `introspectTable`, ModelMeta/FieldMeta, kind and flag mapping (identity columns are generated; PG `valueCheck`), PK/FK rules, snapshot projection |
+| interfaces/data.md | Repository API, query builders (search/filter/order/pk parsing with DB value domains), DB error classification, Drizzle boundary |
+| interfaces/forms.md | Form field layout, widget defaults, coercion rules (integers via `parseFieldValue`), zod schema, validation pipeline, widget rendering |
+| interfaces/auth.md | Session/flash cookies with per-instance derived keys, CSRF check, safe `next`, login redirects, permission helpers (`can`, `canAny`) |
+| interfaces/routes.md | App assembly: AdminVars context (incl. cookie keys), middleware order, security headers and CSP, hidden-model 404, route table, catch-all, error handling |
+| interfaces/routes-handlers.md | Per-page handler behavior: dashboard, list (search text normalization), actions (selection cap), add/change (PRG, hooks), delete, login/logout |
+| interfaces/views.md | JSX page components and their props, stable selectors for tests, cell formatting, icon set and placement (decision 039), CSS and script modules (script hash for the CSP) |
 | interfaces/views-style.md | `ADMIN_CSS` after the DADS-inspired restyle (decision 040): light/dark color tokens with sources, typography, reference rules per area, button variant mapping, focus ring, 767px block, attribution comment |
-| interfaces/support.md | `messages.ts` structure and required keys, `time.ts` functions (time-zone math, UTC calendar dates for date-only values) |
-| interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
-| interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
-| test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: Q12 (`register()` rejects `password`-widget fields in `searchFields`, `ordering` or as the primary key; decision 037 point 7), L011/L010 (password-widget list columns not sortable, no FK link on masked cells; decision 037 point 6), L013 (DoD import-line exception; decision 041), Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
-| decisions-and-evidence.md | Decisions 001-041 and evidence ids referenced by this design |
+| interfaces/support.md | `messages.ts` structure and required keys (incl. `tooManySelected`), `time.ts` functions (time-zone math, UTC calendar dates for date-only values) |
+| interfaces/project-setup.md | package.json (incl. `prepack`), tsconfig(s), biome.json, vitest config, scripts, LICENSE, CHANGELOG, README outline |
+| interfaces/example.md | Example schema, seed, Host check (`host-guard.ts`), server, and run instructions for the user's browser check |
+| test-strategy.md | Tests per component, dialect parameterization, helpers, security audit fix cases, §10 test matrix, phase gates |
+| questions.md | Open: none; resolved: Q13 (`register()` rejects `listPerPage` above 500), Q14 (uuid / NUL / enum key checks kept), security audit fixes (decisions 042-048), Q12 (`register()` rejects `password`-widget fields in `searchFields`, `ordering` or as the primary key; decision 037 point 7), L011/L010 (password-widget list columns not sortable, no FK link on masked cells; decision 037 point 6), L013 (DoD import-line exception; decision 041), Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| decisions-and-evidence.md | Decisions 001-048 and evidence ids referenced by this design |

@@ -35,3 +35,8 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-dads-icon-terms | Does DADS define an icon set, and under what license? | expires 2027-01-06
 - 2026-10-08-dads-restyle-palette-contrast | For decision 040, which DADS primitives does the restyle palette use and do all light/dark pairs meet WCAG 4.5:1 / 3:1? | expires 2027-01-06
 - 2026-10-08-masked-list-column-sort-and-fk-link | For L010/L011, can a password-widget list column be sorted or FK-linked, and is password allowed on FK columns? | expires 2027-01-06
+- 2026-10-08-hono-signed-cookie-key-and-max-age | For decision 042, can hono signed cookies use a derived binary key, what is signed, and what happens with Max-Age above 400 days? | expires 2027-01-06
+- 2026-10-08-csp-hash-and-form-action | For decision 044, how do CSP inline-script hashes work and does form-action apply to redirects after a form POST? | expires 2027-01-06
+- 2026-10-08-prepack-lifecycle | For decision 048, which lifecycle script runs on every npm/pnpm pack and publish? | expires 2027-01-06
+- 2026-10-08-bind-parameter-limits | For decision 045, how many bound parameters can one statement carry on SQLite and PostgreSQL? | expires 2027-01-06
+- 2026-10-08-pg-key-input-domains | For decision 045, which PK/FK inputs make PostgreSQL error, and what are drizzle's column type names? | expires 2027-01-06

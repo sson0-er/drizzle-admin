@@ -3,6 +3,7 @@
 Files: `src/routes/dashboard.ts`, `list.ts`, `actions.ts`, `form.ts`, `delete.ts`, `login.ts`.
 Middleware, context helpers (`renderPage`, `redirectWithFlash`, `modelOr404`) and the route table are in [routes.md](routes.md). Views and their props are in [views.md](views.md).
 Notation: `P` = `prefix`, `M` = resolved model, `U` = current user, `ctx` = `HookCtx` (decision 015), `list URL` = `${P}/${M.slug}/`.
+Changed 2026-10-08: "`M` or 404" in every handler below is `modelOr404` (routes.md), which also answers 404 for a model on which `U` has none of the four permissions (decision 043). The later "or 403" checks are unchanged and only apply to models the user holds at least one permission on.
 
 ## Rendering pages
 Changed 2026-10-08: 200/400 pages use the function form of `renderPage` (decision 027).
@@ -22,7 +23,7 @@ Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug
 
 1. `M` or 404; `view` permission or 403.
 2. Parse the query (decision 013 item 6):
-   - `q`: used only if `M.searchFields.length > 0`.
+   - `q`: used only if `M.searchFields.length > 0`. Changed 2026-10-08 (decision 045): normalized as `Array.from(raw.replaceAll("\u0000", "").trim()).slice(0, 200).join("")` where `raw = params.get("q") ?? ""` (NUL characters removed, trimmed, cut to 200 code points; `SEARCH_MAX_LENGTH = 200`, module-private). The normalized value is passed to `repo.list` and to `ListPage` as `q` (the search box echoes it). An empty result means no search.
    - `o`: comma list; each item `-?key`; keep keys in `M.listDisplay` whose widget is not `password` (`M.widgets[key] !== "password"`), dedupe. A `password` key is dropped silently, like any other unknown key; the remaining keys still apply (decision 037 point 6). Empty → `defaultOrdering(M)` (`M.ordering`; still empty → `[{ key: pk, desc: true }]`).
    - `f_<key>` for `key` in `M.listFilter` only; an empty value is ignored. For an FK filter with `!refVisible` the parameter is ignored (not passed to `repo.list`), because that filter is not offered (step 5; decision 034).
    - `p`: integer ≥ 1, else 1.
@@ -41,7 +42,7 @@ Changed 2026-10-08: no surviving rows → `noSelection` warning for `delete_sele
 
 Body: `action`, `_selected` (repeated), optional `_confirm=1`. `listUrl` = `${prefix}/${M.slug}/`; `backQuery` = the request's query string (leading `?`, or `""`); `back` = `listUrl + backQuery`.
 Every `ConfirmActionPage` render below passes `modelLabel: M.label`, `action` (the submitted value), `listHref: listUrl` and `backQuery`, plus the props listed in its step.
-1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back.
+1. `M` or 404. Selected ids: strings from `_selected` (array or single), deduped. None → warning flash `noSelection`, 303 back. Changed 2026-10-08 (decision 045): more than `MAX_SELECTED` ids (`export const MAX_SELECTED = 500` in `src/routes/actions.ts`; exported because `register()` caps `listPerPage` with the same constant, admin.md; design review, security-audit fix round) → warning flash `messages.tooManySelected(500)`, 303 back, with no DB query and no `run`. Both checks run before the action lookup and the permission checks below. Ids that `parsePk` rejects (e.g. out of the column's integer range, data.md) are dropped by `getMany` / `delete`, so they act like vanished rows.
 2. `action === "delete_selected"`:
    - no `delete` permission → 403.
    - `rows = repo.getMany(...)` (both steps). `rows` empty (every selected row vanished) → warning flash `noSelection`, 303 back (decision 033 item 3).
@@ -72,7 +73,7 @@ Changed 2026-10-07: FK choices are computed as in Add step 2 (review finding).
 Changed 2026-10-08: `FormPage` gets `displayRow: row` and `timeZone: state.config.timeZone` on GET and on the 400 re-render (decision 030).
 Changed 2026-10-08: `password` fields render empty and an empty submission keeps the stored value (decision 037); non-DB errors from `repo.update` are 500s (decision 033 item 10).
 
-1. `M` or 404; GET needs `view`, POST needs `change` (else 403). `row = repo.get(M.meta, pk)` → 404 if null.
+1. `M` or 404; GET needs `view`, POST needs `change` (else 403). `row = repo.get(M.meta, pk)` → 404 if null (also for a `pk` outside the column's domain, which `parsePk` rejects without a query; decision 045).
 2. FK choices exactly as Add step 2 (GET and POST; `buildFormGroups` needs them for both). `canChange = can(M, "change", U)`; groups with `canChange` (all display-only when false). Save buttons only if `canChange`; delete link only if `can(M, "delete", U)`.
 3. GET → `FormPage({ mode: "change", groups, values, displayRow: row, timeZone, canSave: canChange, deleteHref? })` with `values` = `toFormValue(field, row[key], timeZone)` of each editable field, 200.
 4. POST → as Add steps 4-7 with `mode: "change"` and `repo.update(M.meta, pk, data)`; `null` → 404. As in Add step 6, only DB errors become form errors; others are rethrown (500). An editable `password`-widget field submitted empty is absent from `data` (forms.md), so `update` keeps its stored value; its input always renders empty, also on the 400 re-render (decision 037). The 400 re-render passes the echoed request strings as `values` and the stored `row` (from step 1) as `displayRow`, plus `timeZone`.

@@ -19,6 +19,7 @@ Changed 2026-10-08: added 039 (post-v1 user request: UI icons as static inline S
 Changed 2026-10-08: added 040 (post-v1 user request: DADS-inspired restyle of `ADMIN_CSS`, own dark palette and focus ring); 039 point 6 colors superseded; evidence 2026-10-08-dads-restyle-palette-contrast added.
 Changed 2026-10-08: 037 point 6 added (L011, L010: password-widget columns not sortable, no FK link on masked cells); added 041 (L013: DoD test-diff rule allows import lines that only add names); evidence 2026-10-08-masked-list-column-sort-and-fk-link added.
 Changed 2026-10-08: 037 point 7 added (Q12: `register()` rejects a `password` widget on the primary key or on a field in `searchFields` / `ordering`).
+Changed 2026-10-08: added 042-048 (security audit fixes approved by the user); 007 is extended by 044 (the inline script is now also allowed by its CSP hash), 008 by 042 (derived signing keys), 038 by 048 (example Host check).
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -62,6 +63,13 @@ Changed 2026-10-08: 037 point 7 added (Q12: `register()` rejects a `password` wi
 - 039-ui-icons-inline-svg: post-v1 icons as static inline SVG (`src/views/icons.tsx`, 9 fixed icons, `aria-hidden`, `currentColor`); boolean list cells and read-only boolean form fields (`DisplayValue`, Q9) get a colored mark with visually hidden `messages.yes` / `messages.no`; no `info` flash level (Q8); CSS mask-image, sprite and glyph alternatives rejected.
 - 040-dads-inspired-restyle: post-v1 restyle using DADS token values with our own CSS, selectors and markup; 28 color tokens in both schemes (own dark palette from DADS hues, contrast verified), black/yellow focus ring swapped in dark mode, 16px/1.7 body and 48px controls, denser 14px table, solid/outline/text/danger button mapping via existing selectors, card flash; attribution only as a source comment (views-style.md).
 - 041-dod-test-diff-import-lines: task DoDs that limit removed lines in `git diff test/` allow edits to existing import lines that only add names; task 38's import edits accepted (L013).
+- 042-instance-bound-cookie-keys: `da_session` and `da_flash` are signed with `HMAC-SHA256(secret, cookieName + "\0" + prefix)` keys derived once per app, so instances with different basePaths (same secret) reject each other's cookies and session/flash values are not interchangeable; replicas with the same basePath still share sessions; README recommends a distinct secret per instance; everyone is signed out once; `sessionMaxAgeSec` capped at 34560000 (audit B).
+- 043-permission-inheritance-and-hidden-models: unset `add` / `change` / `delete` take the resolved `view`; a model with none of the four permissions for the user answers 404 like an unknown slug on every model route (`modelOr404`); otherwise per-route 403s stay (audit A and the 403/404 oracle).
+- 044-csp-and-nosniff-headers: every admin response gets `X-Content-Type-Options: nosniff` and `default-src 'none'; script-src 'sha256-<SELECT_ALL_SCRIPT_SHA256>'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'` (external mode: no `form-action`, because SSO redirect chains after a form POST cannot be listed); the hash is a pinned constant (static script route rejected as larger).
+- 045-request-input-bounds: `parseFieldValue` rejects values outside PG int2/int4/int8 ranges, non-uuid strings for uuid keys, NUL characters and non-enum values (→ 404 / filter ignored / id skipped); `q` loses NUL characters and is cut to 200 code points; bulk actions take at most 500 ids (warning `tooManySelected`); integer form input goes through `parseFieldValue` (`0x`, `0b`, `1e3`, unsafe integers → `invalidInteger`). (Changed 2026-10-08: point 5, `register()` rejects `listPerPage` above 500 (Q13); the uuid / NUL / enum checks confirmed (Q14).)
+- 046-column-exposure-defaults: the default `listDisplay` drops `exclude` keys (first 5 of the remaining `[pk, ...others]`, `[pk]` if none); `isGenerated` covers identity columns, so non-PK identity columns are display-only.
+- 047-external-login-next-safenext: the external-mode login redirect sends `next = safeNext(target, prefix)`; README tells hosts to still validate `next`.
+- 048-example-host-guard-prepack-changelog: `example/host-guard.ts` rejects unexpected Host headers (loopback names for loopback/wildcard binds, IP literals for wildcard binds) with 403; `"prepack": "pnpm build"`; new `CHANGELOG.md` with the audit changes, in `files`.
 
 ## Evidence referenced
 Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
@@ -69,6 +77,7 @@ Changed 2026-10-08: 2026-10-08-node-listen-empty-hostname added (decision 038 am
 Changed 2026-10-08: four entries for decision 039 (icons) added; they expire 2027-01-06.
 Changed 2026-10-08: DADS research entries (2026-10-08-dads-*) and 2026-10-08-dads-restyle-palette-contrast added for decision 040; they expire 2027-01-06.
 Changed 2026-10-08: 2026-10-08-masked-list-column-sort-and-fk-link added (decision 037 point 6, Q12).
+Changed 2026-10-08: five entries for the security audit fixes (decisions 042, 044, 045, 048) added; they expire 2027-01-06.
 - 2026-10-07-drizzle-orm-release-lines (research)
 - 2026-10-07-drizzle-column-introspection (research)
 - 2026-10-07-hono-csrf-and-jsx (research)
@@ -101,6 +110,11 @@ Changed 2026-10-08: 2026-10-08-masked-list-column-sort-and-fk-link added (decisi
 - 2026-10-08-dads-a11y-focus-contrast (research, decision 040): focus ring 4px black outline, 2px offset, 2px yellow-300 halo; link underline 1px/3px, offset 3px; contrast of DADS colors on white.
 - 2026-10-08-dads-icon-terms (research): DADS has no icon font; inline SVGs use `currentcolor` and `aria-hidden`, consistent with decision 039.
 - 2026-10-08-dads-restyle-palette-contrast (design, decision 040): DADS primitives used by the restyle; every light/dark text pair >= 4.5:1 and non-text pair >= 3:1; dark black ring 1.21:1 and red-800 on gray-50 4.11:1 (rejected options).
+- 2026-10-08-hono-signed-cookie-key-and-max-age (design, decision 042): hono's signed-cookie helpers accept a `BufferSource` key; only the value is signed (no name, path or instance); the serializer throws for `maxAge > 34560000`. Expires 2027-01-06.
+- 2026-10-08-csp-hash-and-form-action (design, decision 044): `'sha256-...'` allows an inline script whose exact text hashes to it (Baseline since 2016); `form-action` blocks redirects after a form POST in Chrome but not in Firefox (MDN). Expires 2027-01-06.
+- 2026-10-08-prepack-lifecycle (design, decision 048): npm runs `prepack` on pack, publish and git-dependency installs, `prepublishOnly` only on publish; pnpm publish lists both; `pnpm pack` running `prepack` is unconfirmed. Expires 2027-01-06.
+- 2026-10-08-bind-parameter-limits (design, decision 045): SQLite allows 32766 parameters since 3.32.0 (999 before); PG's Bind counts parameters in an Int16. Expires 2027-01-06.
+- 2026-10-08-pg-key-input-domains (design, decisions 045, 046): PG int2/int4/int8 ranges and errors; uuid input forms and canonical output; NUL in text errors (22021, audit); drizzle columnType names; identity columns have `generatedIdentity` but no `generated`. Expires 2027-01-06.
 - 2026-10-08-masked-list-column-sort-and-fk-link (design, decision 037 point 6): `o` accepts every `listDisplay` key, the list FK link ignores the mask, `allowedWidgets` never offers `password` for FK columns, and `register()` does not check widgets of `searchFields`, `ordering` or the primary key. Expires 2027-01-06.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

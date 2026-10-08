@@ -21,3 +21,4 @@ tsc does not handle CSS assets (evidence: 2026-10-07-ts7-vitest-biome-compat). H
 ## Consequences
 - CSS edits happen in a TS file (Biome formats it as TS, not as CSS).
 - The script must avoid comparisons and logical operators that use `<`, `>` or `&`.
+- Changed 2026-10-08: the inline script is also allowed by a Content-Security-Policy hash (`SELECT_ALL_SCRIPT_SHA256`), so any edit to the script must update that constant (decision 044).

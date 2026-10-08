@@ -46,6 +46,12 @@
 | 40 | password-hardening-and-cleanup | 36, 38 | Follow-up (decision 037 points 6-7): `password`-widget list columns not sortable (`sortHref: null`, `?o=` drops the key) and no FK link on masked cells (L011, L010); `register()` rejects `password` on the PK / in `searchFields` / in `ordering` (Q12); README external-mode wording (L014) and password notes; shared rule 0-3 precedence helper for `formatCell` / `cellBoolean` (L001); `Icon` guard kept with a why-comment (L007) |
 | 41 | test-precision | 33, 40 | Follow-up, tests only: denied add POST creates no row (L008/L019), unique 403-matrix titles (L012), flash XSS text kept (L022), aria-hidden check per render (L017), one case per `DisplayValue` row (L020), no `?? doc` fallback (L023), 64/65-char name in `describeForLog` (L026) |
 | 42 | register-check-order | 40, 41 | Follow-up (task 40/41 review lows): `register()` password-widget checks moved to a second loop after the `allowedWidgets` loop (admin.md step 5 order), braces on all three, order-pinning test in `test/register.test.ts`; `DisplayValue` time-zone `it.each` rows written out literally in `test/widgets.test.ts` |
+| 43 | instance-bound-cookie-keys | 42 | Security audit (decisions 042, 047): `deriveCookieKey`, `CookieOpts.key` / `FlashOpts.key`, lazily derived keys in `AdminVars.cookieKeys`, `cookieOpts(c)` / `flashOpts(c)`; `sessionMaxAgeSec` ≤ 34560000; external-mode `next` through `safeNext`; cross-instance, replica and external-`next` tests |
+| 44 | permission-inheritance-and-hidden-models | 43 | Security audit (decisions 043, 046 point 1): unset `add` / `change` / `delete` inherit `view`; `canAny`; `modelOr404` answers 404 for a model with no permission; default `listDisplay` skips `exclude`; existing `view: false` 403 tests become 404 |
+| 45 | key-value-domains-and-identity | 44 | Security audit (decisions 045 points 1, 4, 6; 046 point 2): `FieldMeta.valueCheck`, identity columns `isGenerated`, `parseFieldValue` PG int/uuid/NUL/enum domains, integer form coercion via `parseFieldValue`; PG snapshot update |
+| 46 | search-and-selection-caps | 44, 45 | Security audit (decision 045 points 2, 3, 5): `q` NUL strip + 200 code points, `MAX_SELECTED = 500` cap with `tooManySelected` warning, `register()` rejects `listPerPage` > 500 |
+| 47 | csp-and-nosniff | 43 | Security audit (decision 044): `SELECT_ALL_SCRIPT_SHA256` + hash pin test, `securityHeaders(csp)` with `buildCsp(authMode)` (no `form-action` in external mode), `nosniff` on every response |
+| 48 | example-host-guard-and-docs | 43, 44, 45, 46, 47 | Security audit (decision 048 + docs of 042-047): `example/host-guard.ts` and server wiring, `prepack`, `CHANGELOG.md`, README updates, CLAUDE.md "Security rules" (derived cookie keys, CSP hash rule) |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -133,6 +139,31 @@ Execution order: 41 → 42
   - 40 → 42: the `register` widget loop in `src/admin.ts`;
   - 41 → 42: the `DisplayValue` table in `test/widgets.test.ts`.
 - Decision 041 applies to the test-diff rule.
+
+### Security audit fix tasks 43-48 (decisions 042-048, Q13, Q14)
+Execution order: 42 → 43 → 44 → 45 → 46 → 47 → 48
+
+- Tasks 01-42 are done and unchanged. Sources: decisions 042-048, the design changes they list (admin, auth, routes, routes-handlers, data, introspect, forms, views, support, example, project-setup), test-strategy.md "Security audit fixes (decisions 042-048)", questions.md Q13 (`listPerPage` ≤ 500) and Q14 (uuid / NUL / enum checks kept), and the original findings in `security-audit/`.
+- Six tasks instead of the suggested four: the "input bounds" group touches 7 source and 11 test files, so it is split by layer into 45 (introspect / data / forms: value domains, identity, integer coercion) and 46 (routes / admin: search text, selection cap, `listPerPage`). The "headers & surroundings" group is split into 47 (library CSP, tested by `headers.test.ts`) and 48 (example, packaging and docs), so README and CHANGELOG are written last, against the final behavior.
+- Task 43 is still large (7 source and 4 test files), because the derived key changes every cookie call site at once (`session.ts`, `flash.ts`, `context.ts`, `middleware.ts`, `index.ts`, `login.ts`). The `sessionMaxAgeSec` cap and the external `next` fix are one-line changes in files it already touches (`src/admin.ts` aside).
+- The default `listDisplay` fix (decision 046 point 1) goes into task 44 rather than the input-bounds tasks. It edits the same `ResolvedModel` block of `src/admin.ts` as the permission inheritance, and test-strategy.md groups both under the `register.test.ts` defaults bullet. The identity-column fix (046 point 2) goes into 45 with introspection.
+- Dependencies come from shared files:
+  - 42 → 43: `src/admin.ts`;
+  - 43 → 44: `src/routes/context.ts` (`cookieOpts` / `flashOpts` vs `modelOr404`), `src/admin.ts`, `test/auth.test.ts`;
+  - 44 → 45: `test/list.test.ts`, `test/form.test.ts` (44 turns `view: false` 403 assertions into 404, 45 adds cases);
+  - 44 / 45 → 46: `src/admin.ts` and `test/register.test.ts` (44), `test/list.test.ts` (44, 45);
+  - 43 → 47: `src/routes/middleware.ts`, `src/routes/index.ts`;
+  - 43-47 → 48: README.md and CHANGELOG.md describe all of them; CLAUDE.md names `deriveCookieKey` (43) and `SELECT_ALL_SCRIPT_SHA256` / `buildCsp` (47).
+- Parallelizable later: 47 only needs 43, so it can run alongside 44-46.
+- Every task's DoD requires its new tests to fail on the pre-change code (recorded in History) and `scripts/verify.sh`.
+- Planner decisions:
+  - **`buildCsp` export (task 47)**: routes.md calls `buildCsp(authMode)` module-private in `middleware.ts`, but also says the policy is built once in `buildApp` (`index.ts`) and passed to `securityHeaders(csp)`. Task 47 exports `buildCsp` and records the export in History, so routes.md can be synced.
+  - **Hidden-model tests (task 44)** go in `test/auth.test.ts`, next to the 403 matrix and its `clientWith` helper (test-strategy.md allows "`pages.test.ts` or a permissions test"). The matrix's two `view` rows now expect 404, as test-strategy.md requires.
+  - **Changelog pointer (task 48)**: project-setup.md adds a "Changelog" pointer "after section 11", but `test/readme.test.ts` pins the exact list of `##` headings. The pointer goes inside "Development" (a sentence or a `###` subsection) instead of a new `##` heading.
+  - **CLAUDE.md (task 48)**: the "Security rules" edit was requested by the orchestrator for this round. Only that section changes. If the permission system refuses the edit, the rest of task 48 still completes and the item is reported blocked.
+  - **Planner-added tests**: `canAny` unit rows (44), a `fields.test.ts` case for a non-PK identity column (45), and a `hostGuard` middleware case (48). test-strategy.md does not list them, but each covers a behavior that the shared DoD requires to be tested.
+- Design text not yet updated, which the tasks follow anyway (orchestrator to sync): routes.md describes `buildCsp` as module-private (task 47 exports it); project-setup.md places the Changelog pointer "after section 11" (task 48 places it inside section 11).
+- Manual checks reported as 未確認 until run: the CSP console check of task 47 and the Host-header `curl` check of task 48.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes

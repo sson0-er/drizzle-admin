@@ -1,7 +1,7 @@
 # Interface: auth
 
 Files: `src/auth/session.ts`, `src/auth/csrf.ts`, `src/auth/flash.ts`, `src/auth/redirect.ts`, `src/auth/permissions.ts`.
-Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `hono/csrf`. Web Crypto only (`crypto.getRandomValues`). No `node:` imports.
+Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `hono/csrf`. Web Crypto only (`crypto.getRandomValues`, and `crypto.subtle` HMAC for `deriveCookieKey`). No `node:` imports.
 
 ## Responsibilities
 - Signed session cookie (§10) carrying user, CSRF token and issue time.
@@ -16,10 +16,14 @@ Uses `hono/cookie` (`getSignedCookie`, `setSignedCookie`, `deleteCookie`) and `h
 Changed 2026-10-07: `CookieOpts` gained `publicOrigin` and `isSecure()` decides the `Secure` flag (decision 017); external-mode use fixed (decision 014).
 Changed 2026-10-08: `clearSession` deletes with the same attributes as `writeSession`, including `Secure` (decision 036).
 Changed 2026-10-08: exported helper `cookieAttrs` recorded (added by task 30); all session and flash cookie sets and deletes use it, with `maxAge` added only on sets (decision 036, L072).
+Changed 2026-10-08: cookies are signed with keys derived per instance and per cookie (`deriveCookieKey`); `CookieOpts.secret` is replaced by `key` (decision 042).
 ```ts
 export interface Session { u: AdminUser | null; csrf: string; iat: number } // iat = unix seconds
 export const SESSION_COOKIE = "da_session";
-export interface CookieOpts { secret: string; prefix: string; maxAgeSec: number; publicOrigin: string | null }
+export interface CookieOpts { key: ArrayBuffer; prefix: string; maxAgeSec: number; publicOrigin: string | null }
+  // key = deriveCookieKey(secret, SESSION_COOKIE, prefix), derived once per app (routes.md)
+export async function deriveCookieKey(secret: string, cookieName: string, prefix: string): Promise<ArrayBuffer>;
+  // HMAC-SHA256 with key UTF-8(secret) over UTF-8(`${cookieName}\0${prefix}`): 32 bytes (decision 042)
 export async function readSession(c: Context, o: CookieOpts, now: number): Promise<Session | null>;
 export async function writeSession(c: Context, o: CookieOpts, s: Session): Promise<void>;
 export function clearSession(c: Context, o: CookieOpts): void;
@@ -32,6 +36,7 @@ export function cookieAttrs(c: Context, prefix: string, publicOrigin: string | n
   // { httpOnly: true, sameSite: "Lax", path: prefix || "/", secure: isSecure(c, publicOrigin) } as const
 ```
 - `cookieAttrs` is the single source of the attributes shared by every set and delete of `da_session` and `da_flash` (`writeSession`, `clearSession`, `addFlash`, `consumeFlash`). Deletions must carry the same attributes as sets (decision 036), so the four call sites must not build attributes themselves. Sets spread it and add `maxAge`; deletes pass it unchanged (decision 036, L072).
+- `deriveCookieKey` uses Web Crypto only: `crypto.subtle.importKey("raw", UTF-8(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"])`, then `crypto.subtle.sign("HMAC", key, UTF-8(cookieName + "\0" + prefix))`. `prefix` is the normalized prefix (`""` for basePath `"/"`). The result is passed unchanged as the `secret` argument of hono's `getSignedCookie` / `setSignedCookie`, which accept a `BufferSource` and import it as a raw HMAC key (evidence: 2026-10-08-hono-signed-cookie-key-and-max-age). Consequences (decision 042): instances with different prefixes reject each other's cookies even with the same `secret`; a `da_session` value never verifies as `da_flash` and the reverse; instances with the same `secret` and prefix (replicas) share sessions.
 - `readSession` returns `null` if the cookie is missing, the signature is invalid (`getSignedCookie` → `false`), the JSON is malformed or has the wrong shape (validate: `u` null or `{id: string, name: string}`, `csrf` non-empty string, `iat` finite number), or `now - iat > maxAgeSec` or `iat > now + 60`.
 - `writeSession` cookie attributes: `{ ...cookieAttrs(c, o.prefix, o.publicOrigin), maxAge: o.maxAgeSec }`, i.e. `httpOnly: true`, `sameSite: "Lax"`, `path: prefix || "/"`, `maxAge: maxAgeSec`, `secure: isSecure(c, o.publicOrigin)`.
 - External-auth mode (decision 014): the same cookie is used with `u` always `null`; it only carries `csrf` and `iat`. Callers never pass a user to `newSession` in external mode, and the user comes from `getUser` (routes.md).
@@ -55,11 +60,13 @@ Whether hono compares the string `origin` option by exact equality is unverified
 Changed 2026-10-07: options gained `publicOrigin` for the `Secure` flag (decision 017).
 Changed 2026-10-08: several `da_flash` Set-Cookie headers per response are acceptable (decision 033 item 1); `consumeFlash` deletes with the same attributes as `addFlash`, including `Secure` (decision 036).
 Changed 2026-10-08: `addFlash` and `consumeFlash` take their attributes from `cookieAttrs` imported from `session.ts` (task 30; decision 036, L072).
+Changed 2026-10-08: `FlashOpts.secret` is replaced by `key`, the derived flash key (decision 042).
 ```ts
 export type FlashLevel = "success" | "warning" | "error";
 export interface FlashMessage { level: FlashLevel; text: string }
 export const FLASH_COOKIE = "da_flash";
-export interface FlashOpts { secret: string; prefix: string; publicOrigin: string | null }
+export interface FlashOpts { key: ArrayBuffer; prefix: string; publicOrigin: string | null }
+  // key = deriveCookieKey(secret, FLASH_COOKIE, prefix) (session.ts, decision 042)
 export async function addFlash(c: Context, o: FlashOpts, msgs: FlashMessage[]): Promise<void>;
 export async function consumeFlash(c: Context, o: FlashOpts): Promise<FlashMessage[]>;
 ```
@@ -73,6 +80,7 @@ export function loginRedirectUrl(prefix: string, currentPathAndQuery: string): s
 export function externalLoginUrl(loginUrl: string, currentPathAndQuery: string): string;
   // appends `next=` with "?" or "&" depending on whether loginUrl already has a query
 ```
+Changed 2026-10-08: the auth guard passes `safeNext(target, prefix)` to `externalLoginUrl`, never the raw target (decision 047). Both functions are unchanged.
 Changed 2026-10-08: `safeNext` also judges the percent-decoded path; decoded whitespace and encoded `%2F` are allowed, decoded `.`/`..` segments, control characters and `\`, raw `//` and malformed escapes are rejected (user decision after the task 22 review; decision 032, consistent with decision 029).
 
 `safeNext` returns a value only if every check below holds, in this order; the first failing check returns `${prefix}/`. Let `url = new URL(next, "http://x.invalid")`, `raw = url.pathname` (still percent-encoded) and `decoded = decodeURIComponent(raw)`.
@@ -93,15 +101,19 @@ Callers must pass the raw percent-encoded path in `next`. Hono's `c.req.path` de
 
 ### `permissions.ts`
 Changed 2026-10-07: custom-action permission fixed to `change` (decision 016).
+Changed 2026-10-08: `canAny` added for the hidden-model rule (decision 043); the inheritance of unset entries lives in `ResolvedModel.permissions` (admin.md), so `can` is unchanged.
 ```ts
 export type Perm = "view" | "add" | "change" | "delete";
 export function can(model: ResolvedModel, perm: Perm, user: AdminUser): boolean;
+export function canAny(model: ResolvedModel, user: AdminUser): boolean;
+  // true if can() is true for at least one of view, add, change, delete; false = the model is hidden (decision 043)
 export const ACTION_PERMISSION: Perm = "change"; // custom actions (decision 016); built-in delete_selected uses "delete"
 ```
 
 ## Data formats
-- Session cookie value: hono signed-cookie format (URL-encoded JSON + `.` + base64 HMAC-SHA256; tampered → `false`; evidence: 2026-10-07-hono-routing-cookies-script-escaping) of `{"u":...,"csrf":"...","iat":...}`.
-- Flash cookie value: same signing, JSON array of `FlashMessage`.
+Changed 2026-10-08: the HMAC key is the derived per-cookie key, not `secret` (decision 042).
+- Session cookie value: hono signed-cookie format (URL-encoded JSON + `.` + base64 HMAC-SHA256 with the derived session key; tampered → `false`; evidence: 2026-10-07-hono-routing-cookies-script-escaping) of `{"u":...,"csrf":"...","iat":...}`.
+- Flash cookie value: same format with the derived flash key, JSON array of `FlashMessage`.
 
 ## Errors
 - Nothing throws on bad cookies; they read as absent. Token/Origin failures are turned into 403 by routes ([routes.md](routes.md)).
