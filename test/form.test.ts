@@ -178,6 +178,18 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       }
     });
 
+    // Runs before the tests that add authors, so the four seeded authors are all there is.
+    it.each([
+      { name: "no ordering (primary key descending)", options: {}, ids: ["4", "3", "2", "1"] },
+      { name: 'ordering ["id"]', options: { ordering: ["id"] }, ids: ["1", "2", "3", "4"] },
+    ])("orders the FK select by the referenced model's default: $name", async (c) => {
+      const own = await adminOn(t, fixture, { authors: c.options, articles: {} });
+      const doc = await docOf(await own.get("/admin/articles/add/"));
+      const select = qs(rowOf(doc, "authorId"), { tag: "select" });
+      const values = qsa(select ?? doc, { tag: "option" }).map((o) => attr(o, "value"));
+      expect(values).toEqual(c.ids);
+    });
+
     it("renders the change page for every model", async () => {
       for (const path of ["authors/1", "articles/1", "kv/a"]) {
         const res = await client.get(`/admin/${path}/change/`);

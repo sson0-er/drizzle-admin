@@ -41,15 +41,15 @@ const USERS = [
 
 const TAGS = ["news", "tutorial", "release", "opinion", "howto", "faq", "meta", "misc"];
 
-// How many days before "now" each published post went out: today, within the past 7 days,
-// earlier this month and well before that, so every date filter has matches.
-// The "earlier this month" age is clamped so that it stays in the current month early on.
-const PUBLISH_AGES_DAYS = [0, 2, 5, Math.min(12, new Date().getDate() - 1), 40, 75];
-
 /** Deterministic (no randomness); dates are relative to the time of the call so filters show data. */
 export async function seed(db: BetterSQLite3Database): Promise<void> {
   const now = Date.now();
   const ago = (days: number) => new Date(now - days * DAY_MS);
+
+  // How many days before "now" each published post went out: today, within the past 7 days,
+  // earlier this month and well before that, so every date filter has matches.
+  // The "earlier this month" age is clamped so that it stays in the current month early on.
+  const publishAgesDays = [0, 2, 5, Math.min(12, new Date(now).getDate() - 1), 40, 75];
 
   const inserted = await db
     .insert(users)
@@ -71,7 +71,7 @@ export async function seed(db: BetterSQLite3Database): Promise<void> {
         status: published ? ("published" as const) : ("draft" as const),
         authorId: authorIds[i % authorIds.length] as number,
         publishedAt: published
-          ? ago(PUBLISH_AGES_DAYS[publishedCount++ % PUBLISH_AGES_DAYS.length] as number)
+          ? ago(publishAgesDays[publishedCount++ % publishAgesDays.length] as number)
           : null,
         metadata: i % 4 === 0 ? { featured: true, rank: i } : null,
       };

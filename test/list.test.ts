@@ -1,8 +1,16 @@
 import { sql, type Table } from "drizzle-orm";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { messages } from "../src/messages.js";
 import { calendarPresetRange, toDateOnly } from "../src/time.js";
-import { makeAdmin, type TestAdmin } from "./helpers/app.js";
+import {
+  createClient,
+  makeAdmin,
+  TEST_PASSWORD,
+  TEST_SECRET,
+  TEST_USER,
+  type TestAdmin,
+} from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
 import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 
@@ -370,6 +378,36 @@ describe.each(dialects)("list page with extra rows ($name)", (fixture) => {
     expect(full.rows).toHaveLength(30);
     expect(small.rows).toHaveLength(3);
     expect(full.queries).toBe(small.queries);
+  });
+
+  // Another admin over the same database, so one PGlite instance serves both configurations.
+  it.each([
+    {
+      name: "no ordering (primary key descending)",
+      ordering: undefined,
+      ids: ["4", "3", "2", "1"],
+    },
+    { name: 'ordering ["id"]', ordering: ["id" as const], ids: ["1", "2", "3", "4"] },
+  ])("lists FK filter choices by the referenced model's default: $name", async (c) => {
+    const authors: ModelAdminOptions<Table> =
+      c.ordering === undefined ? {} : { ordering: c.ordering };
+    const admin = createAdmin({
+      db: t.db,
+      dialect: fixture.dialect,
+      basePath: "/admin",
+      secret: TEST_SECRET,
+      auth: {
+        verifyCredentials: async (u, p) =>
+          u === TEST_USER.name && p === TEST_PASSWORD ? TEST_USER : null,
+      },
+    });
+    admin.register(t.schema.authors, authors);
+    admin.register(t.schema.articles, { listFilter: ["authorId"] });
+    const client = createClient((req) => admin.fetch(req));
+    await client.login();
+    const doc = parse(await (await client.get("/admin/articles/")).text());
+    const links = filterLinks(doc, "authorId");
+    expect(links.slice(1).map((l) => l.params.get("f_authorId"))).toEqual(c.ids);
   });
 
   it("truncates long text with an ellipsis", async () => {

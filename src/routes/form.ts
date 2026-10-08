@@ -17,6 +17,7 @@ import type { HookCtx, ResolvedModel } from "../types.js";
 import { FormPage } from "../views/form.js";
 import {
   type AdminContext,
+  defaultOrdering,
   errorPage,
   modelOr404,
   pageChrome,
@@ -59,7 +60,7 @@ async function loadFkChoices(
     if (ref === undefined) continue;
     const options = await repo.options(ref.meta, {
       limit: FK_CHOICE_LIMIT + 1,
-      ordering: ref.ordering,
+      ordering: defaultOrdering(ref),
       toLabel: ref.toString,
     });
     choices.set(field.key, options.length > FK_CHOICE_LIMIT ? "tooMany" : options);

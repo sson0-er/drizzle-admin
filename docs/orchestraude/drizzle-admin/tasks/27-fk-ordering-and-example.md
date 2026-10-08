@@ -1,7 +1,7 @@
 ---
 id: 27-fk-ordering-and-example
 depends_on: [06-example-app, 15-routes-list, 19-routes-add-change]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 27: fk-ordering-and-example
@@ -52,3 +52,9 @@ FK filter choices on the list page and FK select choices on add/change forms com
 - Evidence: docs/orchestraude/evidence/2026-10-08-hono-head-cookie-body-node-server.md (`serve` passes `hostname` to `listen`)
 
 ## History
+
+- Added export `defaultOrdering(model: ResolvedModel)` to `src/routes/context.ts` (model `ordering`, else primary key descending). Used by `listHandler` (page ordering), `filterChoices` and `loadFkChoices`. Design needs an update (not in routes-handlers.md yet, which also still writes `ordering: refModel.ordering`).
+- `example/seed.ts`: the `PUBLISH_AGES_DAYS` module constant became a local `publishAgesDays` in `seed()`, clamp computed from `new Date(now)`.
+- `example/server.ts`: `hostname = process.env.HOST ?? "127.0.0.1"` passed to `serve`; printed URL brackets IPv6 hosts. Ran `pnpm example` with `HOST=::1 PORT=3917` and saw `http://[::1]:3917/admin/` (default 127.0.0.1 run not separately executed: 未確認).
+- Tests: `test/list.test.ts` (FK filter choice order, both dialects, second admin over the same DB), `test/form.test.ts` (FK select order, in "pages" before the author-adding tests), `test/example.test.ts` (seed publish ages on the 1st and 5th). No existing test assumed ascending FK order, so none were updated.
+- Verified the new list/form tests fail with the old `ref.ordering` and pass with the fix.

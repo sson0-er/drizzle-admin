@@ -1,6 +1,12 @@
-import { describe, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import { drizzle } from "drizzle-orm/better-sqlite3";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createExampleApp } from "../example/app.js";
+import { posts } from "../example/schema.js";
+import { createSchema, seed } from "../example/seed.js";
 import { createClient } from "./helpers/app.js";
+
+const DAY_MS = 24 * 60 * 60 * 1000;
 
 describe("example app (phase 1)", () => {
   it("builds with schema, seed and all registrations, and redirects / to /admin/", async () => {
@@ -51,5 +57,32 @@ describe("example app (phase 5)", () => {
       const res = await client.get(path);
       expect(res.status, path).toBe(200);
     }
+  });
+});
+
+describe("example seed", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Local-time constructors keep the day of month independent of the process time zone.
+  it.each([
+    { name: "the 1st", now: new Date(2026, 10, 1, 12), ages: [0, 2, 5, 40, 75] },
+    { name: "the 5th", now: new Date(2026, 10, 5, 12), ages: [0, 2, 4, 5, 40, 75] },
+  ])("spreads publish ages over $name of the month", async ({ now, ages }) => {
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(now);
+    const sqlite = new Database(":memory:");
+    createSchema(sqlite);
+    const db = drizzle(sqlite);
+    await seed(db);
+    const rows = await db.select().from(posts);
+    sqlite.close();
+    const published = rows.flatMap((p) =>
+      p.publishedAt === null
+        ? []
+        : [Math.round((now.getTime() - p.publishedAt.getTime()) / DAY_MS)],
+    );
+    expect([...new Set(published)].sort((a, b) => a - b)).toEqual(ages);
   });
 });

@@ -9,6 +9,7 @@ import { type Cell, ListPage, type ListPageProps } from "../views/list.js";
 import { type SortState, sortHref, withQuery } from "../views/url.js";
 import {
   type AdminContext,
+  defaultOrdering,
   errorPage,
   modelOr404,
   pageChrome,
@@ -90,7 +91,7 @@ async function filterChoices(c: AdminContext, field: FieldMeta): Promise<Choice[
   if (ref === undefined) return null;
   const options = await c.var.repo.options(ref.meta, {
     limit: FK_FILTER_LIMIT,
-    ordering: ref.ordering,
+    ordering: defaultOrdering(ref),
     toLabel: ref.toString,
   });
   return options.map((o) => ({ label: o.label, value: o.value }));
@@ -113,12 +114,7 @@ export async function listHandler(c: AdminContext): Promise<Response> {
   const searchable = model.searchFields.length > 0;
   const q = searchable ? (params.get("q") ?? "") : null;
   const userOrdering = parseOrdering(params.get("o"), model.listDisplay);
-  const ordering: OrderItem[] =
-    userOrdering.length > 0
-      ? userOrdering
-      : model.ordering.length > 0
-        ? model.ordering
-        : [{ key: model.meta.pk.key, desc: true }];
+  const ordering = userOrdering.length > 0 ? userOrdering : defaultOrdering(model);
   const filters: Record<string, string> = {};
   for (const key of model.listFilter) {
     const value = params.get(`f_${key}`);

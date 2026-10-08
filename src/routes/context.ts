@@ -98,6 +98,11 @@ export function errorPage(
   return html(c, status, jsx(ErrorPage, { ...chrome, status, message }));
 }
 
+/** The model's `ordering`, or primary key descending when it has none (decision 013 item 4). */
+export function defaultOrdering(model: ResolvedModel): ResolvedModel["ordering"] {
+  return model.ordering.length > 0 ? model.ordering : [{ key: model.meta.pk.key, desc: true }];
+}
+
 export function modelOr404(c: AdminContext, slug: string): ResolvedModel | Response {
   return c.var.state.models.get(slug) ?? errorPage(c, 404, messages.notFound);
 }
