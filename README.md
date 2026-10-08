@@ -93,9 +93,9 @@ serve({ fetch: app.fetch, port: 3000 });
 | `dialect` | `"sqlite" \| "postgres"` | required | Must match the dialect of the registered tables, otherwise `register()` throws. |
 | `basePath` | `string` | required | Must start with `/` and must not contain `?`, `#`, `\`, whitespace or `//`. A trailing `/` is removed, and `"/"` mounts the admin at the root. |
 | `siteTitle` | `string` | `"サイト管理"` | Shown in the header and the page titles. |
-| `secret` | `string` | required | At least 32 characters. Signs the session and flash cookies; changing it signs every user out. |
+| `secret` | `string` | required | At least 32 characters. Signs the session and flash cookies; changing it signs every user out. Use a distinct secret for each admin instance and do not reuse it elsewhere in the host application: the cookie keys are derived from `secret` and `basePath`. |
 | `auth` | `AuthConfig` | required | At least one of `verifyCredentials` and `getUser` must be a function. See below. |
-| `sessionMaxAgeSec` | `number` | `28800` (8 hours) | A positive integer. The expiry is fixed from the time the session was issued (no sliding renewal). |
+| `sessionMaxAgeSec` | `number` | `28800` (8 hours) | A positive integer of at most `34560000` (400 days). The expiry is fixed from the time the session was issued (no sliding renewal). |
 | `timeZone` | `string` | the server's local time zone | A valid IANA zone name such as `"Asia/Tokyo"`. Used to display and parse datetimes and to decide what "today" means for the date filters. |
 | `publicOrigin` | `string` | not set (the origin is derived from each request URL) | See "Deploying behind a reverse proxy". A `http:` or `https:` origin with no credentials, path, query or fragment; stored normalized (`"https://admin.example.com/"` becomes `"https://admin.example.com"`). |
 
@@ -119,22 +119,22 @@ serve({ fetch: app.fetch, port: 3000 });
 |---|---|---|
 | `slug` | the table name | URL segment of the model. Letters, digits, `_` and `-` only; must be unique; `login`, `logout` and `static` are reserved. |
 | `label` | the table name | Name shown in the dashboard, breadcrumbs and page titles. |
-| `listDisplay` | the primary key followed by the first four other columns, in definition order | Columns shown in the list table. Only these columns can be sorted by clicking the header. |
+| `listDisplay` | the primary key followed by the first four other columns, in definition order, skipping columns in `exclude` | Columns shown in the list table. Only these columns can be sorted by clicking the header. |
 | `listDisplayLinks` | the first `listDisplay` column | Columns whose cell links to the change page. A foreign-key cell that is not one of these links to the referenced row (when the referenced table is registered) and shows its `toString` label. |
 | `searchFields` | none (no search box) | Columns searched by the `q` box. Must be string or enum columns. See "Behavior notes". |
 | `listFilter` | none | Columns offered as filters. Must be boolean, enum, date, PostgreSQL `date()` (string mode) or foreign-key columns. A foreign-key filter needs the referenced table to be registered and referenced by its primary key. |
 | `ordering` | primary key descending | Default sort: column keys, with a leading `-` for descending (`["-createdAt", "name"]`). The primary key is appended ascending as a tiebreaker unless it is already listed. |
-| `listPerPage` | `50` | A positive integer. |
+| `listPerPage` | `50` | A positive integer of at most 500. |
 | `fields` | all columns in definition order | Columns shown on the add and change forms, in this order. Cannot be combined with `fieldsets`. |
-| `exclude` | none | Columns removed from the form (also applied to `fieldsets`). |
-| `readonlyFields` | none | Columns shown as text on the change page and omitted from the add page. Generated columns, columns of unsupported types and (on the change page) primary keys are always display-only. |
+| `exclude` | none | Columns removed from the form (also applied to `fieldsets`). It also removes them from the default list columns. |
+| `readonlyFields` | none | Columns shown as text on the change page and omitted from the add page. Generated columns, identity columns, columns of unsupported types and (on the change page) primary keys are always display-only. |
 | `fieldsets` | one untitled group with the `fields` columns | Groups of columns: `{ title?: string; fields: [...] }[]`. Cannot be combined with `fields`. |
 | `widgets` | derived from the column (see below) | Overrides the input element per column. Restricted to the allowed widgets of the column. |
 | `formatters` | none | Per-column `(value, row) => string` that replaces the text of a cell in the **list table** (the returned string is escaped). It does not affect the forms. On a foreign-key column the formatter's output replaces the referenced row's label, and the cell no longer links to the referenced row. |
 | `toString` | `` `${label} #${pk}` `` | `(row) => string`. Names a row in links, confirmation pages, flash messages and foreign-key choices. |
 | `validate` | none | `(data, { mode }) => Record<string, string> \| void` (or a promise). See below. |
 | `hooks` | none | `beforeSave`, `afterSave`, `beforeDelete`. See below. |
-| `permissions` | all allowed | `view`, `add`, `change` and `delete`, each a boolean or a `(user) => boolean`. An unset entry allows the operation. |
+| `permissions` | all allowed | `view`, `add`, `change` and `delete`, each a boolean or a `(user) => boolean`. An unset `add`, `change` or `delete` follows `view`; when nothing is set, everything is allowed. |
 | `actions` | none | Custom bulk actions. See "Actions". |
 
 `register()` also rejects duplicate or empty action names, the reserved action name `delete_selected`, and a widget override that is not allowed for the column:
@@ -226,7 +226,7 @@ The list page has an action dropdown for the rows selected with the checkboxes.
   ```
 
 - The returned `message` is shown as a success message (default: a generic done message). A thrown error shows a generic error message and the error text is not rendered. After running, the user returns to the list with the same search, filter, sort and page.
-- Submitting without selecting any row shows a warning.
+- Submitting without selecting any row shows a warning. At most 500 rows can be selected for one action; more shows a warning and runs nothing.
 
 ## Authentication modes and security
 
@@ -238,20 +238,29 @@ The list page has an action dropdown for the rows selected with the checkboxes.
 
 **`next` handling.** Only same-site targets inside `basePath` are followed; anything else falls back to the dashboard. A target is rejected when it is empty, does not start with a single `/`, contains `\`, control characters, whitespace or `//` in its path, has a malformed percent escape, contains a `.` or `..` path segment after percent-decoding, or leaves `basePath`. Percent-encoded characters that belong in a path (for example `%20` in a text primary key) are accepted and stay encoded.
 
+The admin only sends `safeNext` paths as `next` to `loginUrl`, but your login page must still validate `next` itself before redirecting to it.
+
 ### Cookies
 
 | Cookie | Content | Lifetime |
 |---|---|---|
-| `da_session` | Signed (HMAC-SHA256 with `secret`): the user, a CSRF token and the issue time | `sessionMaxAgeSec`, fixed |
+| `da_session` | Signed (HMAC-SHA256 with a key derived from `secret`): the user, a CSRF token and the issue time | `sessionMaxAgeSec`, fixed |
 | `da_flash` | Signed: flash messages shown once after a redirect | 60 seconds |
 
-Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `Secure` when the request URL (or `publicOrigin`, when set) is `https:`. In external mode the session cookie carries only the CSRF token and issue time (no user); the token is bound to the cookie and expires with `sessionMaxAgeSec`.
+The HMAC key of each cookie is derived per cookie from `secret` and `basePath`, so two admin instances, or the two cookies of one instance, do not accept each other's cookies even when they share a `secret`. Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `Secure` when the request URL (or `publicOrigin`, when set) is `https:`. In external mode the session cookie carries only the CSRF token and issue time (no user); the token is bound to the cookie and expires with `sessionMaxAgeSec`.
 
 ### CSRF and headers
 
 - Unsafe-method requests (not GET, HEAD or OPTIONS) with a form-like content type (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`, or none) pass through an Origin check (Hono's `csrf` middleware): the request passes if the browser sends `Sec-Fetch-Site: same-origin` or the `Origin` header equals the request URL's origin (or `publicOrigin`, when set). Otherwise it gets a 403 page. GET and HEAD requests and other content types skip this check.
 - Every POST, whatever its content type, must carry the `_csrf` form field equal to the session's token (compared in constant time); otherwise 403. The admin's own forms include it as a hidden field.
-- Responses carry `X-Frame-Options: DENY`, `Referrer-Policy: same-origin` and `Cache-Control: no-store` (the stylesheet is cached instead).
+- Responses carry `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `X-Content-Type-Options: nosniff`, a `Content-Security-Policy` and `Cache-Control: no-store` (the stylesheet is cached instead). With the built-in login the policy is:
+
+  ```
+  default-src 'none'; script-src 'sha256-SELECT_ALL_SCRIPT_SHA256'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
+  ```
+
+  With external authentication the same string is sent without `form-action 'self'`, so that a redirect chain through your SSO login keeps working (`form-action` is defense in depth only, because the admin has no HTML injection path). `SELECT_ALL_SCRIPT_SHA256` stands for the base64 SHA-256 hash of the one inline script (the select-all checkbox) in `src/static/select-all.ts`.
+- A host application that adds its own `Content-Security-Policy` must allow the same sources, otherwise the browser applies the intersection of both policies and the admin pages can break.
 - All output is escaped by Hono's JSX; the library does not use raw HTML insertion.
 - Database errors are shown as fixed messages (duplicate value, related data exists, missing required value, other). The raw error message, which may contain SQL and parameters, is never rendered.
 - The login endpoint has no rate limiting (see "Known limitations").
@@ -265,9 +274,11 @@ Both cookies are `HttpOnly`, `SameSite=Lax` and scoped to `basePath`. They are `
 - `change`: saving on the change page, and custom actions.
 - `delete`: the delete page, the delete button and `delete_selected`.
 
+A model for which the user has none of the four permissions is hidden: it is not listed on the dashboard and every page of it answers 404, like an unknown page.
+
 Foreign keys need `view` on the referenced model too. Without it, the foreign-key columns of the list show the raw values without links or labels, the foreign-key filter is not offered, and the foreign-key fields of the forms are plain key inputs instead of a select.
 
-A change page opened with `view` but without `change` shows every field read-only without save buttons, and a POST to it returns 403. Denied pages return a 403 page.
+A change page opened with `view` but without `change` shows every field read-only without save buttons, and a POST to it returns 403. Granting `change` or `delete` without `view` works, but the change and delete pages then show row labels and read-only values to that user. Denied pages return a 403 page.
 
 ### Deploying behind a reverse proxy
 
@@ -289,12 +300,13 @@ The admin reads each form body fully into memory and has no body size limit of i
 ## Behavior notes
 
 - **List page.** Query parameters: `q` (search), `p` (page, 1-based), `o` (ordering) and `f_<column>` (filters). Changing the search, a filter or the ordering resets the page. A page number that is not an integer or is below 1 is page 1; a page beyond the last shows an empty table with the pagination.
-- **Search.** The whole trimmed `q` is one term, matched as a case-insensitive substring in any of the `searchFields` (`ILIKE` on PostgreSQL, `LIKE` on SQLite, with `%`, `_` and `\` escaped). On PostgreSQL every search column is cast to text, so uuid, numeric and enum columns can be searched. SQLite's `LIKE` rules for case folding apply.
+- **Search.** NUL characters are removed from `q`, and it is cut to 200 characters. The whole trimmed `q` is one term, matched as a case-insensitive substring in any of the `searchFields` (`ILIKE` on PostgreSQL, `LIKE` on SQLite, with `%`, `_` and `\` escaped). On PostgreSQL every search column is cast to text, so uuid, numeric and enum columns can be searched. SQLite's `LIKE` rules for case folding apply.
 - **Filters.** Boolean columns offer yes/no, enum columns their values, date columns the presets today, past 7 days, this month and this year (computed in `timeZone`), and foreign-key columns the first 200 referenced rows in the referenced model's `ordering` (primary key descending when it is not set).
 - **Sorting.** Clicking a column header cycles that column through ascending, descending and unsorted, and drops other sort keys. A hand-written multi-column `o` is honored. Only `listDisplay` columns can be sorted, and a `password` column cannot (see below).
 - **Primary keys.** An auto-increment key is omitted on the add page. Other primary keys can be entered when adding and are display-only when changing (a key cannot be renamed).
 - **Saving.** After a successful save the user is redirected (303) to the list, or to the change page with "save and continue", or to the add page with "save and add another", with a flash message. A failed validation re-renders the form with status 400 and the entered values.
 - **Deleting.** The delete page and the bulk-delete confirmation ask first. A foreign-key violation is shown as an error message on the list.
+- **Malformed keys.** A malformed or out-of-range key in a URL (for example a non-numeric id for an integer key) is a 404. In a filter parameter it is ignored.
 - **Missing trailing slash.** A path such as `/admin/users` is redirected (301) to `/admin/users/`. Unknown pages render the admin 404 page.
 - **Foreign keys.** Choices are loaded from the referenced model when it is registered and referenced by its primary key; with more than 200 rows the form falls back to a plain input plus a link to the referenced list. Without the `view` permission on the referenced model, the list shows raw values, the filter is not offered and the form field is a plain key input.
 - **Password widget.** The `password` widget never renders the stored value. An empty submission on the change page keeps the stored value; read-only fields and list cells show `********`. A `password` list column cannot be sorted: its header has no sort link and `o` ignores it. No hashing is added.
@@ -332,6 +344,12 @@ HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first
 `scripts/verify.sh` runs test, typecheck, lint and build in order.
 
 The example app (`example/`) is a demo with users, posts and tags on an in-memory SQLite database seeded with sample data. It listens on `127.0.0.1:3000` unless `HOST` or `PORT` are set. Open `http://127.0.0.1:3000/admin/` and log in as `admin` / `admin`. The environment variables `HOST` (default `127.0.0.1`; an empty value also falls back to `127.0.0.1`), `PORT` (default `3000`), `ADMIN_PASSWORD` (default `admin`; a warning is printed when it is not set) and `ADMIN_SECRET` (default: random at startup, so sessions do not survive a restart) configure it.
+
+The example rejects requests whose `Host` header is not the bound host and port (403), which protects the demo and its default password against DNS rebinding. Loopback names (`localhost`, `127.0.0.1`, `[::1]`) are accepted when it is bound to a loopback address or to all interfaces, and IP literals are accepted when it is bound to all interfaces (`HOST=0.0.0.0`).
+
+### Changelog
+
+User-visible changes are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

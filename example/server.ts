@@ -1,6 +1,8 @@
 import { randomBytes } from "node:crypto";
 import { serve } from "@hono/node-server";
+import { Hono } from "hono";
 import { createExampleApp } from "./app.js";
+import { hostGuard } from "./host-guard.js";
 
 const DEFAULT_PASSWORD = "admin";
 const secret = process.env.ADMIN_SECRET ?? randomBytes(32).toString("hex");
@@ -20,7 +22,10 @@ if (process.env.ADMIN_SECRET === undefined) {
 }
 
 const { app } = await createExampleApp({ secret, adminPassword });
-serve({ fetch: app.fetch, port, hostname }, () => {
+const root = new Hono();
+root.use("*", hostGuard(hostname, port));
+root.route("/", app);
+serve({ fetch: root.fetch, port, hostname }, () => {
   const host = hostname.includes(":") ? `[${hostname}]` : hostname;
   console.log(`drizzle-admin demo: http://${host}:${port}/admin/`);
   console.log("Log in as admin (password from ADMIN_PASSWORD, default: admin).");

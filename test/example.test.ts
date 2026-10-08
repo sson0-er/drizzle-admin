@@ -1,7 +1,9 @@
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
+import { Hono } from "hono";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createExampleApp } from "../example/app.js";
+import { hostGuard, isAllowedHost } from "../example/host-guard.js";
 import { posts } from "../example/schema.js";
 import { createSchema, seed } from "../example/seed.js";
 import { createClient } from "./helpers/app.js";
@@ -84,5 +86,40 @@ describe("example seed", () => {
         : [Math.round((now.getTime() - p.publishedAt.getTime()) / DAY_MS)],
     );
     expect([...new Set(published)].sort((a, b) => a - b)).toEqual(ages);
+  });
+});
+
+describe("example host guard", () => {
+  it.each([
+    ["http://127.0.0.1:3000/", "127.0.0.1", 3000, true],
+    ["http://localhost:3000/", "127.0.0.1", 3000, true],
+    ["http://[::1]:3000/", "127.0.0.1", 3000, true],
+    ["http://evil.example:3000/", "127.0.0.1", 3000, false],
+    ["http://127.0.0.1:3001/", "127.0.0.1", 3000, false],
+    ["http://192.168.1.5:3000/", "0.0.0.0", 3000, true],
+    ["http://evil.example:3000/", "0.0.0.0", 3000, false],
+    ["http://[::1]:3000/", "::1", 3000, true],
+    ["http://example.test:3000/", "example.test", 3000, true],
+    ["http://localhost:3000/", "example.test", 3000, false],
+    ["http://127.0.0.1/", "127.0.0.1", 80, true],
+  ])("isAllowedHost(%s, bind %s, port %d) is %s", (url, bindHost, port, expected) => {
+    expect(isAllowedHost(url, bindHost, port)).toBe(expected);
+  });
+
+  it.each([
+    {
+      name: "rejects an unexpected Host",
+      url: "http://evil.example:3000/",
+      status: 403,
+      body: "Forbidden: unexpected Host header",
+    },
+    { name: "passes the bound Host", url: "http://127.0.0.1:3000/", status: 200, body: "ok" },
+  ])("hostGuard $name", async ({ url, status, body }) => {
+    const app = new Hono();
+    app.use("*", hostGuard("127.0.0.1", 3000));
+    app.get("/", (c) => c.text("ok"));
+    const res = await app.request(url);
+    expect(res.status).toBe(status);
+    expect(await res.text()).toBe(body);
   });
 });

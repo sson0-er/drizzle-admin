@@ -1,7 +1,7 @@
 ---
 id: 48-example-host-guard-and-docs
 depends_on: [43-instance-bound-cookie-keys, 44-permission-inheritance-and-hidden-models, 45-key-value-domains-and-identity, 46-search-and-selection-caps, 47-csp-and-nosniff]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 48: example-host-guard-and-docs
@@ -76,3 +76,11 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row.
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Tests were written first: `npx vitest run test/example.test.ts` failed (import of `example/host-guard.js` unresolved) before `example/host-guard.ts` existed; afterwards the 11 `isAllowedHost` rows and 2 `hostGuard` cases pass and the existing example tests are unchanged. `scripts/verify.sh` passes.
+- Manual check run (port 3917 instead of 3000): `curl -H "Host: evil.example:3917" .../admin/` gave 403, without the override 302. `npm pack --dry-run`: 未確認.
+- package.json: `scripts.prepack` and `files` entry added; CHANGELOG.md created. CLAUDE.md "Security rules" edited (two bullets), no permission block.
+- README sections where each security-audit item was applied: 5 (`secret` row: distinct secret and derived keys; `sessionMaxAgeSec` row: 34560000 max); 6 (`listDisplay` default skips `exclude`; `exclude` row; `readonlyFields` row adds identity columns; `permissions` row: unset add/change/delete follow view; `listPerPage` row: at most 500); 7 (Actions: 500-row selection cap, warning, nothing runs); 8 ("Authentication modes" `next` note for the host login page; "Cookies" derived per-cookie key; "CSRF and headers": nosniff, CSP string with literal `SELECT_ALL_SCRIPT_SHA256`, external-mode string without `form-action`, host-CSP note; "Permissions": hidden-model 404 and change/delete-without-view note); 9 (Behavior notes: search NUL removal and 200 cap; new "Malformed keys" bullet); 11 (Development: example Host check; `### Changelog` subsection at its end pointing to CHANGELOG.md).
+- No export or prop outside the design was added.
+- Review round 1: high 0, medium 0, low 3 (tests: missing wildcard/IPv6/uppercase/https rows, 403 shown only via body; spec: README names the CSP hash constant instead of the literal value). Done.

@@ -28,7 +28,8 @@ Project guide for contributors and coding agents. The full design lives in `docs
 ## Security rules
 - `Location` headers are path-only and stay under the prefix (the one exception is the configured `auth.loginUrl`); post-login targets go through `safeNext`.
 - Every POST passes the Origin check and the `_csrf` token check.
-- Cookies are signed, HttpOnly, SameSite=Lax and Secure per `isSecure`; set and delete share `cookieAttrs`.
+- Cookies are signed with keys derived per instance and per cookie (`deriveCookieKey(secret, cookieName, prefix)`, decision 042); the raw `secret` is passed to no cookie function. They are HttpOnly, SameSite=Lax and Secure per `isSecure`; set and delete share `cookieAttrs`.
+- Every response carries the Content-Security-Policy from `buildCsp` and `X-Content-Type-Options: nosniff` (decision 044). When `SELECT_ALL_SCRIPT` changes, update `SELECT_ALL_SCRIPT_SHA256` in the same change (a test recomputes it). A new inline script, `style` attribute or external resource needs a policy change and a decision record.
 - Raw DB error messages are never rendered or logged; log through `describeForLog`.
 - Output is escaped by JSX; never inject raw HTML.
 - Values the user may not see are not rendered (FK labels: decision 034; password values: decision 037).
