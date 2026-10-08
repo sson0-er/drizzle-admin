@@ -13,11 +13,16 @@ Changed 2026-10-08: the 26 "B. Decisions needed" items of `05-low-findings-triag
 Changed 2026-10-08: Q7 answered (option (b)) and moved to Resolved questions.
 Changed 2026-10-08: L067 answer changed by the user: labels stay the raw field key (decision 035 rewritten).
 Changed 2026-10-08: two section-A fixes approved in the low-findings triage (L083 FK choice ordering, L046 `describeForLog` sanitization) added to Resolved questions.
+Changed 2026-10-08: Q8-Q10 added while designing the post-v1 icons (decision 039). None blocks implementation: the design proceeds with the stated default unless the user answers otherwise.
+Changed 2026-10-08: Q8-Q10 answered by the user and moved to Resolved questions (decision 039).
 
 (None.)
 
 ## Resolved questions
 (Question, answer, date. Move items here once the user has decided.)
+- **Q8. "info" flash level (post-v1 icons).** Answer: keep the three levels `success` / `warning` / `error`; no `info` level is added; `error` uses `circle-alert` (2026-10-08; decision 039; views.md Icons).
+- **Q9. Read-only boolean form fields (post-v1 icons).** Answer: yes, changed from the design default: `DisplayValue` renders booleans with `BooleanMark` (colored `check` / `x` plus visually hidden `messages.yes` / `messages.no`), the same as list cells; the password mask still wins (2026-10-08; decision 039 point 5; forms.md, views.md, test-strategy.md).
+- **Q10. Dashboard and remaining controls (post-v1 icons).** Answer: confirmed as designed: the dashboard model rows get icons on their add (`plus`) and change (`pencil`) links, no per-model icon; the action `run` button, the login button, paginator, filter and breadcrumb links stay text-only (2026-10-08; decision 039).
 - **Low-findings triage, FK choice ordering (L083).** FK filter and FK select choices were sorted by primary key ascending when the referenced model has no `ordering`, unlike decision 013 item 7. Answer: follow decision 013 item 7: the referenced model's `ordering`, else primary key descending, the same fallback as the list page (2026-10-08; decision 013 item 7 amended; routes-handlers.md List steps 2 and 5 and Add step 2, data.md `options`, test-strategy.md).
 - **Low-findings triage, `describeForLog` log injection (L046).** Answer: `<name>` and `<code>` are written only if they match `/^[A-Za-z0-9_.-]{1,64}$/`, otherwise `-`; a missing name stays `unknown`; classification uses the raw code (2026-10-08; decision 033 item 16 amended; data.md, test-strategy.md).
 - **Q7. Password-widget fields in list cells.** Decision 037 kept the stored value out of form HTML, but list cells (including the default `listDisplay`) still showed it. Answer: option (b): fields with the `password` widget are masked as `********` in list cells too, and anywhere else the library displays field values outside forms (display-only form fields were already masked). The mask wins over formatters, FK labels and null; `toString` row labels are out of scope (2026-10-08; decision 037 point 5; views.md `formatCell`, routes-handlers.md List step 4b, test-strategy.md).

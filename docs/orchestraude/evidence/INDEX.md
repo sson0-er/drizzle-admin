@@ -24,3 +24,7 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-08-safenext-decoded-path | For login `next` validation, how do WHATWG URL parsing, decodeURIComponent and Hono's `c.req.path` treat encoded dot segments, `%2F`, spaces and malformed escapes? | expires 2027-01-06
 - 2026-10-08-hono-head-cookie-body-node-server | How do Hono 4.13.13 and @hono/node-server 2.1.3 treat HEAD (c.req.method), deleteCookie attributes, parseBody size and the listen hostname? | expires 2027-01-06
 - 2026-10-08-node-listen-empty-hostname | What address does the example server listen on when HOST is set but empty? | expires 2027-01-06
+- 2026-10-08-hono-jsx-inline-svg | For decision 039 (UI icons), can Hono JSX render static inline SVG without raw(), and does it type-check? | expires 2027-01-06
+- 2026-10-08-biome-no-svg-without-title | For decision 039, does Biome's recommended noSvgWithoutTitle reject inline SVG, and are aria-hidden SVGs exempt? | expires 2027-01-06
+- 2026-10-08-css-mask-image-support | For decision 039, how widely is CSS mask-image supported, and does a page CSP affect it? | expires 2027-01-06
+- 2026-10-08-icon-color-contrast | For decision 039, do the proposed icon colors reach 3:1 contrast in light and dark mode? | expires 2027-01-06

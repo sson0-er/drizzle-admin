@@ -139,6 +139,7 @@ export function toFormValue(field: FormField, value: unknown, timeZone: string):
 Changed 2026-10-07: `toFormValue` selects by `meta`, not by widget (decisions 019, 021).
 Changed 2026-10-07: date-only strings pass through unchanged (decision 023).
 Changed 2026-10-08: the `password` widget renders no value (decision 037; supersedes decision 013 item 11).
+Changed 2026-10-08: `DisplayValue` renders a boolean value as `BooleanMark` (user answer to Q9, decision 039 point 5).
 
 `toFormValue` (by `meta.kind`): null/undefined → `""`; date → `toDateOnly(v)` when `meta.isDateOnly` (UTC parts), else `toDatetimeLocal(v, timeZone)`; boolean → `"on"` / `""`; json → `JSON.stringify(v, null, 2)`; bigint/number → `String`; string → itself (for a date-only string this is the stored `YYYY-MM-DD`, which `<input type="date">` accepts as its value; decision 023).
 
@@ -154,7 +155,7 @@ Rendering (`name` and `id` = `id_<key>`):
 | date | `<input type="date">` |
 | datetime | `<input type="datetime-local">` |
 | hidden | `<input type="hidden">` (no label row) |
-`required` attributes are not emitted, so the server-side errors stay observable and testable with plain requests. An error renders `<ul class="errorlist"><li>msg</li></ul>` before the input. `fkFallbackHref` renders `<a href>` with `messages.openRelated` and the `fkTooMany` hint; a field without `fkFallbackHref` (including `"noView"`) renders neither. `DisplayValue` renders the formatted value as text (views `formatValue`), except for a field whose widget is `password`, which renders the fixed mask `********` (decision 037).
+`required` attributes are not emitted, so the server-side errors stay observable and testable with plain requests. An error renders `<ul class="errorlist"><li>msg</li></ul>` before the input. `fkFallbackHref` renders `<a href>` with `messages.openRelated` and the `fkTooMany` hint; a field without `fkFallbackHref` (including `"noView"`) renders neither. `DisplayValue` renders `<span class="readonly">` containing, first match: a field whose widget is `password` → the fixed mask `********` (decision 037); `typeof value === "boolean"` → `<BooleanMark value={value} />` from `src/views/icons.tsx` (colored `check` / `x` icon plus visually hidden `messages.yes` / `messages.no`, the same markup as boolean list cells; decision 039); otherwise the formatted value as text (views `formatValue`). `null` / `undefined` stays `-` via `formatValue`. `widgets.tsx` already imports `views/format.ts`; `views/icons.tsx` imports only `messages` and the `FlashLevel` type, so the new import creates no module cycle.
 
 ## Data formats
 - Field names in HTML equal `FieldMeta.key`. Reserved body names: `_csrf`, `_save`, `_addanother`, `_continue`.

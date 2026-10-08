@@ -15,6 +15,7 @@ Changed 2026-10-08: 032 amended: dot segments resolved by URL parsing are accept
 Changed 2026-10-08: added 033-038 (user answers to the low-findings triage section B and three follow-ups); 013 item 11, 017 and 021 carry notes pointing to them; evidence 2026-10-08-hono-head-cookie-body-node-server added.
 Changed 2026-10-08: 037 extended to list cells (Q7 option (b)); 035 rewritten after the user changed the L067 answer (labels stay the raw key).
 Changed 2026-10-08: 038 item 2 amended after task 36: the example uses `HOST || "127.0.0.1"`, so an empty `HOST` also falls back to loopback; evidence 2026-10-08-node-listen-empty-hostname added.
+Changed 2026-10-08: added 039 (post-v1 user request: UI icons as static inline SVG; Q8-Q10 answers applied, Q9 extends it to `DisplayValue`); evidence 2026-10-08-hono-jsx-inline-svg, -biome-no-svg-without-title, -css-mask-image-support, -icon-color-contrast added.
 
 (Files in `docs/orchestraude/decisions/`.)
 - 001-pnpm-provisioned-via-mise: pnpm 12.10.0 via mise.toml, pinned by the user; no `packageManager` field; no task edits mise.toml.
@@ -55,10 +56,12 @@ Changed 2026-10-08: 038 item 2 amended after task 36: the example uses `HOST || 
 - 036-triage-behavior-changes: `tooMany` link only for default/`select` widgets (L062); cookie deletions carry the same attributes incl. `Secure` (L072); custom confirm action with no surviving rows → `noSelection` (L003); single delete removing 0 rows → `alreadyDeleted` warning (L074).
 - 037-password-widget-no-echo: the `password` input renders empty; empty on change keeps the stored value (zod optional, not required); display-only password fields and list cells masked as `********` (Q7 option (b)); amends 013 item 11 and 021.
 - 038-body-size-and-example-bind: no in-library body limit in v1, README tells deployers to limit it at the proxy; the example binds to `127.0.0.1` unless `HOST` is set to a non-empty value (`HOST || "127.0.0.1"`).
+- 039-ui-icons-inline-svg: post-v1 icons as static inline SVG (`src/views/icons.tsx`, 9 fixed icons, `aria-hidden`, `currentColor`); boolean list cells and read-only boolean form fields (`DisplayValue`, Q9) get a colored mark with visually hidden `messages.yes` / `messages.no`; no `info` flash level (Q8); CSS mask-image, sprite and glyph alternatives rejected.
 
 ## Evidence referenced
 Changed 2026-10-08: 2026-10-08-hono-head-cookie-body-node-server added (decisions 033, 036, 038).
 Changed 2026-10-08: 2026-10-08-node-listen-empty-hostname added (decision 038 amendment).
+Changed 2026-10-08: four entries for decision 039 (icons) added; they expire 2027-01-06.
 - 2026-10-07-drizzle-orm-release-lines (research)
 - 2026-10-07-drizzle-column-introspection (research)
 - 2026-10-07-hono-csrf-and-jsx (research)
@@ -81,5 +84,9 @@ Changed 2026-10-08: 2026-10-08-node-listen-empty-hostname added (decision 038 am
 - 2026-10-08-hono-head-cookie-body-node-server (design, decisions 033, 036, 038): Hono routes HEAD through GET routes but `c.req.method` stays `HEAD` (the auth guard currently gives HEAD `next = <prefix>/`); `deleteCookie` passes all options (incl. `Secure`) to the `Max-Age=0` Set-Cookie; `parseBody` buffers the whole body with no limit (Hono has a separate `body-limit` middleware); `@hono/node-server` `serve` listens on `hostname`. Expires 2027-01-06.
 - 2026-10-08-safenext-decoded-path (design, decision 032): `new URL` resolves literal and `%2e` dot segments but not `..%2Fx`, which `decodeURIComponent` turns into `/admin/../x`; `%20` and `%2F%2F` stay encoded in the pathname; malformed escapes throw `URIError`; Hono `c.req.path` decodes `%20`/`%09`/`%5C` but keeps `%2F`. Expires 2027-01-06.
 - 2026-10-08-node-listen-empty-hostname (design, decision 038 amendment): `@hono/node-server` passes `hostname` unchanged to `server.listen`; Node 24.21.0 listens on `::` (all interfaces) for an empty hostname, so `HOST=""` with `??` would not stay on loopback. Expires 2027-01-06.
+- 2026-10-08-hono-jsx-inline-svg (design, decision 039): Hono 4.13.13 JSX renders `svg`/`path` without `raw()`; `viewBox` stays as written, camelCase stroke attributes become kebab-case; typings accept any svg attributes.
+- 2026-10-08-biome-no-svg-without-title (design, decision 039): `noSvgWithoutTitle` is recommended and ignores SVGs with `aria-hidden="true"`; to be confirmed by `pnpm lint` on 2.5.15.
+- 2026-10-08-css-mask-image-support (design, decision 039): `mask-image` Baseline since 2023-12 but older Chrome/Safari need `-webkit-`; whether CSP `img-src` blocks data: masks is unconfirmed.
+- 2026-10-08-icon-color-contrast (design, decision 039): proposed icon colors reach 4.74:1 or more on all listed light/dark backgrounds.
 
 All other entries expire 2026-11-06. Re-verify any expired entry before relying on it.

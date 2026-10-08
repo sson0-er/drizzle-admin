@@ -6,6 +6,8 @@ drizzle-admin is an ESM TypeScript library that turns registered Drizzle tables 
 Pre-spec references "§N" point to `docs/pre-specs.md`. The pre-spec remains normative except where a decision in `docs/orchestraude/decisions/` says otherwise.
 
 ## Components and responsibilities
+Changed 2026-10-08: views also own the fixed icon set, `src/views/icons.tsx` (decision 039).
+
 | Component | Responsibility | Depends on | Interface file |
 |---|---|---|---|
 | admin (public API) | Public types, `createAdmin`, `register` validation, option defaults (`ResolvedModel`), registry finalization, `admin.app` / `admin.fetch` | introspect, routes, support | interfaces/admin.md |
@@ -14,7 +16,7 @@ Pre-spec references "§N" point to `docs/pre-specs.md`. The pre-spec remains nor
 | forms | Form field layout, widget choice, coercion, zod schema, validation pipeline, widget rendering | introspect types, admin types, support | interfaces/forms.md |
 | auth | Session cookie, CSRF token check, flash cookie, safe `next`, login redirects, permission evaluation | hono/cookie, hono/csrf | interfaces/auth.md |
 | routes | Hono app assembly: middleware chain, every page/handler in §8, actions, PRG | admin, data, forms, auth, views | interfaces/routes.md, interfaces/routes-handlers.md |
-| views | Hono JSX pages, cell formatting, CSS module, select-all script | support, forms (widgets) | interfaces/views.md |
+| views | Hono JSX pages, cell formatting, decorative icon set, CSS module, select-all script | support, forms (widgets) | interfaces/views.md |
 | support | `messages.ts` (all Japanese UI strings), `time.ts` (time-zone math) | none | interfaces/support.md |
 | project setup | package.json, tsconfig, Biome, vitest config, scripts, LICENSE, README content | none | interfaces/project-setup.md |
 | example | `example/` demo app (users, posts, tags), seed, server, run instructions | public API | interfaces/example.md |
@@ -27,7 +29,7 @@ src/data/{repository,query,errors,db}.ts
 src/forms/{fields,coerce,schema,validate}.ts  src/forms/widgets.tsx
 src/auth/{session,csrf,flash,redirect,permissions}.ts
 src/routes/{index,middleware,context,dashboard,list,actions,form,delete,login}.ts
-src/views/{layout,dashboard,list,form,delete,confirm-action,login,error}.tsx  src/views/{format,render,url}.ts
+src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx  src/views/{format,render,url}.ts
 src/static/admin-css.ts  src/static/select-all.ts
 example/{schema,seed,app,server}.ts
 test/...
@@ -72,6 +74,8 @@ Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisio
 Changed 2026-10-08: decisions 027-029 (task 14 follow-ups) added; summaries updated.
 Changed 2026-10-08: decisions summary range updated for 030 (task 18) and 031 (task 21).
 Changed 2026-10-08: questions and decisions summaries updated for the low-findings answers (decisions 033-038, Q7).
+Changed 2026-10-08: post-v1 icons (decision 039): views.md summary, open questions Q8-Q10, decisions summary range.
+Changed 2026-10-08: Q8-Q10 answered; questions summary updated.
 
 | File | Summary |
 |---|---|
@@ -83,10 +87,10 @@ Changed 2026-10-08: questions and decisions summaries updated for the low-findin
 | interfaces/auth.md | Session/flash cookies, CSRF check, safe `next`, login redirects, permission helper |
 | interfaces/routes.md | App assembly: AdminVars context, middleware order, route table, catch-all, error handling |
 | interfaces/routes-handlers.md | Per-page handler behavior: dashboard, list, actions, add/change (PRG, hooks), delete, login/logout |
-| interfaces/views.md | JSX page components and their props, stable selectors for tests, cell formatting, CSS and script modules |
+| interfaces/views.md | JSX page components and their props, stable selectors for tests, cell formatting, icon set and placement (decision 039), CSS and script modules |
 | interfaces/support.md | `messages.ts` structure and required keys, `time.ts` functions (time-zone math, UTC calendar dates for date-only values) |
 | interfaces/project-setup.md | package.json, tsconfig(s), biome.json, vitest config, scripts, LICENSE, README outline |
 | interfaces/example.md | Example schema, seed, server, and run instructions for the user's browser check |
 | test-strategy.md | Tests per component, dialect parameterization, helpers, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
-| decisions-and-evidence.md | Decisions 001-038 and evidence ids referenced by this design |
+| questions.md | Open: none; resolved: Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| decisions-and-evidence.md | Decisions 001-039 and evidence ids referenced by this design |

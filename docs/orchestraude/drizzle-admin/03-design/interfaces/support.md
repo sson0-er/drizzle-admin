@@ -3,7 +3,7 @@
 Files: `src/messages.ts`, `src/time.ts`. No dependencies. Web-standard APIs only (`Intl`).
 
 ## Responsibilities
-- `messages.ts`: every user-visible UI string (Japanese), in one file (§2). No other source file contains UI text literals. Changed 2026-10-08: glyph-only literals that contain no words are exempt: the paginator's `‹` / `›`, the breadcrumb separator `›`, the boolean cell marks `✓` / `✗`, the null cell `-`, the truncation `…`, the empty choice `---------` and the password mask `********` (decisions 033 item 11, 037).
+- `messages.ts`: every user-visible UI string (Japanese), in one file (§2). No other source file contains UI text literals. Changed 2026-10-08: glyph-only literals that contain no words are exempt: the paginator's `‹` / `›`, the breadcrumb separator `›`, the boolean cell marks `✓` / `✗`, the null cell `-`, the truncation `…`, the empty choice `---------` and the password mask `********` (decisions 033 item 11, 037). Changed 2026-10-08: icons (decision 039, `src/views/icons.tsx`) are decorative SVG with no text and need no message; the accessible text of a boolean list cell reuses `yes` / `no`, so no key is added. `formatValue` / `formatCell` still return `✓` / `✗` for booleans, but neither list cells nor `DisplayValue` render that text any more; both show `BooleanMark` (Q9).
 - `time.ts`: time-zone validation, conversion between `datetime-local` values and instants, date-preset ranges, list date formatting.
 
 ## API
