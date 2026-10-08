@@ -112,8 +112,10 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 
       it("treats backslash literally", async () => {
         const { repo, articles } = await make();
+        await repo.create(articles, { title: "back\\slash", authorId: 1 });
         const r = await repo.list(articles, params({ q: "\\", searchFields: ["title"] }));
-        expect(r.rows).toEqual([]);
+        expect(col(r.rows, "title")).toEqual(["back\\slash"]);
+        expect(r.total).toBe(1);
       });
 
       it("searches several fields with OR", async () => {
@@ -258,9 +260,16 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       expect((await repo.list(authors, params())).total).toBe(5);
     });
 
-    it("propagates DB errors unchanged", async () => {
+    it("propagates the driver's unique violation unchanged", async () => {
       const { repo, authors } = await make();
-      await expect(repo.create(authors, { name: "alice" })).rejects.toThrow();
+      const error = (await repo.create(authors, { name: "alice" }).catch((e: unknown) => e)) as {
+        message: string;
+        code?: string;
+        cause?: { message: string; code?: string };
+      };
+      // Drizzle may wrap the driver error, so look at the error and its cause alike.
+      if (fx.name === "pglite") expect(error.code ?? error.cause?.code).toBe("23505");
+      else expect(error.cause?.message ?? error.message).toMatch(/UNIQUE constraint failed/);
     });
   });
 

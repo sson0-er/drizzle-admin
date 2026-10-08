@@ -1,3 +1,4 @@
+import { DrizzleQueryError } from "drizzle-orm";
 import { afterEach, describe, expect, it } from "vitest";
 import { classifyDbError, describeForLog, isDbError } from "../src/data/errors.js";
 import { createRepository } from "../src/data/repository.js";
@@ -77,6 +78,12 @@ describe("data/errors (synthetic)", () => {
     expect(classifyDbError(deep(6))).toBe("other");
     expect(isDbError(deep(5))).toBe(true);
     expect(isDbError(deep(6))).toBe(false);
+  });
+
+  it("treats a DrizzleQueryError without any code as a DB error of kind other", () => {
+    const err = new DrizzleQueryError("select 1", [], new Error("no code"));
+    expect(isDbError(err)).toBe(true);
+    expect(classifyDbError(err)).toBe("other");
   });
 
   it("maps every documented code", () => {

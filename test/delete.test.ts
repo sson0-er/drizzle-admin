@@ -1,5 +1,5 @@
 import { type Column, eq, getTableColumns, type Table } from "drizzle-orm";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { messages } from "../src/messages.js";
 import {
@@ -46,9 +46,9 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     return row;
   }
   /** Another admin over the same database, so one PGlite instance serves every configuration. */
-  async function adminWith(authors: ModelAdminOptions<Table>): Promise<Client> {
+  async function adminWith(authors: ModelAdminOptions<Table>, db: unknown = t.db): Promise<Client> {
     const admin = createAdmin({
-      db: t.db,
+      db,
       dialect: fixture.dialect,
       basePath: "/admin",
       secret: TEST_SECRET,
@@ -59,6 +59,17 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     const c = createClient((req) => admin.fetch(req));
     await c.login();
     return c;
+  }
+  /** The same database, but every `delete()` throws `failure` before reaching the driver. */
+  function dbFailingOnDelete(failure: Error): unknown {
+    return new Proxy(t.db as object, {
+      get: (target, prop) =>
+        prop === "delete"
+          ? () => {
+              throw failure;
+            }
+          : Reflect.get(target, prop, target),
+    });
   }
   async function flashes(c: Client, res: Response, cls?: string) {
     const doc = await docOf(await c.get(res.headers.get("Location") ?? ""));
@@ -267,6 +278,70 @@ describe.each(dialects)("delete ($name)", (fixture) => {
       const ids = (await rows("authors")).map((r) => r.id);
       expect(ids).toContain(1);
       expect(ids).toContain(free.id);
+    });
+  });
+
+  describe("failures other than a foreign key", () => {
+    // A DB error is any error carrying a string `code`; a plain Error is a bug.
+    const dbError = () => Object.assign(new Error("secret detail"), { code: "XX000" });
+    const requests = [
+      {
+        name: "single delete",
+        path: (id: unknown) => `/admin/authors/${String(id)}/delete/`,
+        form: () => ({}),
+      },
+      {
+        name: "delete_selected with _confirm=1",
+        path: () => "/admin/authors/",
+        form: (id: unknown) => ({
+          action: "delete_selected",
+          _selected: String(id),
+          _confirm: "1",
+        }),
+      },
+    ];
+
+    it.each(requests)("$name with a non-FK DB error flashes dbOther", async (r) => {
+      const author = await addAuthor(`db-other ${r.name}`);
+      const c = await adminWith({}, dbFailingOnDelete(dbError()));
+      const res = await send(c, r.path(author.id), r.form(author.id));
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe("/admin/authors/");
+      expect(await flashes(c, res, "error")).toEqual([messages.dbOther]);
+      expect((await rows("authors")).some((x) => x.id === author.id)).toBe(true);
+    });
+
+    it.each(requests)("$name with a non-DB error answers 500", async (r) => {
+      const author = await addAuthor(`non-db ${r.name}`);
+      const c = await adminWith({}, dbFailingOnDelete(new Error("a bug")));
+      // onError logs the error; keep the test output clean.
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const res = await send(c, r.path(author.id), r.form(author.id));
+        expect(res.status).toBe(500);
+        expect(await res.text()).not.toContain("a bug");
+      } finally {
+        log.mockRestore();
+      }
+      expect((await rows("authors")).some((x) => x.id === author.id)).toBe(true);
+    });
+  });
+
+  describe("delete_selected with only vanished rows", () => {
+    it.each([
+      ["without _confirm", {}],
+      ["with _confirm=1", { _confirm: "1" }],
+    ])("%s flashes noSelection and deletes nothing", async (_name, extra) => {
+      const before = (await rows("authors")).length;
+      const res = await send(client, "/admin/authors/", {
+        action: "delete_selected",
+        _selected: "999999",
+        ...extra,
+      });
+      expect(res.status).toBe(303);
+      expect(res.headers.get("Location")).toBe("/admin/authors/");
+      expect(await flashes(client, res, "warning")).toEqual([messages.noSelection]);
+      expect(await rows("authors")).toHaveLength(before);
     });
   });
 });

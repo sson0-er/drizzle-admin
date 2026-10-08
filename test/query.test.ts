@@ -137,6 +137,32 @@ describe("buildFilters: dates", () => {
     expect(q.params).toEqual([Date.UTC(2026, 8, 30, 15), Date.UTC(2026, 9, 31, 15)]);
   });
 
+  it.each([
+    ["today", ["2026-10-06T15:00:00.000Z", "2026-10-07T15:00:00.000Z"]],
+    ["past7", ["2026-09-30T15:00:00.000Z", "2026-10-07T15:00:00.000Z"]],
+    ["month", ["2026-09-30T15:00:00.000Z", "2026-10-31T15:00:00.000Z"]],
+    ["year", ["2025-12-31T15:00:00.000Z", "2026-12-31T15:00:00.000Z"]],
+  ])("timestamp field binds the hard-coded bounds of the %s preset", (preset, params) => {
+    const { q } = filterSql(pgDb, pg.articles, pgMeta(pg.articles), { publishedAt: preset });
+    expect(q.sql).toContain('"articles"."published_at" >= $1 and "articles"."published_at" < $2');
+    expect(q.params).toEqual(params);
+  });
+
+  it("a date field that is also a foreign key still filters by preset range, not equality", () => {
+    const base = pgMeta(pg.articles);
+    const publishedAt = {
+      ...field(base, "publishedAt"),
+      foreignKey: { table: pg.authors, column: "id" },
+    };
+    const meta: ModelMeta = {
+      ...base,
+      fields: base.fields.map((f) => (f.key === "publishedAt" ? publishedAt : f)),
+    };
+    const { q } = filterSql(pgDb, pg.articles, meta, { publishedAt: "today" });
+    expect(q.sql).toContain('"articles"."published_at" >= $1 and "articles"."published_at" < $2');
+    expect(q.params).toEqual(["2026-10-06T15:00:00.000Z", "2026-10-07T15:00:00.000Z"]);
+  });
+
   it("ignores an unknown preset", () => {
     const meta = pgMeta(pg.events);
     expect(buildFilters(meta, { day: "decade", due: "", publishedAt: "x" }, TOKYO, NOW)).toEqual(
@@ -195,6 +221,12 @@ describe("buildOrderBy", () => {
       .toSQL();
     expect(q.sql).toContain('order by "authors"."name" desc, "authors"."id" asc');
     expect(q.sql).not.toContain('"authors"."id" desc');
+  });
+
+  it("throws for a key that is not a column", () => {
+    expect(() => buildOrderBy(pgMeta(pg.authors), [{ key: "nope", desc: false }])).toThrow(
+      'drizzle-admin: unknown column "nope" on "authors"',
+    );
   });
 
   it("appends the PK for an empty ordering", () => {

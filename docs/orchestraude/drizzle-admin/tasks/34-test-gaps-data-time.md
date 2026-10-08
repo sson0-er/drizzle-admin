@@ -1,7 +1,7 @@
 ---
 id: 34-test-gaps-data-time
 depends_on: [29-vanished-rows-warnings]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 34: test-gaps-data-time

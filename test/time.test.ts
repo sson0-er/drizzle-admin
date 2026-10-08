@@ -215,6 +215,23 @@ describe("datePresetRange (instants in the zone)", () => {
     ]);
   });
 
+  it.each([
+    [
+      "spring-forward day (23 h)",
+      "2026-03-08T17:00:00Z",
+      "2026-03-08T05:00:00.000Z",
+      "2026-03-09T04:00:00.000Z",
+    ],
+    [
+      "fall-back day (25 h)",
+      "2026-11-01T17:00:00Z",
+      "2026-11-01T04:00:00.000Z",
+      "2026-11-02T05:00:00.000Z",
+    ],
+  ])("today on the New York %s", (_name, nowIso, start, end) => {
+    expect(range(datePresetRange("today", new Date(nowIso), NY))).toEqual([start, end]);
+  });
+
   it("handles month/year boundaries on Dec 31 and Jan 1 in the zone", () => {
     // 2026-12-31T15:00Z is already 2027-01-01 00:00 in Tokyo.
     const jan1 = new Date("2026-12-31T15:00:00Z");
