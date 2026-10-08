@@ -63,6 +63,7 @@ const functionKeys = [
   "added",
   "changed",
   "deleted",
+  "alreadyDeleted",
   "deletedMany",
   "confirmDelete",
   "confirmAction",
@@ -87,6 +88,7 @@ describe("messages", () => {
     expect(messages.added("x")).toBe("「x」を追加しました。");
     expect(messages.changed("x")).toBe("「x」を変更しました。");
     expect(messages.deleted("x")).toBe("「x」を削除しました。");
+    expect(messages.alreadyDeleted("x")).toBe("「x」は既に削除されています。");
     expect(messages.deletedMany(2)).toBe("2 件削除しました。");
     expect(messages.confirmDelete("x")).toBe("「x」を削除してもよろしいですか?");
     expect(messages.confirmAction("y")).toBe("「y」を実行してもよろしいですか?");

@@ -43,6 +43,7 @@ export const messages = {
   added: (s: string) => `「${s}」を追加しました。`,
   changed: (s: string) => `「${s}」を変更しました。`,
   deleted: (s: string) => `「${s}」を削除しました。`,
+  alreadyDeleted: (s: string) => `「${s}」は既に削除されています。`,
   deletedMany: (n: number) => `${n} 件削除しました。`,
   actionDone: "操作を実行しました。",
   afterSaveFailed: "保存しましたが、保存後の処理でエラーが発生しました。",

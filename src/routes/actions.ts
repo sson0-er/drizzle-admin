@@ -98,7 +98,10 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
   if (!can(model, ACTION_PERMISSION, user)) return errorPage(c, 403, messages.forbidden);
 
   if (custom.confirm === true && !confirmed) {
-    return confirmPage(custom.label, false, await repo.getMany(model.meta, ids));
+    const rows = await repo.getMany(model.meta, ids);
+    // Every selected row vanished meanwhile: nothing to confirm.
+    if (rows.length === 0) return flashBack("warning", messages.noSelection);
+    return confirmPage(custom.label, false, rows);
   }
   try {
     const result = await custom.run({ ids, db: state.config.db, user });

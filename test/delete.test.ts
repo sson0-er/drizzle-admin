@@ -1,4 +1,4 @@
-import type { Table } from "drizzle-orm";
+import { type Column, eq, getTableColumns, type Table } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { messages } from "../src/messages.js";
@@ -17,6 +17,7 @@ type Rec = Record<string, unknown>;
 type RawDb = {
   select(): { from(table: Table): PromiseLike<Rec[]> };
   insert(table: Table): { values(rows: Rec): { returning(): PromiseLike<Rec[]> } };
+  delete(table: Table): { where(condition: unknown): PromiseLike<unknown> };
 };
 
 async function docOf(res: Response): Promise<Node> {
@@ -107,6 +108,28 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     expect((await rows("authors")).some((r) => r.id === author.id)).toBe(false);
     expect(await flashes(client, res)).toEqual([messages.deleted("to-delete")]);
+  });
+
+  it("flashes alreadyDeleted when the row vanishes after beforeDelete", async () => {
+    const author = await addAuthor("vanishing");
+    const c = await adminWith({
+      toString: (row) => String(row.name),
+      hooks: {
+        // Removes the row itself, so the delete that follows matches 0 rows.
+        beforeDelete: async (row, ctx) => {
+          const id = getTableColumns(table("authors")).id as Column;
+          await (ctx.db as RawDb).delete(table("authors")).where(eq(id, row.id));
+        },
+      },
+    });
+    const res = await send(c, `/admin/authors/${String(author.id)}/delete/`);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe("/admin/authors/");
+    // The flash is consumed by the first GET, so read all items and their level from one page.
+    const doc = await docOf(await c.get(res.headers.get("Location") ?? ""));
+    const items = qsa(qs(doc, { tag: "ul", cls: "messagelist" }) as Node, { tag: "li" });
+    expect(items.map((li) => text(li).trim())).toEqual([messages.alreadyDeleted("vanishing")]);
+    expect(items.map((li) => attr(li, "class"))).toEqual([expect.stringContaining("warning")]);
   });
 
   it("keeps an author that an article references and flashes the FK error", async () => {

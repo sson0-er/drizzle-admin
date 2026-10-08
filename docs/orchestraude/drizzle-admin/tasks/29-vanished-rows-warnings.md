@@ -1,8 +1,8 @@
 ---
 id: 29-vanished-rows-warnings
 depends_on: [20-routes-delete, 21-routes-actions]
-status: pending
-attempts: 0
+status: done
+attempts: 1
 ---
 # Task 29: vanished-rows-warnings
 
@@ -46,3 +46,5 @@ Rows that disappear concurrently no longer produce misleading pages. A custom ac
 - Decisions: docs/orchestraude/decisions/036-triage-behavior-changes.md (items 3, 4), docs/orchestraude/decisions/033-low-findings-recorded-behaviors.md (item 3)
 
 ## History
+
+- Attempt 1: review round 1 findings (high 0, medium 1)

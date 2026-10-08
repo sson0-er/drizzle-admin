@@ -53,13 +53,21 @@ export async function deleteHandler(c: AdminContext): Promise<Response> {
     return redirectWithFlash(c, listUrl, [{ level: "error", text: messages.hookFailed }]);
   }
 
+  let n: number;
   try {
-    await repo.delete(model.meta, [pk]);
+    n = await repo.delete(model.meta, [pk]);
   } catch (err) {
     // Anything that is not a database error is a bug and goes to onError.
     if (!isDbError(err)) throw err;
     const text = classifyDbError(err) === "foreignKey" ? messages.dbForeignKey : messages.dbOther;
     return redirectWithFlash(c, listUrl, [{ level: "error", text }]);
   }
-  return redirectWithFlash(c, listUrl, [{ level: "success", text: messages.deleted(label) }]);
+  // 0 rows: the row vanished between the lookup and the delete.
+  return redirectWithFlash(
+    c,
+    listUrl,
+    n > 0
+      ? [{ level: "success", text: messages.deleted(label) }]
+      : [{ level: "warning", text: messages.alreadyDeleted(label) }],
+  );
 }

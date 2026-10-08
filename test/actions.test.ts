@@ -165,6 +165,14 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     expect(await flashes(client, second, "success")).toEqual(["Asked."]);
   });
 
+  it("warns and skips the confirmation page when no selected row exists any more", async () => {
+    const res = await post(client, "/admin/authors/", { action: "ask", _selected: "999999" });
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe("/admin/authors/");
+    expect(await flashes(client, res, "warning")).toEqual([messages.noSelection]);
+    expect(runs.ask).toHaveLength(0);
+  });
+
   it("redirects to the list URL plus the original query string", async () => {
     const query = "?q=a&o=-id";
     const cases: Record<string, string | string[]>[] = [
