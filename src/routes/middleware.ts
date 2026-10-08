@@ -4,6 +4,7 @@ import { externalLoginUrl, loginRedirectUrl, safeNext } from "../auth/redirect.j
 import { newSession, readSession, writeSession } from "../auth/session.js";
 import type { Repository } from "../data/repository.js";
 import { messages } from "../messages.js";
+import { SELECT_ALL_SCRIPT_SHA256 } from "../static/select-all.js";
 import type { AdminState } from "../types.js";
 import { type AdminEnv, type AdminVars, cookieOpts, errorPage } from "./context.js";
 
@@ -19,13 +20,32 @@ export const initVars =
     await next();
   };
 
-export const securityHeaders: Mw = async (c, next) => {
-  await next();
-  c.header("X-Frame-Options", "DENY");
-  c.header("Referrer-Policy", "same-origin");
-  // Only the static CSS route sets its own Cache-Control.
-  if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
-};
+/**
+ * The policy depends only on the auth mode. `form-action` is left out in external mode: a form
+ * submitted after the host session expired is redirected to the host's login URL, which may be
+ * cross-origin and chain through further hops (decision 044).
+ */
+export const buildCsp = (authMode: "builtin" | "external"): string =>
+  [
+    "default-src 'none'",
+    `script-src 'sha256-${SELECT_ALL_SCRIPT_SHA256}'`,
+    "style-src 'self'",
+    ...(authMode === "builtin" ? ["form-action 'self'"] : []),
+    "frame-ancestors 'none'",
+    "base-uri 'none'",
+  ].join("; ");
+
+export const securityHeaders =
+  (csp: string): Mw =>
+  async (c, next) => {
+    await next();
+    c.header("X-Frame-Options", "DENY");
+    c.header("Referrer-Policy", "same-origin");
+    c.header("X-Content-Type-Options", "nosniff");
+    c.header("Content-Security-Policy", csp);
+    // Only the static CSS route sets its own Cache-Control.
+    if (!c.res.headers.has("Cache-Control")) c.header("Cache-Control", "no-store");
+  };
 
 export const sessionMiddleware =
   (_state: AdminState, getCookieKeys: () => Promise<AdminVars["cookieKeys"]>): Mw =>

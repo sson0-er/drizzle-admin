@@ -1,8 +1,9 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import type { FormField } from "../src/forms/fields.js";
 import { messages } from "../src/messages.js";
 import { ADMIN_CSS, ADMIN_CSS_VERSION } from "../src/static/admin-css.js";
-import { SELECT_ALL_SCRIPT } from "../src/static/select-all.js";
+import { SELECT_ALL_SCRIPT, SELECT_ALL_SCRIPT_SHA256 } from "../src/static/select-all.js";
 import { ConfirmActionPage } from "../src/views/confirm-action.js";
 import { DashboardPage } from "../src/views/dashboard.js";
 import { DeletePage } from "../src/views/delete.js";
@@ -79,6 +80,11 @@ describe("static modules", () => {
     for (const ch of ["&", "<", ">", '"', "'"]) {
       expect(SELECT_ALL_SCRIPT).not.toContain(ch);
     }
+  });
+
+  it("SELECT_ALL_SCRIPT_SHA256 is the base64 SHA-256 of SELECT_ALL_SCRIPT", () => {
+    const hash = createHash("sha256").update(SELECT_ALL_SCRIPT, "utf8").digest("base64");
+    expect(SELECT_ALL_SCRIPT_SHA256).toBe(hash);
   });
 
   it("ADMIN_CSS has no external resources", () => {

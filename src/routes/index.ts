@@ -17,6 +17,7 @@ import { listHandler } from "./list.js";
 import { loginHandler, logoutHandler } from "./login.js";
 import {
   authGuard,
+  buildCsp,
   csrfToken,
   initVars,
   securityHeaders,
@@ -64,7 +65,7 @@ export function buildApp(state: AdminState): Hono {
 
   app.use("*", initVars(state, repo));
   // 1. securityHeaders
-  app.use("*", securityHeaders);
+  app.use("*", securityHeaders(buildCsp(config.authMode)));
   // 2. static (route 1): registered before the remaining middleware so none of it runs for the CSS.
   app.get("/static/admin.css", (c) =>
     c.body(ADMIN_CSS, 200, {

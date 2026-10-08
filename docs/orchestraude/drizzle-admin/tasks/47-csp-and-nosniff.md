@@ -1,7 +1,7 @@
 ---
 id: 47-csp-and-nosniff
 depends_on: [43-instance-bound-cookie-keys]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 47: csp-and-nosniff
@@ -66,3 +66,12 @@ Follow the conventions in CLAUDE.md: one case per `it.each` row, exact header va
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Tests written first and run against the unchanged code: 15 failed (no `SELECT_ALL_SCRIPT_SHA256` export, `X-Content-Type-Options` and `Content-Security-Policy` headers `null` in every `expectHardened` case, the new 500 and external-mode cases).
+- The recomputed hash equals the design value `v/peDHOfIZWrfvqqPHbyzhkt2GMZ+0UvE0ARRSfmSAU=`; no deviation.
+- New export not in the design: `buildCsp(authMode)` from `src/routes/middleware.ts` (called in `buildApp`, so the policy is built once; routes.md says module-private, the design should be updated).
+- `buildCsp` joins directives with `"; "`; the exact strings are pinned in `test/headers.test.ts`.
+- Manual browser check of the select-all script under the CSP: 未確認.
+- `scripts/verify.sh` passes.
+- Review round 1: high 0, medium 0, low 1 (tests: redundant not.toContain("form-action") after the exact external CSP match). Done.
