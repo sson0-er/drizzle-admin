@@ -49,3 +49,13 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-09-npm-publish-fields | For decision 052, which package.json fields control publish access, repository links and engines, and are peers installed automatically? | expires 2027-01-07
 - 2026-10-09-dependabot-sha-pins | For decision 052 (Q17), does Dependabot's github-actions ecosystem update SHA-pinned actions and their version comments? | expires 2027-01-07
 - 2026-10-09-require-esm | For decision 052 (release-round review), can a CommonJS host require() the ESM-only package, and which exports condition does it need? | expires 2027-01-07
+- 2026-10-09-hono-oidc-auth-package | For the OIDC example, what is @hono/oidc-auth's version, peers, configuration, API, session cookie and return-URL behaviour? | expires 2027-01-07
+- 2026-10-09-oidc-auth-http-issuer | Does @hono/oidc-auth work against an http://localhost issuer (HTTPS enforcement in oauth4webapi)? | expires 2027-01-07
+- 2026-10-09-oidc-provider-mock-idp | Can panva oidc-provider serve as an in-process mock IdP and be driven by fetch without a browser? | expires 2027-01-07
+- 2026-10-09-oidc-mock-alternatives | How do oauth2-mock-server and a hand-written jose mock compare with oidc-provider as a mock IdP? | expires 2027-01-07
+- 2026-10-09-oidc-auth-oidc-provider-e2e | Does the full login/callback/return/logout flow run with fetch only against @hono/oidc-auth + oidc-provider inside vitest? | expires 2027-01-07
+- 2026-10-09-selfsigned-cert-generation | Can a localhost cert (SAN localhost, 127.0.0.1) be generated in Node without openssl, and at what dependency cost? | expires 2027-01-07
+- 2026-10-09-extra-ca-certs-flow | Does the OIDC flow run end to end over https://localhost trusted via NODE_EXTRA_CA_CERTS (launcher and vitest) without disabling TLS verification? | expires 2027-01-07
+- 2026-10-09-secure-cookie-localhost-browsers | Which browsers accept Secure cookies set over http://localhost? | expires 2026-11-08
+- 2026-10-09-oidc-example-package-types | For decision 053, which exact versions, type declarations, engines and install scripts do the OIDC example's dev dependencies bring? | expires 2027-01-07
+- 2026-10-09-oidc-example-runtime-checks | For decision 053, does the repo's toolchain support the launcher and the getUser bridge (tsx via --import, hono mount sharing the Request and headers, localhost resolution)? | expires 2027-01-07

@@ -1,5 +1,7 @@
 # Interface: example app
 
+Changed 2026-10-09 (decision 053): a second example, the OIDC SSO demo under `example/oidc/`, is specified in [example-oidc.md](example-oidc.md); it reuses `createExampleAdmin` and `hostGuard` from here.
+
 Files: `example/schema.ts`, `example/seed.ts`, `example/app.ts`, `example/host-guard.ts`, `example/server.ts` (`app.ts` is an addition to §4 so the smoke test can build the app without listening on a port; `host-guard.ts` is an addition from decision 048 so the Host check can be unit-tested without starting the server). It imports the library from `../src/index.js` (run with tsx; decision 005). It uses SQLite through better-sqlite3 so it runs with no external services.
 
 ## Responsibilities
@@ -40,10 +42,12 @@ export async function seed(db: BetterSQLite3Database): Promise<void>;
 Seed data: 5 users (one inactive, mixed roles), 60 posts spread across authors, statuses and dates (some within today / past 7 days / this month, so that pagination and filters show), 8 tags. The data is deterministic (no randomness).
 
 ### `example/app.ts`
+Changed 2026-10-09 (decision 053): the DB setup, seed, `createAdmin` call and registrations move into `createExampleAdmin`, so the OIDC example (example-oidc.md) builds the same admin with external auth. `createExampleApp` keeps its signature and behavior; existing tests are unchanged.
 ```ts
 export async function createExampleApp(opts: { secret: string; adminPassword: string }): Promise<{ app: Hono; admin: Admin }>;
+export async function createExampleAdmin(opts: { secret: string; auth: AuthConfig }): Promise<Admin>;
 ```
-Everything below except the port and environment handling lives here; `server.ts` reads the environment, calls it and serves.
+Everything below except the port and environment handling lives here; `server.ts` reads the environment, calls it and serves. `createExampleAdmin` does the in-memory DB, seed, `createAdmin({ ..., secret, auth })` and the three registrations, and returns the admin without reading `admin.app`. `createExampleApp` calls it with `auth: { verifyCredentials }` (below), then builds the `Hono` app (`GET /` redirect and the mount).
 
 ### `example/server.ts` (behavior of app.ts + server.ts together)
 Changed 2026-10-08: the server binds to `127.0.0.1` by default, overridable with `HOST` (decision 038).

@@ -15,12 +15,14 @@ Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`,
 | `pnpm lint` | `biome check .` | 0 errors |
 | `pnpm build` | `node -e "require('node:fs').rmSync('dist',{recursive:true,force:true})" && tsc -p tsconfig.build.json` | `dist/index.js` and `dist/index.d.ts` plus per-module files |
 | `pnpm example` | `tsx example/server.ts` | demo server (example.md) |
+| `pnpm example:oidc` | `tsx example/oidc/launch.ts` | Changed 2026-10-09 (decision 053): OIDC SSO demo with a local mock IdP, or a real IdP via `OIDC_ISSUER` (example-oidc.md) |
 | `pnpm format` | `biome check --write .` | convenience |
 | (lifecycle) `prepack` | `pnpm build` | Changed 2026-10-08 (decision 048): runs before every `npm pack` / `npm publish` and in `pnpm publish`, so the tarball's `dist/` is always built from the current `src/` (evidence: 2026-10-08-prepack-lifecycle) |
 
 ## Data formats
 
 ### package.json
+Changed 2026-10-09 (decision 053): script `example:oidc` and four exact-pinned devDependencies for the OIDC example: `@hono/oidc-auth` 1.10.0, `oidc-provider` 9.12.2, `@types/oidc-provider` 9.12.1, `selfsigned` 5.5.0 (evidence: 2026-10-09-oidc-example-package-types). Run `pnpm install` so `pnpm-lock.yaml` matches. `files`, `dependencies` and `peerDependencies` do not change, so nothing of the example reaches the tarball (the smoke test's content check already fails on `package/example/`). Their engines allow Node 22 and none has an install script, so the CI `smoke-node22` job's `pnpm install --frozen-lockfile` is unaffected (pnpm 12's reaction to engines is unverified; a failure there blocks the task). Importing `@hono/oidc-auth` anywhere in the type-check program augments hono's `ContextVariableMap` with `oidc*` keys; no admin variable uses those names, and `tsconfig.build.json` (src only) never sees it.
 Changed 2026-10-09 (decision 052): scoped `name`, `repository` / `homepage` / `bugs`, `engines`, `publishConfig`; `hono` moved from `dependencies` to `peerDependencies` (range `^4.13.13`) and added to `devDependencies` (exact `4.13.13`). Run `pnpm install` afterwards so `pnpm-lock.yaml` matches (CI installs with `--frozen-lockfile`). Top-level key order as below.
 Changed 2026-10-09 (decision 052 point 13, design review): `exports` gains `"default": "./dist/index.js"`, the same ESM file as `import`, so `require()` from a CommonJS host resolves on Node versions with require(esm) enabled (22.12 and later); without it `require()` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED` (evidence: 2026-10-09-require-esm). The package stays ESM-only; there is no CommonJS build.
 Changed 2026-10-09 (decision 052 point 9, Q16): `files` also lists `src`, so the shipped source maps and declaration maps (`sourceMap` and `declarationMap` stay on in `tsconfig.build.json`) resolve their `../src/*.ts` references inside the package. `src/` contains only library sources; tests, fixtures, `example/` and `scripts/` are not published (the smoke test checks this, release-checks.md).
@@ -48,7 +50,8 @@ Changed 2026-10-09 (decision 052 point 9, Q16): `files` also lists `src`, so the
   "devDependencies": {  // exact versions (decision 005); the file keeps these keys sorted
     "drizzle-orm": "0.45.3", "hono": "4.13.13", "typescript": "7.0.2", "vitest": "5.0.3", "@biomejs/biome": "2.5.15",
     "better-sqlite3": "13.0.3", "@types/better-sqlite3": "9.6.0", "@electric-sql/pglite": "0.5.8",
-    "parse5": "8.0.1", "@hono/node-server": "2.1.3", "tsx": "4.23.15", "@types/node": "24.19.1"
+    "parse5": "8.0.1", "@hono/node-server": "2.1.3", "tsx": "4.23.15", "@types/node": "24.19.1",
+    "@hono/oidc-auth": "1.10.0", "oidc-provider": "9.12.2", "@types/oidc-provider": "9.12.1", "selfsigned": "5.5.0"  // decision 053
   }
 }
 ```
@@ -91,6 +94,16 @@ Allowed `any` only in `src/introspect/**` and `src/data/**`, each with `// biome
 
 ### vitest.config.ts
 `defineConfig({ test: { include: ["test/**/*.test.ts", "test/**/*.test.tsx"], environment: "node" } })`. The JSX settings come from tsconfig (evidence: 2026-10-07-ts7-vitest-biome-compat).
+Changed 2026-10-09 (decision 053): the existing `testTimeout` / `hookTimeout` stay; add
+```ts
+    // The OIDC test trusts its mock IdP through NODE_EXTRA_CA_CERTS, which Node reads only when a
+    // process starts: workers must be child processes spawned after the global setup has set it.
+    // forks is vitest's default; pinned so a change of default or a switch to threads fails loudly
+    // here instead of as a TLS error (decision 053).
+    pool: "forks",
+    globalSetup: ["test/helpers/oidc-global-setup.ts"],
+```
+The global setup applies to the whole run (certificate generation takes about 20 ms; no other test opens a TLS connection), see test-strategy.md (evidence: 2026-10-09-extra-ca-certs-flow).
 
 ### .gitignore
 `node_modules/`, `dist/`, `coverage/`, `example/*.sqlite*`.
@@ -134,6 +147,8 @@ Changed 2026-10-08: security audit fixes (decisions 042-048), by section. 5: the
 Changed 2026-10-09: internationalization (decisions 049-051), by section. 1: the feature list says "English and Japanese UI". 5: the `siteTitle` row's default is "Site administration" (English) / "サイト管理" (Japanese), following the visitor's language; a configured title is not translated. 6: the `slug` row lists `_lang` with `login`, `logout` and `static` as reserved. 8: the cookies table adds `da_lang` (unsigned, value `en` or `ja`, one year, same `Path` / `HttpOnly` / `SameSite` / `Secure` rules; not a security cookie). New section "Language" after 8: English is the default for every visitor; the header switcher (a POST form, works without JavaScript) stores the choice in `da_lang`; `Accept-Language` is not used; there is no option to change the default; model labels, field names, action labels, `toString` and formatter output, `validate` messages and a configured `siteTitle` are shown as written; configuration errors and log lines are English. 10: "Japanese UI only" is replaced by "English and Japanese only; the default language (English) cannot be configured".
 
 Changed 2026-10-09: release preparation (decision 052), by section. 2: "Node.js 24 (the version the test suite runs on)" becomes "Node.js 22 or later. The full test suite runs on Node.js 24; CI also installs the packed package on Node.js 22 and runs a smoke test."; the Hono bullet says Hono `^4.13.13` is a peer dependency to install next to this package, instead of "Hono is a dependency of this package"; a new bullet (decision 052 point 13) says: "The package is ESM-only. A CommonJS application can `require()` it only on a Node.js version that supports `require()` of ES modules without a flag (22.12 or later); otherwise use `import()`." 3: the install command is exactly `pnpm add @sson0-er/drizzle-admin drizzle-orm hono`. 4: the Quick start imports `createAdmin` from `"@sson0-er/drizzle-admin"`; nothing else in it changes. 11: after the `scripts/verify.sh` sentence, one paragraph: "`scripts/smoke-pack.sh` builds and packs the package, installs the tarball into a temporary project and type-checks and runs a small consumer against SQLite and PGlite. It needs access to the npm registry. CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on every push and pull request to `main`." The `# drizzle-admin` title and the product name in prose stay.
+
+Changed 2026-10-09 (decision 053), by section. 11: the command block gains `pnpm example:oidc     # OIDC sign-in demo with a local mock IdP; open http://localhost:3000/admin/`, and a new subsection "OIDC example" is placed before "Changelog" with the content given in example-oidc.md "README text" (run, real IdP variables, how the bridge and `next` validation work, caveats). No CHANGELOG entry: the published files do not change.
 
 Changed 2026-10-07: section 6 points at all sources of `register()` constraints (decisions 013 item 13, 021, 023; admin.md step 5).
 

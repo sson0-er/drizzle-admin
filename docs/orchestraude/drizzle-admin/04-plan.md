@@ -59,6 +59,9 @@
 | 53 | security-low-findings-tests | 49 | Tests only, security-fix low findings A (L007, L009, L010, L008, L013, L016, L018): per-dialect data in the int4 test, dashboard positive control, exact flash lists, boundary rows for `parseFieldValue`, search normalization and host guard |
 | 54 | package-metadata-and-docs | 52 | Release prep (decision 052 points 1-5, 8, 9, 13): package.json (scoped name, links, `exports` `default`, `files` + `src`, `engines` `>=22`, `publishConfig`, hono peer), lockfile, README requirements/install/import/development, CHANGELOG 0.1.0, `readme.test.ts` package-name case |
 | 55 | smoke-test-and-ci | 54 | Release prep (decision 052 points 6, 7, 10-13): `scripts/smoke-pack.sh` + `scripts/smoke/` consumer, `.github/workflows/ci.yml`, `.github/dependabot.yml`, CLAUDE.md Overview/Commands/Layout; local Node 24 run; first CI run (Node 22) is a post-push user check |
+| 56 | oidc-shared-admin-and-config | 54 | OIDC example (decision 053), part 1: `createExampleAdmin` in example/app.ts; pure modules `return-path.ts`, `allowlist.ts`, `mode.ts`, `config.ts`; four exact-pinned devDependencies + lockfile (published file list unchanged); unit tables in `test/example-oidc.test.ts`; `test/tls-verification.test.ts` (scan, `mode.ts` once-only, refusal rows, worker env) |
+| 57 | oidc-app-mock-idp-and-flow-test | 56 | OIDC example, part 2: `cert.ts`, `mock-idp.ts`, `app.tsx` (bridge, allowlist 403, login `next`, callback 400, logout, `/`), `test/helpers/oidc-global-setup.ts`, vitest `pool: "forks"` + `globalSetup`; full-flow, allowlist, TLS negative control, shell isolation, callback failure, logout and `/` cases |
+| 58 | oidc-launcher-and-docs | 57, 55 | OIDC example, part 3: `server.ts`, `launch.ts`, `example:oidc` script, README `### OIDC example` + readme cases, CLAUDE.md Commands/Layout/Security rules; manual launcher run; user browser check (Q19) after the task |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -238,6 +241,53 @@ Execution order: 53 → 54 → 55
     - task 55 runs `bash -n`, checks the executable bit, and runs `shellcheck` when installed.
 - No vitest change in task 55: test-strategy.md lists only the readme case (task 54). The smoke script and the workflow are checked by the runs above.
 - Publishing stays out of scope. Neither task runs `npm publish`, bumps the version, creates a tag or fills in the CHANGELOG date.
+
+### OIDC SSO example tasks 56-58 (decision 053, Q19-Q21)
+Execution order: 55 → 56 → 57 → 58
+
+- Tasks 01-55 are done and unchanged. Sources:
+  - decision 053 (points 1-15);
+  - example-oidc.md (new);
+  - example.md (`createExampleAdmin`);
+  - project-setup.md (script, devDependencies, vitest config, README paragraph);
+  - test-strategy.md "Helpers" and "OIDC example (decision 053)";
+  - the design README (component, layout, "Project rules affected (decision 053)");
+  - questions.md Q19-Q21;
+  - the 2026-10-09 and 2026-10-10 OIDC scope notes in 01-requirements.md.
+- The library (`src/`) does not change in any of the three tasks. Each task that touches package.json or README.md (56, 58) checks that the `npm pack --dry-run` file list is identical before and after.
+- Split, by what can be verified on its own:
+  - 56: pure modules and their unit tables, the TLS guard, the shared admin builder, and the dependencies.
+  - 57: everything the in-process flow test needs (certificate, mock IdP, app, global setup, vitest pin) and that test.
+  - 58: the untested process wiring (server, launcher, script), checked by a manual run, plus README and CLAUDE.md.
+  - 57 has 5 code/config files plus the test file; it stays one task because the flow test only means something once the app, the IdP and the global setup exist together.
+- Dependencies come from shared files and APIs:
+  - 54 → 56: package.json / lockfile were last changed there.
+  - 56 → 57: `createExampleAdmin`, `safeReturnPath`, `isAllowed` / `Allowlist`, the devDependencies, and `test/example-oidc.test.ts`.
+  - 57 → 58: `server.ts` imports `cert.ts`, `mock-idp.ts` and `app.tsx`.
+  - 55 → 58: CLAUDE.md "Commands" / "Layout" were last edited in 55.
+- Planner decisions:
+  - **devDependencies in 56, not with the docs**: `config.ts` imports the `OidcAuthEnv` type from `@hono/oidc-auth`, so typecheck needs the packages in the first task. All four are added at once so the lockfile changes once. The `example:oidc` script goes to 58 together with `launch.ts`, so it never points at a missing file.
+  - **Launcher and server in 58, not 57**: they are process wiring that test-strategy.md leaves untested and checks by one manual run. Grouping them with the docs keeps 57 test-driven and 58 small.
+  - **`mode.ts` single occurrence**: test-strategy.md requires `NODE_TLS_REJECT_UNAUTHORIZED` to appear exactly once in `example/oidc/mode.ts`. The design's error message and the check would each contain it. Task 56 uses one module-private constant for the variable name, used both in the lookup and in the message template. The message text and behavior are unchanged.
+  - **TLS guard in 56**: `test/tls-verification.test.ts` lands with `mode.ts`, because the `assertTlsVerificationOn` rows need the forbidden name and may live only in that file. Every later task's new files are then scanned automatically.
+  - **IdP hooks scoped to a `describe` (57)**: test-strategy.md puts the unit tables and the IdP-backed cases in one file, with a file-level `beforeAll`. 57 wraps the IdP-backed cases in one `describe` that owns the hooks, so the unit tables from 56 stay unchanged and start no IdP.
+  - **Non-vacuity checks (57)**: run once and reverted, outcomes in History:
+    - the negative control is pointed at the trusted certificate and must fail;
+    - a `--pool=threads` run is recorded (informational; the `forks` pin stays).
+    - No check sets the TLS variable. The launcher's refusal is covered only by the unit rows.
+  - **Planner-added README cases (58)**: an `it.each` over the key texts of the `### OIDC example` subsection and one ordering `it`, in `test/readme.test.ts`. test-strategy.md does not list them; recorded for sync. The subsection is `###` inside "Development", so the 12-heading assertion stays.
+  - **CLAUDE.md (58)**: the user approved the edits the design specifies. Only "Commands", "Layout" and "Security rules" change. If the permission system refuses the edit, the rest of 58 completes and the item is reported blocked.
+- Blocking conditions named in the tasks (do not adapt, report):
+  - the `OidcAuthEnv` key set differs from the 13 keys of `config.ts`, or tsc 7 cannot resolve its types (56);
+  - a flow step differs from example-oidc.md "Flow" (57);
+  - a manual-run step differs (58).
+- Unverified until checked, recorded as 未確認 in History:
+  - CI `smoke-node22` with the new devDependencies (post-push, 56);
+  - the user's browser check (Q19, after 58; acceptance, not an implementer DoD item);
+  - the refresh path and other browsers / operating systems (decision 053 Consequences).
+- Design text not yet updated, which the tasks follow anyway (orchestrator to sync):
+  - test-strategy.md does not list the readme cases of 58;
+  - example-oidc.md `mode.ts` does not mention the shared name constant.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes
