@@ -57,6 +57,8 @@
 | 51 | language-switcher-ui | 49, 50 | i18n (decision 051 points 4-8): `div.header-tools` + `form.lang-switch` in `Layout`, `PageChrome.currentUrl` (login: `loginRedirectUrl`; minimal: `null`), three CSS rules; test edits 2-5 |
 | 52 | i18n-docs | 49, 50, 51 | i18n docs: README (sections 1, 5, 6, 8 cookies, `### Language`, 10), CHANGELOG "Changed", CLAUDE.md per design README "Project rules affected" (user-approved) |
 | 53 | security-low-findings-tests | 49 | Tests only, security-fix low findings A (L007, L009, L010, L008, L013, L016, L018): per-dialect data in the int4 test, dashboard positive control, exact flash lists, boundary rows for `parseFieldValue`, search normalization and host guard |
+| 54 | package-metadata-and-docs | 52 | Release prep (decision 052 points 1-5, 8, 9, 13): package.json (scoped name, links, `exports` `default`, `files` + `src`, `engines` `>=22`, `publishConfig`, hono peer), lockfile, README requirements/install/import/development, CHANGELOG 0.1.0, `readme.test.ts` package-name case |
+| 55 | smoke-test-and-ci | 54 | Release prep (decision 052 points 6, 7, 10-13): `scripts/smoke-pack.sh` + `scripts/smoke/` consumer, `.github/workflows/ci.yml`, `.github/dependabot.yml`, CLAUDE.md Overview/Commands/Layout; local Node 24 run; first CI run (Node 22) is a post-push user check |
 
 ## Execution order
 01 → 02 → 03 → 04 → 05 → 06 → 07 → 08 → 09 → 10 → 11 → 12 → 13 → 14 → 15 → 16 → 17 → 17a → 18 → 19 → 20 → 21 → 22 → 23 → 24 → 25 → 26
@@ -204,6 +206,38 @@ Execution order: 48 → 49 → 50 → 51 → 52 → 53
   - test-strategy.md "Helpers" does not list `Client.setCookie`;
   - project-setup.md places "Language" as a section "after 8", where task 52 uses a `###` subsection.
 - Manual check reported as 未確認 until the user runs it: task 51's browser check (switch without JavaScript, focus ring in light and dark mode).
+
+### Release preparation tasks 54-55 (decision 052, Q16-Q18)
+Execution order: 53 → 54 → 55
+
+- Tasks 01-53 are done and unchanged. Sources:
+  - decision 052;
+  - project-setup.md (package.json, CHANGELOG, README outline "release preparation" paragraph);
+  - release-checks.md (new);
+  - the design README section "Project rules affected (decision 052)";
+  - test-strategy.md "Release preparation (decision 052)";
+  - questions.md Q16-Q18;
+  - the 2026-10-09 release-preparation scope note in 01-requirements.md (CI in scope; `npm publish`, version bumps, tags and publish jobs out of scope).
+- Split:
+  - 54 holds everything that changes what is published and how it is described: package.json, lockfile, README, CHANGELOG, and the one new readme case.
+  - 55 holds the checks that prove it: the smoke script and consumer, the CI workflow, dependabot.yml, and CLAUDE.md.
+  - 55 depends on 54 because the smoke test asserts what 54 introduces: the scoped import specifier, `src/` in the tarball, the `default` export condition and hono as a peer.
+  - 54 depends on 52 only because README.md and CHANGELOG.md were last edited there.
+- Planner decisions:
+  - **README "Development" paragraph in task 54**: the paragraph names `scripts/smoke-pack.sh` and the CI workflow, which task 55 creates. The whole README edit stays in one task, as suggested, so README.md is touched once. The mismatch lasts only between the two sequential tasks.
+  - **CLAUDE.md in task 55**: the design README "Project rules affected (decision 052)" text covers the npm name, the smoke command, CI and the layout. All three bullets go into the task that creates the files they name. The user approved CLAUDE.md edits that the design specifies. If the permission system refuses the edit, the rest of task 55 completes and the item is reported blocked.
+  - **No CI run locally**: the workflow cannot run locally. Task 55's DoD therefore requires:
+    - a local `scripts/smoke-pack.sh` run on Node 24 (`ok sqlite`, `ok postgres`, `ok require`, `smoke-pack: ok`);
+    - one negative run with the `@ts-expect-error` line removed;
+    - byte-identical diffs of ci.yml, dependabot.yml and the smoke tsconfig against release-checks.md;
+    - a SHA-pin grep;
+    - a YAML parse with a local parser, or 未確認 if none is installed.
+  - **First real CI run (Node 22 included) is a post-push check for the user**, recorded in task 55's History. Until then the Node 22 claim is 未確認. If `smoke-node22` fails for any reason other than the two unverified mechanics (`MISE_NODE_VERSION` propagation, `mise trust`), task 55 is reported blocked with the failing output. `engines`, `--ignore-scripts` and the job are not changed without a new decision (decision 052 point 12).
+  - **Planner-added checks** (not in test-strategy.md, each cheap and local):
+    - task 54 checks the file list from `npm pack --dry-run` (`src/` in, `test/` / `example/` / `scripts/` out) before the smoke script exists;
+    - task 55 runs `bash -n`, checks the executable bit, and runs `shellcheck` when installed.
+- No vitest change in task 55: test-strategy.md lists only the readme case (task 54). The smoke script and the workflow are checked by the runs above.
+- Publishing stays out of scope. Neither task runs `npm publish`, bumps the version, creates a tag or fills in the CHANGELOG date.
 
 ## Definition of Done shared by all tasks
 - scripts/verify.sh passes

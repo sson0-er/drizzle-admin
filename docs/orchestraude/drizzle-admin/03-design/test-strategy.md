@@ -113,6 +113,15 @@ Migration of existing tests (decision 049 point 10; Changed 2026-10-09 after the
 - Logged in, `GET /admin/_lang/` → 404; logged out (builtin), `GET /admin/_lang/` → 302 to the login page like any page (decision 051 point 2). A model registered with `slug: "lang"` still serves its list at `GET /admin/lang/` (200) and its bulk actions at `POST /admin/lang/`, unaffected by the switch route. The CSP header on a Japanese page equals the exact policy of the §10 response-headers row (unchanged).
 - Manual (user, browser; 未確認 until checked): `pnpm example`, switch on the login page and on a list page with JavaScript disabled, check the focus ring on both switch buttons in light and dark mode.
 
+### Release preparation (decision 052)
+Changed 2026-10-09: new section.
+
+- `readme.test.ts`, one new case "uses the package name in the Install command and the Quick start import": read `name` from `package.json` (`readFileSync(new URL("../package.json", import.meta.url))`, `JSON.parse`), then ``expect(readme).toContain(`pnpm add ${name} drizzle-orm hono`)`` and ``expect(readme).toContain(`from "${name}";`)``. No other unit test pins `package.json` values; the smoke test below covers them in practice.
+- No existing test changes: `example/` and `test/` import `../src/index.js`, not the package name, and no test pins the old install line or the CHANGELOG text.
+- `scripts/smoke-pack.sh` (interfaces/release-checks.md) is outside `pnpm test` and `scripts/verify.sh` because it needs the npm registry. What it proves: the tarball contains `src/` (so the maps resolve) and no `test/`, `example/` or `scripts/` (decision 052 point 9); it installs into a clean project with the exact peer versions; `tsc` (NodeNext, strict) resolves `@sson0-er/drizzle-admin` through the `exports` `types` condition and still rejects an unknown column key; at runtime the package resolves `hono` and `zod` from the consumer, and the dashboard and a list page answer 200 with the seeded row on better-sqlite3 (mounted in the consumer's `Hono`) and on PGlite; a CommonJS `require()` of the package returns `createAdmin` (decision 052 point 13; TypeScript CommonJS consumers are not covered). A Node 22 failure other than the CI mechanics blocks the task (decision 052 point 12). It runs in CI on the `mise.toml` Node (24.21.0) and on the newest Node 22 (no Node 26, Q18), and by hand before publishing. `.github/dependabot.yml` has no tests; its first pull request shows it works.
+- CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` on every push and pull request to `main`; the workflow itself has no tests. The implementer reports the first CI run (both jobs, including the `node --version` line of `smoke-node22`) in the task History; until then the Node 22 claim is unverified.
+- Local check for the task: `scripts/smoke-pack.sh` prints `ok sqlite`, `ok postgres`, `ok require` and `smoke-pack: ok`; and, once, with the `@ts-expect-error` line removed, `tsc` fails (then restore it). Both are reported as run or not run.
+
 ### Icons (decision 039)
 Changed 2026-10-08: new section.
 Changed 2026-10-08: `DisplayValue` boolean cases and the view-only page case added (user answer to Q9).
@@ -199,6 +208,7 @@ Changed 2026-10-08: reverse-proxy row checks `Secure` on cookie deletions (decis
 Tests set `Origin: http://localhost` on POST because `app.request()` sends neither Origin nor Sec-Fetch-Site (evidence: 2026-10-07-hono-csrf-and-jsx).
 
 ## Phase gates
+Changed 2026-10-09 (decision 052): the gate is unchanged (`scripts/verify.sh`); CI runs the same script, plus the tarball smoke test, on push and pull request to `main`.
 Changed 2026-10-07: the phase-1 smoke content is defined (example row above).
 
 At the end of every phase, `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm build` all pass. Phase 1 runs the phase-1 part of the example smoke test, which loads the example modules (Hono, better-sqlite3, the library) under vitest. Phase 1 also starts `pnpm example` (tsx + @hono/node-server), checks that `GET /` answers with 302, and stops it. The implementer reports this check as run or not run; it is not part of `pnpm test`. Before phase 5, the routes run without the auth guard. The phase-5 tests then switch the shared `makeAdmin` helper to logging in by default.

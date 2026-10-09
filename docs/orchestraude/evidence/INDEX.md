@@ -43,3 +43,9 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-09-hono-plain-cookie-read | For decision 050, how does hono read and write an unsigned cookie, and does reading ever throw? | expires 2027-01-07
 - 2026-10-09-messages-usage-in-src | For decisions 049-051, where do UI strings, html lang and formatting live in the code, and which strings are bound outside a request? | expires 2027-01-07
 - 2026-10-09-aria-current-and-lang-attribute | For decision 051, may the switcher use aria-current on a button and a lang attribute per language name? | expires 2027-01-07
+- 2026-10-09-tarball-smoke-prototype | For decision 052, does a packed tarball install and work in a clean consumer project, and can a consumer file be type-checked against the packed types? | expires 2027-01-07
+- 2026-10-09-node-minimum-version | For decision 052, what minimum Node version do the library code and its runtime dependencies need, and which Node lines are supported? | expires 2027-01-07
+- 2026-10-09-github-actions-pinning | For decision 052, how should the CI workflow pin actions and provision node/pnpm consistently with mise.toml? | expires 2026-11-08
+- 2026-10-09-npm-publish-fields | For decision 052, which package.json fields control publish access, repository links and engines, and are peers installed automatically? | expires 2027-01-07
+- 2026-10-09-dependabot-sha-pins | For decision 052 (Q17), does Dependabot's github-actions ecosystem update SHA-pinned actions and their version comments? | expires 2027-01-07
+- 2026-10-09-require-esm | For decision 052 (release-round review), can a CommonJS host require() the ESM-only package, and which exports condition does it need? | expires 2027-01-07

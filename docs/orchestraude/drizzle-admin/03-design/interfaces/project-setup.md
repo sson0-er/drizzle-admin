@@ -1,10 +1,11 @@
 # Interface: project setup and packaging
 
-Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`, `biome.json`, `vitest.config.ts`, `.gitignore`, `LICENSE`, `README.md`, `CHANGELOG.md` (Changed 2026-10-08: added by decision 048). `mise.toml` already pins `node = "24.21.0"` and `pnpm = "12.10.0"` (user-managed, decision 001); it is not modified.
+Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`, `biome.json`, `vitest.config.ts`, `.gitignore`, `LICENSE`, `README.md`, `CHANGELOG.md` (Changed 2026-10-08: added by decision 048). Changed 2026-10-09 (decision 052): the tarball smoke test (`scripts/smoke-pack.sh`, `scripts/smoke/`) and the CI workflow (`.github/workflows/ci.yml`) are specified in [release-checks.md](release-checks.md). `mise.toml` already pins `node = "24.21.0"` and `pnpm = "12.10.0"` (user-managed, decision 001); it is not modified.
 
 ## Responsibilities
 - Make `pnpm test`, `pnpm typecheck`, `pnpm lint` and `pnpm build` work from a clean checkout after `pnpm install` (run under mise).
 - Produce a publishable package (metadata, MIT LICENSE, README, `dist/`).
+- Changed 2026-10-09 (decision 052): publish as the public scoped package `@sson0-er/drizzle-admin`, with `drizzle-orm` and `hono` as peers and `engines.node` `>=22`. The product name stays "drizzle-admin" everywhere else (README title, the `drizzle-admin: ` error prefix, cookie names, the demo).
 
 ## API (commands)
 | Command | Script | Expectation |
@@ -20,30 +21,38 @@ Files: `package.json`, `pnpm-lock.yaml`, `tsconfig.json`, `tsconfig.build.json`,
 ## Data formats
 
 ### package.json
+Changed 2026-10-09 (decision 052): scoped `name`, `repository` / `homepage` / `bugs`, `engines`, `publishConfig`; `hono` moved from `dependencies` to `peerDependencies` (range `^4.13.13`) and added to `devDependencies` (exact `4.13.13`). Run `pnpm install` afterwards so `pnpm-lock.yaml` matches (CI installs with `--frozen-lockfile`). Top-level key order as below.
+Changed 2026-10-09 (decision 052 point 13, design review): `exports` gains `"default": "./dist/index.js"`, the same ESM file as `import`, so `require()` from a CommonJS host resolves on Node versions with require(esm) enabled (22.12 and later); without it `require()` fails with `ERR_PACKAGE_PATH_NOT_EXPORTED` (evidence: 2026-10-09-require-esm). The package stays ESM-only; there is no CommonJS build.
+Changed 2026-10-09 (decision 052 point 9, Q16): `files` also lists `src`, so the shipped source maps and declaration maps (`sourceMap` and `declarationMap` stay on in `tsconfig.build.json`) resolve their `../src/*.ts` references inside the package. `src/` contains only library sources; tests, fixtures, `example/` and `scripts/` are not published (the smoke test checks this, release-checks.md).
 ```jsonc
 {
-  "name": "drizzle-admin",
+  "name": "@sson0-er/drizzle-admin",
   "version": "0.1.0",
   "description": "Django Admin-style, server-rendered CRUD admin for Drizzle ORM tables",
   "license": "MIT",
   "author": "Shoma Sonoda",
+  "repository": { "type": "git", "url": "git+https://github.com/sson0-er/drizzle-admin.git" },
+  "homepage": "https://github.com/sson0-er/drizzle-admin#readme",
+  "bugs": { "url": "https://github.com/sson0-er/drizzle-admin/issues" },
   "type": "module",
-  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" } },
+  "exports": { ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js", "default": "./dist/index.js" } },  // default: decision 052 point 13
   "types": "./dist/index.d.ts",
-  "files": ["dist", "README.md", "LICENSE", "CHANGELOG.md"],   // CHANGELOG.md: decision 048
+  "files": ["dist", "src", "README.md", "LICENSE", "CHANGELOG.md"],   // CHANGELOG.md: decision 048; src: decision 052 point 9
   "sideEffects": false,
   "keywords": ["drizzle", "drizzle-orm", "admin", "hono", "crud"],
   "scripts": { /* table above */ },
-  "peerDependencies": { "drizzle-orm": "^0.45.3" },
-  "dependencies": { "hono": "^4.13.13", "zod": "^4.6.5" },
-  "devDependencies": {  // exact versions (decision 005)
-    "drizzle-orm": "0.45.3", "typescript": "7.0.2", "vitest": "5.0.3", "@biomejs/biome": "2.5.15",
+  "engines": { "node": ">=22" },                       // decision 052
+  "publishConfig": { "access": "public" },             // decision 052: the first scoped publish must be public; npm docs disagree on the default
+  "peerDependencies": { "drizzle-orm": "^0.45.3", "hono": "^4.13.13" },
+  "dependencies": { "zod": "^4.6.5" },
+  "devDependencies": {  // exact versions (decision 005); the file keeps these keys sorted
+    "drizzle-orm": "0.45.3", "hono": "4.13.13", "typescript": "7.0.2", "vitest": "5.0.3", "@biomejs/biome": "2.5.15",
     "better-sqlite3": "13.0.3", "@types/better-sqlite3": "9.6.0", "@electric-sql/pglite": "0.5.8",
     "parse5": "8.0.1", "@hono/node-server": "2.1.3", "tsx": "4.23.15", "@types/node": "24.19.1"
   }
 }
 ```
-No `packageManager` field (decision 001). `repository`/`homepage` fields are omitted until a repository URL exists.
+No `packageManager` field (decision 001). Changed 2026-10-09 (decision 052): `repository`, `homepage` and `bugs` now point at the GitHub repository. `zod` stays a regular dependency because no public type mentions it (`src/types.ts` imports only the `Table` type from drizzle-orm and the `Hono` type from hono). Why `>=22`: the code needs the global Web Crypto (`crypto.subtle`, unflagged since Node 19) and other globals present in every supported line; Node 20 is end-of-life and 22 is the oldest LTS line, checked in CI by the smoke test (evidence: 2026-10-09-node-minimum-version). `engines` only warns unless the consumer sets `engine-strict` (evidence: 2026-10-09-npm-publish-fields).
 If `pnpm install` reports ignored dependency build scripts that break a tool (for example esbuild under tsx; unverified), allow that package explicitly in pnpm's config and record the change in a decision.
 
 ### tsconfig.json (type-check everything)
@@ -89,11 +98,29 @@ Allowed `any` only in `src/introspect/**` and `src/data/**`, each with `// biome
 ### LICENSE
 MIT License text, `Copyright (c) 2026 Shoma Sonoda`.
 
-### CHANGELOG.md (decision 048)
-Changed 2026-10-08: new file.
-English, newest first. It starts with `# Changelog` and an `## Unreleased` section with two lists. "Security": sessions and flash messages are signed with keys derived from `secret` and `basePath`, so instances no longer accept each other's cookies, and **every user is signed out once after upgrading** (decision 042); responses carry a Content-Security-Policy and `X-Content-Type-Options: nosniff` (decision 044); malformed or out-of-range keys, NUL bytes and oversized selections no longer cause 500 errors (decision 045); the external-mode `next` passed to `loginUrl` is sanitized (decision 047). "Changed": unset `add` / `change` / `delete` permissions follow `view`, and a model with no permission for the user answers 404 (decision 043); `sessionMaxAgeSec` above 34560000 (400 days) is rejected (decision 042); the search text is capped at 200 characters, at most 500 rows can be selected for one action and `listPerPage` above 500 is rejected by `register()`, and integer fields reject `0x`/`0b`/exponent notation and unsafe integers (decision 045); `exclude` also removes columns from the default list columns, and identity columns are read-only (decision 046).
+### CHANGELOG.md (decisions 048, 052)
+Changed 2026-10-09 (decision 052): this is the first release, so the former `## Unreleased` lists (decisions 042-051, written as changes against an earlier version) are replaced by initial-release notes; nothing assumes a previous release (no "signed out once after upgrading", no "existing users switch once").
 
-Changed 2026-10-09 (decisions 049-051): the `## Unreleased` section gains, under "Changed": **the UI is English by default**; Japanese is available from the "English / 日本語" switcher in the header and on the login page, remembered per browser in the `da_lang` cookie for one year (existing Japanese-speaking users switch once); the default `siteTitle` follows the language ("Site administration" / "サイト管理"); the model slug `_lang` is now reserved (`register()` throws for it; `lang` stays valid).
+English. The whole file is exactly:
+```markdown
+# Changelog
+
+## 0.1.0 - Unreleased
+
+Initial release.
+
+### Added
+
+- `createAdmin`, `admin.register`, `admin.app` and `admin.fetch`: a server-rendered, Django Admin-style CRUD admin for Drizzle ORM tables, mounted in a Hono app. `drizzle-orm` (`^0.45.3`) and `hono` (`^4.13.13`) are peer dependencies; Node.js 22 or later.
+- SQLite and PostgreSQL.
+- List pages with search, filters, sortable columns and pagination; bulk delete and custom actions with an optional confirmation page.
+- Add and change forms generated from the table definition, with widget overrides, zod validation, a `validate` callback, hooks and read-only fields.
+- Built-in login with a signed session cookie, or external authentication through `getUser` and `loginUrl`; per-model `view` / `add` / `change` / `delete` permissions.
+- Security: HMAC-signed cookies with keys derived per admin instance, CSRF protection (Origin check and token), Content-Security-Policy and other security headers, and bounded input (search text, selections and `listPerPage`).
+- English and Japanese UI, English by default, with a language switcher remembered in the `da_lang` cookie.
+- Light and dark color schemes and a responsive layout; everything works without JavaScript except "select all".
+```
+Whoever publishes replaces `Unreleased` with the publish date (`YYYY-MM-DD`) in the commit that is published (manual publish step, out of scope; decision 052 point 5). The README "Changelog" pointer (after section 11) is unchanged.
 
 ### README.md outline (written in phase 6; English)
 Changed 2026-10-07: section 10 lists the SQLite blob-bigint ordering limitation (decision 026).
@@ -106,11 +133,13 @@ Changed 2026-10-08: security audit fixes (decisions 042-048), by section. 5: the
 
 Changed 2026-10-09: internationalization (decisions 049-051), by section. 1: the feature list says "English and Japanese UI". 5: the `siteTitle` row's default is "Site administration" (English) / "サイト管理" (Japanese), following the visitor's language; a configured title is not translated. 6: the `slug` row lists `_lang` with `login`, `logout` and `static` as reserved. 8: the cookies table adds `da_lang` (unsigned, value `en` or `ja`, one year, same `Path` / `HttpOnly` / `SameSite` / `Secure` rules; not a security cookie). New section "Language" after 8: English is the default for every visitor; the header switcher (a POST form, works without JavaScript) stores the choice in `da_lang`; `Accept-Language` is not used; there is no option to change the default; model labels, field names, action labels, `toString` and formatter output, `validate` messages and a configured `siteTitle` are shown as written; configuration errors and log lines are English. 10: "Japanese UI only" is replaced by "English and Japanese only; the default language (English) cannot be configured".
 
+Changed 2026-10-09: release preparation (decision 052), by section. 2: "Node.js 24 (the version the test suite runs on)" becomes "Node.js 22 or later. The full test suite runs on Node.js 24; CI also installs the packed package on Node.js 22 and runs a smoke test."; the Hono bullet says Hono `^4.13.13` is a peer dependency to install next to this package, instead of "Hono is a dependency of this package"; a new bullet (decision 052 point 13) says: "The package is ESM-only. A CommonJS application can `require()` it only on a Node.js version that supports `require()` of ES modules without a flag (22.12 or later); otherwise use `import()`." 3: the install command is exactly `pnpm add @sson0-er/drizzle-admin drizzle-orm hono`. 4: the Quick start imports `createAdmin` from `"@sson0-er/drizzle-admin"`; nothing else in it changes. 11: after the `scripts/verify.sh` sentence, one paragraph: "`scripts/smoke-pack.sh` builds and packs the package, installs the tarball into a temporary project and type-checks and runs a small consumer against SQLite and PGlite. It needs access to the npm registry. CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on every push and pull request to `main`." The `# drizzle-admin` title and the product name in prose stay.
+
 Changed 2026-10-07: section 6 points at all sources of `register()` constraints (decisions 013 item 13, 021, 023; admin.md step 5).
 
 Changed 2026-10-07: `publicOrigin` documented in sections 5 and 8, new reverse-proxy subsection, proxy caveat removed from known limitations, `HookCtx` and action permission documented (decisions 015-017).
 
-1. What it is, plus a screenshot-free feature list. 2. Requirements (Node 24 verified; drizzle-orm ^0.45.3; SQLite/PostgreSQL). 3. Install (`pnpm add drizzle-admin drizzle-orm`). 4. Quick start (the §5.1 example; mount at `basePath`; `admin.fetch`). 5. Configuration reference: every `AdminConfig` / `AuthConfig` field with its default, including `publicOrigin` (optional, default: derived from each request URL; decision 017). 6. Model options reference: every `ModelAdminOptions` field with its default and the constraints `register()` enforces, taken from admin.md step 5 (decision 013 item 13; the allowed-widgets table per field in forms.md / decision 021; the `password` widget is rejected on the primary key and on fields in `searchFields` or `ordering`, decision 037 point 7; `listFilter` and the `date` widget on PG `date()` string-mode columns, decision 023), and the `HookCtx` shape `{ mode, user, db }` (decision 015). 7. Actions (confirm, casting `db`; custom actions require the model's `change` permission, decision 016). 8. Authentication modes and security (cookies, CSRF + Origin, `next`, headers, permissions; in external mode the session cookie only carries the CSRF token, decision 014; the Origin check covers only unsafe-method requests with a form-like content type (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain` or none), which pass with `Sec-Fetch-Site: same-origin` or an `Origin` equal to the expected origin and otherwise get 403, a missing header included; GET/HEAD and other content types skip it, but every POST still needs the `_csrf` token (evidence: 2026-10-07-hono-csrf-and-jsx)), with a subsection "Deploying behind a reverse proxy": set `publicOrigin` to the browser-facing origin (e.g. `"https://admin.example.com"`) when TLS is terminated by a proxy or the app sees an internal host; it is used for the Origin check and the cookie `Secure` flag; without it, form POSTs that do not carry `Sec-Fetch-Site: same-origin` fail with 403 and cookies lack `Secure`; with it, a form-like POST to the internal URL that sends neither header, or a different `Origin`, gets 403; the subsection also tells deployers to limit the request body size at the reverse proxy (or in the host app), because the admin reads each form body fully into memory and has no limit of its own (decision 038). 9. Behavior notes (decision 013, plus: the `password` widget never shows a value (inputs empty; list cells and read-only fields show `********`; its list column has no sort link and `?o=` ignores it, decision 037 point 6) and leaving it empty on the change page keeps the stored value, so a nullable password field cannot be cleared through the form (decision 037); without `view` on a referenced model, FK columns show raw values without links or labels, the FK filter is not offered, and FK form fields are plain key inputs (decision 034)). 10. Known limitations: no login rate limiting (§10), no composite PKs, no MySQL, no file uploads, no inlines/history, Japanese UI only, SQLite needs `PRAGMA foreign_keys = ON` for FK errors (better-sqlite3 enables it by default; evidence: 2026-10-07-pnpm-mise-and-native-deps), on SQLite a bigint column is `blob({ mode: "bigint" })` (drizzle's SQLite `integer()` has no bigint mode), whose values SQLite compares as BLOBs, so sorting and range comparison on it are not numeric (e.g. 10 sorts before 9; equality and FK lookups work; use `integer()` when numeric order matters; evidence: 2026-10-07-sqlite-blob-bigint-ordering; decision 026), a request path containing a percent-encoded LF or CR (`%0a`, `%0d`) is not routed by Hono, so it gets Hono's (or the host app's) plain 404 instead of the admin 404 page and without the admin's security headers (no redirect is issued; decision 029), no request body size limit inside the library (limit it at the reverse proxy or host app; decision 038), drizzle 0.45 only. 11. Development (mise, pnpm scripts, example; the example listens on `127.0.0.1:3000` unless `HOST` / `PORT` are set; an empty `HOST` also falls back to `127.0.0.1`, decision 038). 12. License.
+1. What it is, plus a screenshot-free feature list. 2. Requirements (Node 22 or later, full suite on Node 24; drizzle-orm ^0.45.3 and hono ^4.13.13 peers; SQLite/PostgreSQL; Changed 2026-10-09, decision 052). 3. Install (`pnpm add @sson0-er/drizzle-admin drizzle-orm hono`; Changed 2026-10-09, decision 052). 4. Quick start (the §5.1 example; mount at `basePath`; `admin.fetch`). 5. Configuration reference: every `AdminConfig` / `AuthConfig` field with its default, including `publicOrigin` (optional, default: derived from each request URL; decision 017). 6. Model options reference: every `ModelAdminOptions` field with its default and the constraints `register()` enforces, taken from admin.md step 5 (decision 013 item 13; the allowed-widgets table per field in forms.md / decision 021; the `password` widget is rejected on the primary key and on fields in `searchFields` or `ordering`, decision 037 point 7; `listFilter` and the `date` widget on PG `date()` string-mode columns, decision 023), and the `HookCtx` shape `{ mode, user, db }` (decision 015). 7. Actions (confirm, casting `db`; custom actions require the model's `change` permission, decision 016). 8. Authentication modes and security (cookies, CSRF + Origin, `next`, headers, permissions; in external mode the session cookie only carries the CSRF token, decision 014; the Origin check covers only unsafe-method requests with a form-like content type (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain` or none), which pass with `Sec-Fetch-Site: same-origin` or an `Origin` equal to the expected origin and otherwise get 403, a missing header included; GET/HEAD and other content types skip it, but every POST still needs the `_csrf` token (evidence: 2026-10-07-hono-csrf-and-jsx)), with a subsection "Deploying behind a reverse proxy": set `publicOrigin` to the browser-facing origin (e.g. `"https://admin.example.com"`) when TLS is terminated by a proxy or the app sees an internal host; it is used for the Origin check and the cookie `Secure` flag; without it, form POSTs that do not carry `Sec-Fetch-Site: same-origin` fail with 403 and cookies lack `Secure`; with it, a form-like POST to the internal URL that sends neither header, or a different `Origin`, gets 403; the subsection also tells deployers to limit the request body size at the reverse proxy (or in the host app), because the admin reads each form body fully into memory and has no limit of its own (decision 038). 9. Behavior notes (decision 013, plus: the `password` widget never shows a value (inputs empty; list cells and read-only fields show `********`; its list column has no sort link and `?o=` ignores it, decision 037 point 6) and leaving it empty on the change page keeps the stored value, so a nullable password field cannot be cleared through the form (decision 037); without `view` on a referenced model, FK columns show raw values without links or labels, the FK filter is not offered, and FK form fields are plain key inputs (decision 034)). 10. Known limitations: no login rate limiting (§10), no composite PKs, no MySQL, no file uploads, no inlines/history, Japanese UI only, SQLite needs `PRAGMA foreign_keys = ON` for FK errors (better-sqlite3 enables it by default; evidence: 2026-10-07-pnpm-mise-and-native-deps), on SQLite a bigint column is `blob({ mode: "bigint" })` (drizzle's SQLite `integer()` has no bigint mode), whose values SQLite compares as BLOBs, so sorting and range comparison on it are not numeric (e.g. 10 sorts before 9; equality and FK lookups work; use `integer()` when numeric order matters; evidence: 2026-10-07-sqlite-blob-bigint-ordering; decision 026), a request path containing a percent-encoded LF or CR (`%0a`, `%0d`) is not routed by Hono, so it gets Hono's (or the host app's) plain 404 instead of the admin 404 page and without the admin's security headers (no redirect is issued; decision 029), no request body size limit inside the library (limit it at the reverse proxy or host app; decision 038), drizzle 0.45 only. 11. Development (mise, pnpm scripts, example; the example listens on `127.0.0.1:3000` unless `HOST` / `PORT` are set; an empty `HOST` also falls back to `127.0.0.1`, decision 038). 12. License.
 
 ## Errors
 - None at runtime. Any failure of the four commands fails the phase gate.

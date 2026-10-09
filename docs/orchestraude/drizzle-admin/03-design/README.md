@@ -5,6 +5,8 @@ drizzle-admin is an ESM TypeScript library that turns registered Drizzle tables 
 
 Changed 2026-10-09: the UI is English (default) and Japanese. The locale comes from the browser's `da_lang` cookie, is resolved first in every request and reaches handlers as `c.var.t` and views as the `t` prop; a POST form in the header switches it (decisions 049-051).
 
+Changed 2026-10-09: release preparation (decision 052): the package is published as `@sson0-er/drizzle-admin` with `drizzle-orm` and `hono` as peers and `engines.node` `>=22`; a tarball smoke test and a GitHub Actions workflow (verify gate plus smoke test on Node 24 and 22) are added. The product name stays "drizzle-admin".
+
 Pre-spec references "§N" point to `docs/pre-specs.md`. The pre-spec remains normative except where a decision in `docs/orchestraude/decisions/` says otherwise.
 
 ## Components and responsibilities
@@ -12,6 +14,7 @@ Changed 2026-10-08: views also own the fixed icon set, `src/views/icons.tsx` (de
 Changed 2026-10-08: the stylesheet has its own interface file, views-style.md (DADS-inspired restyle, decision 040).
 Changed 2026-10-08: security audit fixes (decisions 042-048): forms uses data's pure `parseFieldValue`; the example gains `host-guard.ts`; project setup gains `CHANGELOG.md` and a `prepack` build.
 Changed 2026-10-09: internationalization (decisions 049-051): support holds the `en` / `ja` dictionaries; auth owns the `da_lang` cookie (`locale.ts`); routes resolve the locale in `initVars` and add the language switch route (`lang.ts`); views render `<html lang>` and the header switcher; forms take the dictionary as an argument.
+Changed 2026-10-09: release preparation (decision 052): project setup gains the scoped name, peers, `engines` and the 0.1.0 changelog; new component "release checks" (tarball smoke test, CI workflow).
 
 | Component | Responsibility | Depends on | Interface file |
 |---|---|---|---|
@@ -23,7 +26,8 @@ Changed 2026-10-09: internationalization (decisions 049-051): support holds the 
 | routes | Hono app assembly: middleware chain (incl. locale resolution), every page/handler in §8, actions, PRG, language switch | admin, data, forms, auth, views, support | interfaces/routes.md, interfaces/routes-handlers.md |
 | views | Hono JSX pages, cell formatting, decorative icon set, CSS module, select-all script | support, forms (widgets) | interfaces/views.md, interfaces/views-style.md (stylesheet) |
 | support | `messages.ts` (all UI strings, one dictionary per locale `en` / `ja`, locale helpers), `time.ts` (time-zone math) | none | interfaces/support.md |
-| project setup | package.json, tsconfig, Biome, vitest config, scripts, LICENSE, README content, CHANGELOG | none | interfaces/project-setup.md |
+| project setup | package.json (name, peers, engines, publish access), tsconfig, Biome, vitest config, scripts, LICENSE, README content, CHANGELOG | none | interfaces/project-setup.md |
+| release checks | Tarball smoke test (`scripts/smoke-pack.sh`, `scripts/smoke/`), the CI workflow `.github/workflows/ci.yml` and `.github/dependabot.yml` (action pins); no publishing | project setup (package.json, `scripts/verify.sh`), public API | interfaces/release-checks.md |
 | example | `example/` demo app (users, posts, tags), seed, server, Host check, run instructions | public API | interfaces/example.md |
 
 Source layout (§4 plus additions from decisions 006, 007 and this design):
@@ -37,6 +41,7 @@ src/routes/{index,middleware,context,dashboard,list,actions,form,delete,login,la
 src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx  src/views/{format,render,url}.ts
 src/static/admin-css.ts  src/static/select-all.ts
 example/{schema,seed,app,host-guard,server}.ts  CHANGELOG.md
+scripts/{verify,smoke-pack}.sh  scripts/smoke/{consumer.ts,tsconfig.json}  .github/workflows/ci.yml  .github/dependabot.yml
 test/...
 ```
 
@@ -88,7 +93,16 @@ A task updates `CLAUDE.md` accordingly. Changed 2026-10-09 (design review, i18n 
 - Design principles: "Every UI string lives in `src/messages.ts`" becomes "Every UI string lives in `src/messages.ts`, in both the `en` and `ja` dictionaries (a missing key fails typecheck). Code takes texts from the request's dictionary (`c.var.t` in routes, the `t` prop or argument in views and forms), never from a module-level import or a module-level constant; user-provided labels are not translated; glyph-only literals are exempt (decision 033 item 11) and the language names live in `LOCALE_NAMES`. Developer-facing errors and log lines are English and stay out of the dictionaries."
 - Security rules: "Cookies are signed ..." gains "except `da_lang`, an unsigned preference validated against the locale allow-list on read (decision 050); it still uses `cookieAttrs`". "`Location` headers are path-only ..." gains the language switch next to the post-login target as a `safeNext` user.
 
+## Project rules affected (Changed 2026-10-09, decision 052)
+The release-preparation task updates `CLAUDE.md` with this text:
+- Overview: add "Published on npm as `@sson0-er/drizzle-admin`; `drizzle-orm` and `hono` are peer dependencies."
+- Commands: add "`scripts/smoke-pack.sh` packs the package, installs the tarball into a temporary project and type-checks and runs a consumer on SQLite and PGlite (needs the npm registry; not part of `verify.sh`)." and "CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on push and pull request to `main`; actions are pinned to commit SHAs, which Dependabot updates monthly (`.github/dependabot.yml`)."
+- Layout: add "`scripts/`: `verify.sh`, `smoke-pack.sh` and the smoke consumer in `scripts/smoke/`. `.github/`: the CI workflow and `dependabot.yml`. The published package contains `dist/` and `src/`."
+
 ## Index
+Changed 2026-10-09: release-round design review (decision 052 points 12-13): `exports` `default`, `require()` smoke check, Node 22 failure blocks; project-setup, release-checks, test-strategy summaries updated.
+Changed 2026-10-09: Q16-Q18 answered (decision 052 points 9-11): `src` published, Dependabot for actions, Node 22 and 24 only; project-setup, release-checks, questions summaries updated.
+Changed 2026-10-09: release preparation (decision 052): release-checks.md added; summaries of project-setup, test-strategy, questions and decisions updated; section "Project rules affected (decision 052)" added.
 Changed 2026-10-07: questions and decisions summaries updated for Q1-Q4, then for the review revision (decisions 018-022, Q5).
 Changed 2026-10-07: Q5 answered (decision 023).
 Changed 2026-10-07: SQLite blob-bigint question answered (decision 026); decisions summary range updated.
@@ -109,7 +123,7 @@ Changed 2026-10-09: internationalization (decisions 049-051): summaries of admin
 
 | File | Summary |
 |---|---|
-| README.md | This overview: components, layout, data flow, error handling, project rules affected by i18n |
+| README.md | This overview: components, layout, data flow, error handling, project rules affected by i18n and by release preparation |
 | interfaces/admin.md | Public API types (§5.2 plus additions), createAdmin/register validation (incl. `sessionMaxAgeSec` cap, `siteTitle` kept `null` when unset, reserved slug `_lang`), ResolvedModel (default `listDisplay` without `exclude` keys, permission inheritance from `view`), finalization |
 | interfaces/introspect.md | `introspectTable`, ModelMeta/FieldMeta, kind and flag mapping (identity columns are generated; PG `valueCheck`), PK/FK rules, snapshot projection |
 | interfaces/data.md | Repository API, query builders (search/filter/order/pk parsing with DB value domains), DB error classification, Drizzle boundary |
@@ -120,8 +134,9 @@ Changed 2026-10-09: internationalization (decisions 049-051): summaries of admin
 | interfaces/views.md | JSX page components and their props (`PageChrome` with `locale`, `t`, `currentUrl`; `<html lang>`; header language switcher; `formatValue` / `formatCell` take `t`), stable selectors for tests, cell formatting, icon set and placement (decision 039), CSS and script modules (script hash for the CSP) |
 | interfaces/views-style.md | `ADMIN_CSS` after the DADS-inspired restyle (decision 040): light/dark color tokens with sources, typography, reference rules per area, button variant mapping, language switcher rules, focus ring, 767px block, attribution comment |
 | interfaces/support.md | `messages.ts`: `en` / `ja` dictionaries behind `MESSAGES`, the `Messages` type rule, locale helpers and `LOCALE_NAMES`, required keys (incl. `tooManySelected`, `language`, `binary`), `time.ts` functions (time-zone math, UTC calendar dates for date-only values) |
-| interfaces/project-setup.md | package.json (incl. `prepack`), tsconfig(s), biome.json, vitest config, scripts, LICENSE, CHANGELOG (incl. the English default), README outline (incl. the "Language" section) |
+| interfaces/project-setup.md | package.json (`exports` with `default`, `files` incl. `src`, scoped name `@sson0-er/drizzle-admin`, repository links, `engines` `>=22`, `publishConfig`, `hono` and `drizzle-orm` peers, `prepack`), tsconfig(s), biome.json, vitest config, scripts, LICENSE, CHANGELOG (0.1.0 initial-release text), README outline (incl. the "Language" section and the new install/import lines) |
+| interfaces/release-checks.md | `scripts/smoke-pack.sh` step by step, the smoke consumer and its tsconfig, the tarball content check, the `require()` check, the Node 22 failure rule, the exact CI workflow (SHA-pinned actions, read-only permissions, mise-provided tools, Node 22 smoke job), the exact `dependabot.yml` |
 | interfaces/example.md | Example schema, seed, Host check (`host-guard.ts`), server, and run instructions for the user's browser check |
-| test-strategy.md | Tests per component, dialect parameterization, helpers, security audit fix cases, internationalization cases and test migration, §10 test matrix, phase gates |
-| questions.md | Open: none; resolved: Q15 (switch route `POST <prefix>/_lang/`, reserved slug `_lang`; option (b)), internationalization user decisions (decisions 049-051), Q13 (`register()` rejects `listPerPage` above 500), Q14 (uuid / NUL / enum key checks kept), security audit fixes (decisions 042-048), Q12 (`register()` rejects `password`-widget fields in `searchFields`, `ordering` or as the primary key; decision 037 point 7), L011/L010 (password-widget list columns not sortable, no FK link on masked cells; decision 037 point 6), L013 (DoD import-line exception; decision 041), Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
-| decisions-and-evidence.md | Decisions 001-051 and evidence ids referenced by this design |
+| test-strategy.md | Tests per component, dialect parameterization, helpers, security audit fix cases, internationalization cases and test migration, release preparation (README package-name test, smoke test and CI scope), §10 test matrix, phase gates |
+| questions.md | Open: none; resolved: Q16 (publish `src` so maps resolve), Q17 (Dependabot for actions, monthly), Q18 (Node 22 and 24 only), release-preparation user decisions (decision 052), Q15 (switch route `POST <prefix>/_lang/`, reserved slug `_lang`; option (b)), internationalization user decisions (decisions 049-051), Q13 (`register()` rejects `listPerPage` above 500), Q14 (uuid / NUL / enum key checks kept), security audit fixes (decisions 042-048), Q12 (`register()` rejects `password`-widget fields in `searchFields`, `ordering` or as the primary key; decision 037 point 7), L011/L010 (password-widget list columns not sortable, no FK link on masked cells; decision 037 point 6), L013 (DoD import-line exception; decision 041), Q11 (no DADS-style required marker in the restyle, option (a); decision 040), Q8-Q10 (post-v1 icons: no `info` flash level, read-only booleans use the icon mark, other controls confirmed; decision 039), Q7 (password-widget list cells masked), low-findings triage B items and follow-ups (decisions 033-038), pnpm provisioning, Q1-Q5, hono/csrf origin equality proven by test, SQLite blob-bigint support, task 14 follow-ups (renderPage flash, buildApp type, trailing-slash open redirect, allowlist whitespace, Q6 decoded LF/CR 404), task 22 `safeNext` raw/decoded rules |
+| decisions-and-evidence.md | Decisions 001-052 and evidence ids referenced by this design |
