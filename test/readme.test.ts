@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const readme = readFileSync(new URL("../README.md", import.meta.url), "utf8");
+const { name } = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8")) as {
+  name: string;
+};
 
 // Hand-listed on purpose: a field added to the public types must also be added here and documented.
 const ADMIN_CONFIG_KEYS = [
@@ -130,6 +133,11 @@ describe("README", () => {
       expect(config, key).toContain(`\`${key}\``);
     }
     for (const key of MODEL_OPTION_KEYS) expect(model, key).toContain(`\`${key}\``);
+  });
+
+  it("uses the package name in the Install command and the Quick start import", () => {
+    expect(readme).toContain(`pnpm add ${name} drizzle-orm hono`);
+    expect(readme).toContain(`from "${name}";`);
   });
 
   it("documents the example run instructions", () => {

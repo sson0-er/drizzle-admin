@@ -1,19 +1,29 @@
 {
-  "name": "drizzle-admin",
+  "name": "@sson0-er/drizzle-admin",
   "version": "0.1.0",
   "description": "Django Admin-style, server-rendered CRUD admin for Drizzle ORM tables",
   "license": "MIT",
   "author": "Shoma Sonoda",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sson0-er/drizzle-admin.git"
+  },
+  "homepage": "https://github.com/sson0-er/drizzle-admin#readme",
+  "bugs": {
+    "url": "https://github.com/sson0-er/drizzle-admin/issues"
+  },
   "type": "module",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
     }
   },
   "types": "./dist/index.d.ts",
   "files": [
     "dist",
+    "src",
     "README.md",
     "LICENSE",
     "CHANGELOG.md"
@@ -35,11 +45,17 @@
     "example": "tsx example/server.ts",
     "format": "biome check --write ."
   },
+  "engines": {
+    "node": ">=22"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "peerDependencies": {
-    "drizzle-orm": "^0.45.3"
+    "drizzle-orm": "^0.45.3",
+    "hono": "^4.13.13"
   },
   "dependencies": {
-    "hono": "^4.13.13",
     "zod": "^4.6.5"
   },
   "devDependencies": {
@@ -50,6 +66,7 @@
     "@types/node": "24.19.1",
     "better-sqlite3": "13.0.3",
     "drizzle-orm": "0.45.3",
+    "hono": "4.13.13",
     "parse5": "8.0.1",
     "tsx": "4.23.15",
     "typescript": "7.0.2",

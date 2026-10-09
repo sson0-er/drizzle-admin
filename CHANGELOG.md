@@ -1,21 +1,16 @@
 # Changelog
 
-## Unreleased
+## 0.1.0 - Unreleased
 
-### Security
+Initial release.
 
-- Sessions and flash messages are signed with keys derived from `secret` and `basePath`, so admin instances no longer accept each other's cookies. **Every user is signed out once after upgrading.**
-- Responses carry a Content-Security-Policy and `X-Content-Type-Options: nosniff`.
-- Malformed or out-of-range keys, NUL bytes and oversized selections no longer cause 500 errors.
-- The external-mode `next` passed to `loginUrl` is sanitized.
+### Added
 
-### Changed
-
-- Unset `add` / `change` / `delete` permissions follow `view`, and a model with no permission for the user answers 404.
-- `sessionMaxAgeSec` above 34560000 (400 days) is rejected.
-- The search text is capped at 200 characters, at most 500 rows can be selected for one action, and `listPerPage` above 500 is rejected by `register()`.
-- Integer fields reject `0x`/`0b`/exponent notation and unsafe integers.
-- `exclude` also removes columns from the default list columns, and identity columns are read-only.
-- **The UI is English by default.** Japanese is available from the "English / 日本語" switcher in the header and on the login page, remembered per browser in the `da_lang` cookie for one year. Existing Japanese-speaking users switch once.
-- The default `siteTitle` follows the language ("Site administration" / "サイト管理").
-- The model slug `_lang` is now reserved (`register()` throws for it); `lang` stays valid.
+- `createAdmin`, `admin.register`, `admin.app` and `admin.fetch`: a server-rendered, Django Admin-style CRUD admin for Drizzle ORM tables, mounted in a Hono app. `drizzle-orm` (`^0.45.3`) and `hono` (`^4.13.13`) are peer dependencies; Node.js 22 or later.
+- SQLite and PostgreSQL.
+- List pages with search, filters, sortable columns and pagination; bulk delete and custom actions with an optional confirmation page.
+- Add and change forms generated from the table definition, with widget overrides, zod validation, a `validate` callback, hooks and read-only fields.
+- Built-in login with a signed session cookie, or external authentication through `getUser` and `loginUrl`; per-model `view` / `add` / `change` / `delete` permissions.
+- Security: HMAC-signed cookies with keys derived per admin instance, CSRF protection (Origin check and token), Content-Security-Policy and other security headers, and bounded input (search text, selections and `listPerPage`).
+- English and Japanese UI, English by default, with a language switcher remembered in the `da_lang` cookie.
+- Light and dark color schemes and a responsive layout; everything works without JavaScript except "select all".

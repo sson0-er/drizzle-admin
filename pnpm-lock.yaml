@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      hono:
-        specifier: ^4.13.13
-        version: 4.13.13
       zod:
         specifier: ^4.6.5
         version: 4.6.5
@@ -36,6 +33,9 @@ importers:
       drizzle-orm:
         specifier: 0.45.3
         version: 0.45.3(@electric-sql/pglite@0.5.8)(@types/better-sqlite3@9.6.0)(better-sqlite3@13.0.3)
+      hono:
+        specifier: 4.13.13
+        version: 4.13.13
       parse5:
         specifier: 8.0.1
         version: 8.0.1

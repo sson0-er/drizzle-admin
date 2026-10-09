@@ -1,7 +1,7 @@
 ---
 id: 54-package-metadata-and-docs
 depends_on: [52-i18n-docs]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 54: package-metadata-and-docs
@@ -97,3 +97,11 @@ Nothing is published. The smoke test, CI and CLAUDE.md come in task 55.
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- New readme.test.ts case "uses the package name in the Install command and the Quick start import" was added first and failed against the pre-task README (the README still had `pnpm add drizzle-admin drizzle-orm` and the `drizzle-admin` import). It passes after the edits.
+- package.json updated per the design block; `mise exec -- pnpm install` moved hono to a peer and a dev dependency in pnpm-lock.yaml; `pnpm install --frozen-lockfile` succeeds.
+- `npm pack --dry-run` after `pnpm build`: contains `src/index.ts` and `dist/index.js`, no `test/`, `example/` or `scripts/` path. Summary: `package size: 149.6 kB`, `unpacked size: 575.1 kB`, `total files: 234`. No `.tgz` left in the repository.
+- README Requirements, Install, Quick start import line and Development paragraph edited; CHANGELOG.md replaced with the design block. `grep -c "^## " README.md` = 12.
+- `scripts/verify.sh` passes.
+- Review round 1: high 0, medium 0, low 0. Orchestrator re-ran pnpm install --frozen-lockfile (ok). Done.

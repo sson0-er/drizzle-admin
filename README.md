@@ -16,15 +16,16 @@ drizzle-admin is a Django Admin-style CRUD admin for [Drizzle ORM](https://orm.d
 
 ## Requirements
 
-- Node.js 24 (the version the test suite runs on). The library source uses only Web-standard APIs and no `node:` modules, but it is only tested on Node.
+- Node.js 22 or later. The full test suite runs on Node.js 24; CI also installs the packed package on Node.js 22 and runs a smoke test. The library source uses only Web-standard APIs and no `node:` modules, but it is only tested on Node.
 - `drizzle-orm` `^0.45.3` (peer dependency). Other drizzle-orm versions are not supported.
 - A SQLite database (for example `better-sqlite3`) or a PostgreSQL database (for example `pglite`, `node-postgres`, `postgres-js`). The test suite covers `better-sqlite3` and PGlite only.
-- A Hono application to mount the admin in (Hono is a dependency of this package), or any server that can call `admin.fetch`.
+- A Hono application to mount the admin in, or any server that can call `admin.fetch`. Hono `^4.13.13` is a peer dependency: install it next to this package.
+- The package is ESM-only. A CommonJS application can `require()` it only on a Node.js version that supports `require()` of ES modules without a flag (22.12 or later); otherwise use `import()`.
 
 ## Install
 
 ```sh
-pnpm add drizzle-admin drizzle-orm
+pnpm add @sson0-er/drizzle-admin drizzle-orm hono
 ```
 
 ## Quick start
@@ -35,7 +36,7 @@ import { drizzle } from "drizzle-orm/better-sqlite3";
 import { integer, sqliteTable, text } from "drizzle-orm/sqlite-core";
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
-import { createAdmin } from "drizzle-admin";
+import { createAdmin } from "@sson0-er/drizzle-admin";
 
 const users = sqliteTable("users", {
   id: integer().primaryKey({ autoIncrement: true }),
@@ -351,6 +352,8 @@ HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first
 ```
 
 `scripts/verify.sh` runs test, typecheck, lint and build in order.
+
+`scripts/smoke-pack.sh` builds and packs the package, installs the tarball into a temporary project and type-checks and runs a small consumer against SQLite and PGlite. It needs access to the npm registry. CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on every push and pull request to `main`.
 
 The example app (`example/`) is a demo with users, posts and tags on an in-memory SQLite database seeded with sample data. It listens on `127.0.0.1:3000` unless `HOST` or `PORT` are set. Open `http://127.0.0.1:3000/admin/` and log in as `admin` / `admin`. The environment variables `HOST` (default `127.0.0.1`; an empty value also falls back to `127.0.0.1`), `PORT` (default `3000`), `ADMIN_PASSWORD` (default `admin`; a warning is printed when it is not set) and `ADMIN_SECRET` (default: random at startup, so sessions do not survive a restart) configure it.
 
