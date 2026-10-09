@@ -4,10 +4,13 @@ Project guide for contributors and coding agents. The full design lives in `docs
 
 ## Overview
 - ESM TypeScript library that turns registered Drizzle tables into a server-rendered, Django-admin-like CRUD UI on Hono. SQLite and PostgreSQL; English (default) and Japanese UI.
+- Published on npm as `@sson0-er/drizzle-admin`; `drizzle-orm` and `hono` are peer dependencies.
 
 ## Commands
 - `pnpm test` (vitest), `pnpm typecheck`, `pnpm lint` (biome), `pnpm build` (tsc to `dist/`).
 - `scripts/verify.sh` runs all four in order and is the gate for every change.
+- `scripts/smoke-pack.sh` packs the package, installs the tarball into a temporary project and type-checks and runs a consumer on SQLite and PGlite (needs the npm registry; not part of `verify.sh`).
+- CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on push and pull request to `main`; actions are pinned to commit SHAs, which Dependabot updates monthly (`.github/dependabot.yml`).
 - `pnpm example` starts the demo on `127.0.0.1:3000`; override with `HOST` / `PORT`, set `ADMIN_PASSWORD` / `ADMIN_SECRET`.
 - Tool versions come from `mise.toml` (`mise install`).
 
@@ -18,6 +21,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - `src/messages.ts` (UI strings per locale, `en` and `ja`, and the locale helpers), `src/time.ts`, `src/types.ts` (public types), `src/admin.ts` (`createAdmin`), `src/index.ts` (exports).
 - `test/`: test files are named per module or concern (some modules are split, e.g. `introspect.pg`/`introspect.sqlite`), `helpers/`, `fixtures/`; DB tests run on both dialects via `describe.each(dialects)`.
 - `example/`: runnable demo app. `docs/orchestraude/`: design, decisions, evidence, tasks.
+- `scripts/`: `verify.sh`, `smoke-pack.sh` and the smoke consumer in `scripts/smoke/`. `.github/`: the CI workflow and `dependabot.yml`. The published package contains `dist/` and `src/`.
 
 ## Design principles
 - Drizzle column internals are read only in `src/introspect/` and queries are built only in `src/data/`; the rest works on `ModelMeta` (`src/types.ts` and `src/admin.ts` import just the `Table` type).

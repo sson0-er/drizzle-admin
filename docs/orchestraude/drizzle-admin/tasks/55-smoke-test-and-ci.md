@@ -1,7 +1,7 @@
 ---
 id: 55-smoke-test-and-ci
 depends_on: [54-package-metadata-and-docs]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 55: smoke-test-and-ci
@@ -101,3 +101,16 @@ How failures are handled (release-checks.md "Rules", decision 052 point 12):
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done (implementation)
+- Local run on Node 24, `scripts/smoke-pack.sh` exit 0, output lines: `v24.21.0`, `ok sqlite`, `ok postgres`, `ok require`, `smoke-pack: ok`.
+- Negative type check (run once, `@ts-expect-error` line removed): exit 2, `consumer.ts(72,66): error TS2322: Type '"missing"' is not assignable to type 'ColumnKey<SQLiteTableWithColumns<...`. The line was restored afterwards (one `@ts-expect-error` present).
+- Cleanup: `ls -d /tmp/tmp.*` lists nothing before and after both runs (TMPDIR unset); no `.tgz` in the repository.
+- Static checks: `bash -n` ok, `test -x` ok, `grep -c smoke-pack scripts/verify.sh` = 0. shellcheck: 未確認 (not installed).
+- `diff` of tsconfig.json, ci.yml and dependabot.yml against the fenced blocks in release-checks.md prints nothing. Workflow checks: all `uses:` match the SHA + `# vX.Y.Z` pattern, `permissions:` = 1, `contents: read` = 1, `secrets.|publish` = 0.
+- YAML parse: PyYAML `yaml.safe_load` on ci.yml and dependabot.yml, ok.
+- CLAUDE.md: the four bullets of the design README section (Overview, two in Commands, Layout) added; no other section changed.
+- Optional local Node 22 run (`MISE_NODE_VERSION=22 scripts/smoke-pack.sh`, mise downloaded node 22.23.3): exit 0; `v22.23.3`, `ok sqlite`, `ok postgres`, `ok require`, `smoke-pack: ok`. This does not replace the post-push check.
+- Biome (verify) formatted the consumer import order (`pgTable, text as pgText, serial`); `scripts/verify.sh` passes. No vitest changes.
+- Post-push check: pending (user).
+- Review round 1: high 0, medium 0, low 5 (quality: text parameter shadows helper; spec: misleading tarball-count message; tests: 3 low). Post-push check pending (user): first CI run incl. Node 22. Done.

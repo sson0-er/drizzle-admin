@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.10.3
+      - run: pnpm install --frozen-lockfile
+      - run: scripts/verify.sh
+      - run: scripts/smoke-pack.sh
+
+  # engines.node is ">=22": prove the packed package on the oldest supported line.
+  smoke-node22:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      MISE_NODE_VERSION: "22"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+        with:
+          version: 2026.10.3
+          # Not shared with the verify job: its cache key comes from mise.toml, not from MISE_NODE_VERSION.
+          cache: false
+      - run: pnpm install --frozen-lockfile
+      - run: scripts/smoke-pack.sh
