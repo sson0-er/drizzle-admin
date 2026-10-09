@@ -1,7 +1,7 @@
 ---
 id: 57-oidc-app-mock-idp-and-flow-test
 depends_on: [56-oidc-shared-admin-and-config]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 57: oidc-app-mock-idp-and-flow-test
@@ -147,3 +147,17 @@ Normative: example-oidc.md sections "Flow", `cert.ts`, `mock-idp.ts`, `app.tsx`,
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: done
+- Order followed: cert.ts, global setup and vitest.config.ts first, then all new test cases, then mock-idp.ts and app.tsx. Before mock-idp.ts / app.tsx existed, `vitest run test/example-oidc.test.ts` failed at import: `Cannot find module '../example/oidc/app.js'` (no tests ran).
+- First run with the implementation: 64 of 65 passed. The callback-failure case failed on "one Set-Cookie per name": `@hono/oidc-auth` itself calls `deleteCookie(c, "state", { path })` before it throws, so `state` appears twice (the library's and the handler's). The test now asserts at least one line per name and that every such line has `Max-Age=0` and `Path=/oidc/callback`; the design text ("a Set-Cookie line ... per name") is still met.
+- Consent step: the consent page's form `action` led to consent (POST `prompt=consent` to the first form's action worked); no fallback to the login page's action was needed.
+- Typing deviation in `claimsHook`: `claims.email` is `JsonValue` in `IDToken`, so the design's one-line `claims?.email || orig?.email || ""` does not type-check against `OidcAuthClaims.email?: string`. The hook narrows `claims.email` with `typeof === "string"` first (same result for string emails; a non-string email counts as absent). No cast.
+- `@types/oidc-provider` accepted every option of the design; the `(req, res) => handler(req, res)` handler variable is typed from `provider.callback()`.
+- Non-vacuity check 1: with the negative control serving the trusted certificate (`readLocalhostCert(process.env.OIDC_MOCK_CERT_DIR!)`), "rejects a TLS certificate that is not trusted" failed (fetch returned a 200 Response, not a TypeError). Reverted.
+- Non-vacuity check 2 (`--pool=threads`, informational): 9 of 65 failed, all flow cases (round trip, five allowlist rows, shell isolation, logout origin, `/` signed in) with `500` and `TypeError: Invalid URL` (discovery fails, the extra CA is not trusted). The negative control and the other cases still passed. The `forks` pin stays.
+- Temp directories: count of `drizzle-admin-oidc-*` entries in `/tmp` (os.tmpdir()) before one `pnpm test` (inside `scripts/verify.sh`): 0; after: 0 (also 0/0 around the second run).
+- `scripts/verify.sh` passed twice in a row (1819 passed, 5 skipped). Biome reports 2 warnings, both non-null assertions the task asks for with a why-comment (`process.env.OIDC_MOCK_CERT_DIR!` in the test, `identityOf(...)!` after `oidcAuthMiddleware()` in app.tsx).
+- Exports: cert.ts three functions; mock-idp.ts `MockIdpOptions`, `MockIdp`, `startMockIdp`; app.tsx only `createOidcExampleApp`. No other export. The `describe` hooks sit in one `describe` ("OIDC flow against the mock IdP"); `signIn` takes no path argument and starts at `GET /admin/users/` (the round trip spells out the `?q=a` steps itself).
+- The import line `import { describe, expect, it } from "vitest";` was widened (decision 041 exception); `vitest.config.ts` only gained lines.
+- Review round 1: high 0, medium 0, low 9 (security: logout revokeSession error text can reach the 500 body; spec: at-least-one Set-Cookie assertion and claimsHook typeof form need design sync; tests: log line not pinned, only access_denied callback failure, shell-isolation assertion indirect; quality: mock-idp handler type, redundant identityOf check, console.error spy restored outside afterEach). Done.
