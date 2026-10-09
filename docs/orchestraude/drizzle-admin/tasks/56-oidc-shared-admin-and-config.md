@@ -1,7 +1,7 @@
 ---
 id: 56-oidc-shared-admin-and-config
 depends_on: [54-package-metadata-and-docs]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 56: oidc-shared-admin-and-config
@@ -125,3 +125,15 @@ Normative: example-oidc.md sections `return-path.ts`, `allowlist.ts`, `mode.ts`,
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1: implemented (2026-10-10)
+- Tests first. Before the modules existed both new test files failed as a whole (`Cannot find module` for `example/oidc/*.js`), so every `safeReturnPath`, `isAllowed`, `parseAllowlist`, `readOidcExampleConfig`, `selectMode` and `assertTlsVerificationOn` row failed. Pins: with the `mode.ts` import removed (scratch copy), the seven scan rows and the worker `NODE_TLS_REJECT_UNAUTHORIZED` `it` passed on pre-task code; only the `mode.ts` once-only `it` failed (the file did not exist). All now pass.
+- `OidcAuthEnv` in `node_modules/@hono/oidc-auth/dist/index.d.mts` (14 keys, equal to the 13 keys plus `OIDC_ISSUER`; tsc 7 resolves the types): `OIDC_AUTH_SECRET`, `OIDC_AUTH_REFRESH_INTERVAL?`, `OIDC_AUTH_EXPIRES?`, `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET`, `OIDC_REDIRECT_URI?`, `OIDC_SCOPES?`, `OIDC_COOKIE_PATH?`, `OIDC_COOKIE_NAME?`, `OIDC_COOKIE_DOMAIN?`, `OIDC_AUDIENCE?`, `OIDC_AUTH_EXTERNAL_URL?`, `OIDC_JWT_ALG?` (`SignatureAlgorithm`).
+- `pnpm install` (pnpm 12.10.0) added 82 packages; `pnpm-workspace.yaml` unchanged, no ignored build scripts reported. `pnpm install --frozen-lockfile` succeeds.
+- Published package unchanged: `npm pack --dry-run --json` file list before and after `diff`s empty; 234 files; no `.tgz` in the repo.
+- `mode.ts`: one module-private constant holds the variable name and serves both the lookup and the message template, so the name appears once; comments avoid the name.
+- `config.ts` avoids non-null assertions (biome warns): `requireInRealMode` helper for the real-mode client id and secret, `issuer = env.OIDC_ISSUER || null`, `mockCert` decided by `env.OIDC_MOCK_CERT_DIR` (set only in mock mode once checks 3 and 4 passed). Exports: `OidcExampleConfig`, `readOidcExampleConfig` only. `allowlist.ts` exports `Allowlist`, `OidcIdentity`, `parseAllowlist`, `isAllowed`; `mode.ts` exports `OidcMode`, `selectMode`, `assertTlsVerificationOn`; `return-path.ts` exports `safeReturnPath` (all as listed in the design).
+- `example-oidc.test.ts` has no row for "disabled TLS verification through `readOidcExampleConfig`" because that message contains the forbidden name; check 1 delegation is covered by the `assertTlsVerificationOn` rows. It adds a few rows beyond the design list (notes, listen address).
+- Post-push CI check (`smoke-node22` `pnpm install --frozen-lockfile` with the new devDependencies): 未確認 until the user reports the run.
+- `scripts/verify.sh` passes.
+- Review round 1: high 0, medium 0, low 5 (security: TLS guard misses npm_config_strict_ssl/GIT_SSL_NO_VERIFY/--no-check-certificate/curl -k, once-only count weaker via constant; tests: untested config branches, no test that readOidcExampleConfig calls assertTlsVerificationOn; quality: overlapping whitespace checks in safeReturnPath). Quality reviewer could not write its file; orchestrator transcribed its returned JSON verbatim. Done.

@@ -2,15 +2,15 @@ import Database from "better-sqlite3";
 import { inArray } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/better-sqlite3";
 import { Hono } from "hono";
-import { type Admin, createAdmin } from "../src/index.js";
+import { type Admin, type AuthConfig, createAdmin } from "../src/index.js";
 import { posts, tags, users } from "./schema.js";
 import { createSchema, seed } from "./seed.js";
 
-/** Builds the demo (in-memory SQLite, seeded) without opening a port; server.ts serves it. */
-export async function createExampleApp(opts: {
+/** Builds the seeded in-memory admin with its registrations; the caller chooses how users sign in. */
+export async function createExampleAdmin(opts: {
   secret: string;
-  adminPassword: string;
-}): Promise<{ app: Hono; admin: Admin }> {
+  auth: AuthConfig;
+}): Promise<Admin> {
   const sqlite = new Database(":memory:");
   sqlite.pragma("foreign_keys = ON");
   createSchema(sqlite);
@@ -23,12 +23,7 @@ export async function createExampleApp(opts: {
     basePath: "/admin",
     siteTitle: "drizzle-admin demo",
     secret: opts.secret,
-    auth: {
-      verifyCredentials: async (username, password) =>
-        username === "admin" && password === opts.adminPassword
-          ? { id: "admin", name: "admin" }
-          : null,
-    },
+    auth: opts.auth,
   });
 
   // Action ids arrive as strings; the primary key here is an integer.
@@ -65,6 +60,23 @@ export async function createExampleApp(opts: {
     toString: (row) => row.title,
   });
   admin.register(tags);
+  return admin;
+}
+
+/** Builds the demo (in-memory SQLite, seeded) without opening a port; server.ts serves it. */
+export async function createExampleApp(opts: {
+  secret: string;
+  adminPassword: string;
+}): Promise<{ app: Hono; admin: Admin }> {
+  const admin = await createExampleAdmin({
+    secret: opts.secret,
+    auth: {
+      verifyCredentials: async (username, password) =>
+        username === "admin" && password === opts.adminPassword
+          ? { id: "admin", name: "admin" }
+          : null,
+    },
+  });
 
   const app = new Hono();
   app.get("/", (c) => c.redirect("/admin/"));
