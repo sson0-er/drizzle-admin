@@ -12,6 +12,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - `scripts/smoke-pack.sh` packs the package, installs the tarball into a temporary project and type-checks and runs a consumer on SQLite and PGlite (needs the npm registry; not part of `verify.sh`).
 - CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on push and pull request to `main`; actions are pinned to commit SHAs, which Dependabot updates monthly (`.github/dependabot.yml`).
 - `pnpm example` starts the demo on `127.0.0.1:3000`; override with `HOST` / `PORT`, set `ADMIN_PASSWORD` / `ADMIN_SECRET`.
+- `pnpm example:oidc` starts the OIDC sign-in demo: with no `OIDC_ISSUER` it also starts a local mock IdP on `https://localhost:3001` (open `http://localhost:3000/admin/`, sign in as `demo`); for a real IdP set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and `OIDC_ALLOWED_SUBJECTS` or `OIDC_ALLOWED_EMAIL_DOMAINS`.
 - Tool versions come from `mise.toml` (`mise install`).
 
 ## Layout
@@ -21,6 +22,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - `src/messages.ts` (UI strings per locale, `en` and `ja`, and the locale helpers), `src/time.ts`, `src/types.ts` (public types), `src/admin.ts` (`createAdmin`), `src/index.ts` (exports).
 - `test/`: test files are named per module or concern (some modules are split, e.g. `introspect.pg`/`introspect.sqlite`), `helpers/`, `fixtures/`; DB tests run on both dialects via `describe.each(dialects)`.
 - `example/`: runnable demo app. `docs/orchestraude/`: design, decisions, evidence, tasks.
+- `example/oidc/`: the OIDC demo (`@hono/oidc-auth`, mock IdP `oidc-provider`, run-time certificate, launcher).
 - `scripts/`: `verify.sh`, `smoke-pack.sh` and the smoke consumer in `scripts/smoke/`. `.github/`: the CI workflow and `dependabot.yml`. The published package contains `dist/` and `src/`.
 
 ## Design principles
@@ -31,12 +33,13 @@ Project guide for contributors and coding agents. The full design lives in `docs
 
 ## Security rules
 - `Location` headers are path-only and stay under the prefix (the one exception is the configured `auth.loginUrl`); post-login targets and the language switch's return target go through `safeNext`.
-- Every POST passes the Origin check and the `_csrf` token check.
+- Every POST to the admin (`src/`) passes the Origin check and the `_csrf` token check. The OIDC example's `POST /oidc/logout` is Origin-checked only (decision 053 point 7).
 - Cookies are signed with keys derived per instance and per cookie (`deriveCookieKey(secret, cookieName, prefix)`, decision 042); the raw `secret` is passed to no cookie function. They are HttpOnly, SameSite=Lax and Secure per `isSecure`; set and delete share `cookieAttrs`. The exception is `da_lang`, an unsigned preference validated against the locale allow-list on read (decision 050); it still uses `cookieAttrs`.
 - Every response carries the Content-Security-Policy from `buildCsp` and `X-Content-Type-Options: nosniff` (decision 044). When `SELECT_ALL_SCRIPT` changes, update `SELECT_ALL_SCRIPT_SHA256` in the same change (a test recomputes it). A new inline script, `style` attribute or external resource needs a policy change and a decision record.
 - Raw DB error messages are never rendered or logged; log through `describeForLog`.
 - Output is escaped by JSX; never inject raw HTML.
 - Values the user may not see are not rendered (FK labels: decision 034; password values: decision 037).
+- TLS certificate verification is never disabled, in code, tests, scripts or CI: the mock IdP is trusted only through `NODE_EXTRA_CA_CERTS` with a certificate generated at run time. `test/tls-verification.test.ts` fails on the names that would disable it (the one allowed occurrence is the refusal check in `example/oidc/mode.ts`), and `test/example-oidc.test.ts` proves in the flow's worker that an untrusted certificate is still rejected.
 
 ## Where things live
 - Design: `docs/orchestraude/drizzle-admin/03-design/` (start at `README.md`).

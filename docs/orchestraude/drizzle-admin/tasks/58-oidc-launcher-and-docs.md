@@ -1,7 +1,7 @@
 ---
 id: 58-oidc-launcher-and-docs
 depends_on: [57-oidc-app-mock-idp-and-flow-test, 55-smoke-test-and-ci]
-status: pending
+status: done
 attempts: 0
 ---
 # Task 58: oidc-launcher-and-docs
@@ -126,3 +126,22 @@ Normative: example-oidc.md sections "`example/oidc/server.ts`", "`example/oidc/l
 
 ## History
 (Append one entry per attempt: attempt number, outcome, main findings.)
+
+### Attempt 1 (implementer)
+- Outcome: implemented; scripts/verify.sh passes.
+- Pack list: `npm pack --dry-run --json` file paths (234, sorted) were identical before and after; no `.tgz` left; `pnpm install --frozen-lockfile` succeeded and `pnpm-lock.yaml` is unchanged.
+- Tests first: before the README edit the eight new `it.each` rows and the ordering `it` (9 tests) failed in test/readme.test.ts ("expected null not to be null", "expected -1 to be greater than or equal to 0"); after the edit they pass. No removed lines in `git diff test/readme.test.ts`.
+- Planner-added test cases (not in test-strategy.md, design to sync): the `it.each` "documents %s under the 'OIDC example' heading" (8 rows) and the `it` "places the OIDC example before the Changelog pointer".
+- Added test/design note: server.ts uses a `biome-ignore lint/style/noNonNullAssertion` comment for the single `config.issuer!` (the mock branch narrows through `config.mockCert`, so it needs no assertion).
+- CLAUDE.md: the four bullets were applied with the design README wording, except that the Commands bullet leaves out the trailing "(Changed 2026-10-10: allowlist, Q21)" annotation (a design change note, not rule text). Layout bullet added directly after the `example/` bullet.
+- Manual run (PORT=3100, OIDC_MOCK_PORT=3101 because the user may use 3000; loopback only):
+  1. `mise exec -- pnpm example:oidc` printed `drizzle-admin OIDC demo: http://localhost:3100/admin/`, `Mock IdP: https://localhost:3101`, the two `Note:` lines and `Sign in at the mock IdP as "demo" ...`. `/tmp/drizzle-admin-oidc-wdhh2c` existed while it ran.
+  2. `curl -4 -si http://localhost:3100/admin/` -> `HTTP/1.1 302 Found`, `location: /oidc/login?next=%2Fadmin%2F`.
+  3. `curl -4 -si 'http://localhost:3100/oidc/login?next=%2Fadmin%2F'` -> `302 Found`, `location: https://localhost:3101/auth?client_id=drizzle-admin-example&redirect_uri=http%3A%2F%2Flocalhost%3A3100%2Foidc%...`.
+  4. `curl -4 -s --cacert <dir>/cert.pem https://localhost:3101/.well-known/openid-configuration` -> JSON with `"issuer":"https://localhost:3101"`.
+  5. SIGINT to the launcher node process: the child and launcher exited, the `drizzle-admin-oidc-*` directory no longer existed, ports free. Exit code 1 (the child dies from the forwarded signal, so the launcher exits 1 by design; `pnpm` printed `ELIFECYCLE ... exit code 1`; a second run through `pnpm exec tsx` gave `exit code: 1` from `wait`).
+  6. `pnpm exec tsx example/oidc/server.ts` without `OIDC_*` -> `Mock mode needs the generated certificate: start it with "pnpm example:oidc", or set OIDC_ISSUER to use a real IdP.`, exit 1.
+  7. `OIDC_ISSUER=https://idp.example pnpm example:oidc` -> `OIDC_CLIENT_ID is required when OIDC_ISSUER is set.`, exit 1, no `drizzle-admin-oidc-*` directory created.
+  - No process from the runs is left; the temporary directories are gone.
+- 未確認 (not a DoD item): the user's browser check (Q19, decision 053 point 14) in Chrome or Firefox: accept the mock IdP certificate warning, sign in as `demo`, see the admin with the name, sign out at `/`.
+- Review round 1: high 0, medium 0, low 1 (security: SIGHUP not handled, cert dir left in /tmp with 0700/0600 modes). User browser check (Q19) pending. Done.

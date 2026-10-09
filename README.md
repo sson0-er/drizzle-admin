@@ -349,6 +349,7 @@ pnpm lint             # biome check
 pnpm build            # tsc to dist/
 pnpm example          # then open http://127.0.0.1:3000/admin/ and log in as admin / admin
 HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first)
+pnpm example:oidc     # OIDC sign-in demo with a local mock IdP; open http://localhost:3000/admin/
 ```
 
 `scripts/verify.sh` runs test, typecheck, lint and build in order.
@@ -358,6 +359,39 @@ HOST=0.0.0.0 pnpm example   # listen on all interfaces (set ADMIN_PASSWORD first
 The example app (`example/`) is a demo with users, posts and tags on an in-memory SQLite database seeded with sample data. It listens on `127.0.0.1:3000` unless `HOST` or `PORT` are set. Open `http://127.0.0.1:3000/admin/` and log in as `admin` / `admin`. The environment variables `HOST` (default `127.0.0.1`; an empty value also falls back to `127.0.0.1`), `PORT` (default `3000`), `ADMIN_PASSWORD` (default `admin`; a warning is printed when it is not set) and `ADMIN_SECRET` (default: random at startup, so sessions do not survive a restart) configure it.
 
 The example rejects requests whose `Host` header is not the bound host and port (403), which protects the demo and its default password against DNS rebinding. Loopback names (`localhost`, `127.0.0.1`, `[::1]`) are accepted when it is bound to a loopback address or to all interfaces, and IP literals are accepted when it is bound to all interfaces (`HOST=0.0.0.0`).
+
+### OIDC example
+
+`pnpm example:oidc` starts the same demo with sign-in through OpenID Connect (`@hono/oidc-auth`, external auth mode with `auth.getUser` and `auth.loginUrl`). Without `OIDC_ISSUER` it also starts a local mock IdP (`oidc-provider`) on `https://localhost:3001`. Its certificate is generated at start and trusted by the Node process through `NODE_EXTRA_CA_CERTS`; nothing needs network access. Open `http://localhost:3000/admin/` (use `localhost`, not `127.0.0.1`) and sign in as `demo`; any other user name shows the "Access denied" page. `/` shows the signed-in user and a "Sign out" button.
+
+To use a real IdP, set `OIDC_ISSUER`, `OIDC_CLIENT_ID`, `OIDC_CLIENT_SECRET` and at least one of `OIDC_ALLOWED_SUBJECTS` / `OIDC_ALLOWED_EMAIL_DOMAINS` (otherwise it refuses to start), and register `http://localhost:3000/oidc/callback` (or your `OIDC_REDIRECT_URI`) as a redirect URI at the IdP. Then no mock IdP and no extra CA are used. The example reads these environment variables:
+
+| Variable | Mode | Default | Meaning |
+|---|---|---|---|
+| `PORT` / `HOST` | both | `3000` / `127.0.0.1` | app listen address, as in `pnpm example` |
+| `ADMIN_SECRET` | both | random per start | `createAdmin` secret |
+| `OIDC_AUTH_SECRET` | both | random per start | `@hono/oidc-auth` session signing key, at least 32 characters |
+| `OIDC_REDIRECT_URI` | both | `http://localhost:<PORT>/oidc/callback` | must have the path `/oidc/callback`; register it at the IdP |
+| `OIDC_ALLOWED_SUBJECTS` | both | mock: `demo`; real: required unless the next is set | comma-separated `sub` values allowed into the admin |
+| `OIDC_ALLOWED_EMAIL_DOMAINS` | both | none | comma-separated email domains allowed (exact domain, `email_verified` must be true) |
+| `OIDC_MOCK_PORT` | mock | `3001` | mock IdP port |
+| `OIDC_ISSUER` | real | unset | setting it selects real mode |
+| `OIDC_CLIENT_ID` / `OIDC_CLIENT_SECRET` | real | required | client registered at the IdP |
+| `OIDC_SCOPES` | real | `openid email` | space-separated scopes; each must be in the IdP's `scopes_supported`; add `offline_access` for sessions longer than 15 minutes (mock mode always uses `openid email offline_access`) |
+| `OIDC_AUDIENCE` | real | none | passed as `audience` on the authorization request (some IdPs need it) |
+
+In real mode the example requests only `openid email`; set `OIDC_SCOPES` (for example `"openid email offline_access"`) to change that. Other `OIDC_*` variables of `@hono/oidc-auth` are ignored, because the example passes every setting itself. The email-domain rule needs `email` and `email_verified` in the ID token; if the IdP puts them only in userinfo, use subjects.
+
+How it fits together: the `/admin/*` middleware reads the session with `getAuth(c)`, checks the allowlist, and hands the user to `getUser` through a `WeakMap` keyed by the request. This works because the admin is mounted with `app.route` and sees the same `Request`. The login route validates `next` itself, because `@hono/oidc-auth` returns to the URL stored in its `continue` cookie without validating it. If you copy this, keep the bridge before an `app.route("/admin", admin.app)` mount: with `app.mount`, a separate `admin.fetch` call or the bridge registered after the mount, the admin sees a different `Request`, `getUser` returns `null` even for an allowed user, and the browser loops between `/admin/` and `/oidc/login`.
+
+Caveats:
+
+- This is example code, not a hardened production configuration: every allowlisted user gets full admin access (no per-user permissions).
+- On a manual run the browser warns about the mock IdP's certificate once per start (it is trusted only by Node).
+- Safari may not store `Secure` cookies set by `http://localhost` (WebKit bugs 232088 and 231035), so sign-in may loop there; use Chrome or Firefox.
+- The `@hono/oidc-auth` session cookie (`oidc-auth`) is a signed, not encrypted, JWT that contains the refresh token; it is always `Secure` and has no `SameSite` attribute. `OIDC_AUTH_SECRET` must be at least 32 characters.
+- "Sign out" deletes the app's session and revokes the refresh token when the IdP supports revocation, but does not end the session at the IdP (to switch users at the mock IdP, use a new private window).
+- TLS certificate verification is never turned off: trust comes only from the generated certificate passed as an extra CA, and the example refuses to start when the environment disables verification.
 
 ### Changelog
 

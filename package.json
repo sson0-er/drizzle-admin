@@ -43,6 +43,7 @@
     "build": "node -e \"require('node:fs').rmSync('dist',{recursive:true,force:true})\" && tsc -p tsconfig.build.json",
     "prepack": "pnpm build",
     "example": "tsx example/server.ts",
+    "example:oidc": "tsx example/oidc/launch.ts",
     "format": "biome check --write ."
   },
   "engines": {

@@ -151,4 +151,25 @@ describe("README", () => {
       expect(readme).toContain(text);
     }
   });
+
+  it.each([
+    "pnpm example:oidc",
+    "OIDC_ISSUER",
+    "OIDC_ALLOWED_SUBJECTS",
+    "OIDC_ALLOWED_EMAIL_DOMAINS",
+    "NODE_EXTRA_CA_CERTS",
+    "http://localhost:3000/admin/",
+    "app.route",
+    "Safari",
+  ])("documents %s under the 'OIDC example' heading", (text) => {
+    const match = /^### OIDC example$([\s\S]*?)(?=^#{2,3} |(?![\s\S]))/m.exec(readme);
+    expect(match).not.toBeNull();
+    expect(match?.[1]).toContain(text);
+  });
+
+  it("places the OIDC example before the Changelog pointer", () => {
+    const oidc = readme.indexOf("\n### OIDC example\n");
+    expect(oidc).toBeGreaterThanOrEqual(0);
+    expect(oidc).toBeLessThan(readme.indexOf("\n### Changelog\n"));
+  });
 });
