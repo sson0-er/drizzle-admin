@@ -114,3 +114,4 @@ How failures are handled (release-checks.md "Rules", decision 052 point 12):
 - Biome (verify) formatted the consumer import order (`pgTable, text as pgText, serial`); `scripts/verify.sh` passes. No vitest changes.
 - Post-push check: pending (user).
 - Review round 1: high 0, medium 0, low 5 (quality: text parameter shadows helper; spec: misleading tarball-count message; tests: 3 low). Post-push check pending (user): first CI run incl. Node 22. Done.
+- Post-push check (2026-10-09): CI run 37932078402 succeeded. verify job on Node 24.21.0 (1742 passed, 5 skipped; smoke-pack ok) and smoke-node22 on Node 22.23.3 (ok sqlite / postgres / require). Dependabot run succeeded with no PRs.
