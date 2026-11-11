@@ -1,5 +1,5 @@
 import { DrizzleQueryError } from "drizzle-orm";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { classifyDbError, describeForLog, isDbError } from "../src/data/errors.js";
 import { createRepository } from "../src/data/repository.js";
 import { introspectTable } from "../src/introspect/index.js";
@@ -17,14 +17,7 @@ async function thrown(p: Promise<unknown>): Promise<unknown> {
 }
 
 describe.each(dialects)("data/errors ($name)", (fx: DialectFixture) => {
-  const open: SetupResult[] = [];
-  afterEach(async () => {
-    await Promise.all(open.splice(0).map((s) => s.close()));
-  });
-
-  async function make() {
-    const s = await fx.setup();
-    open.push(s);
+  function make(s: SetupResult) {
     const repo = createRepository({ db: s.db, dialect: fx.dialect, timeZone: "UTC" });
     const authors = introspectTable(s.schema.authors, fx.dialect);
     const articles = introspectTable(s.schema.articles, fx.dialect);
@@ -39,8 +32,19 @@ describe.each(dialects)("data/errors ($name)", (fx: DialectFixture) => {
     };
   }
 
+  // One database for the whole describe: a rejected insert stores nothing, and the one row that
+  // `secret` adds is read by no other test.
+  let setup: SetupResult;
+  let m: ReturnType<typeof make>;
+  beforeAll(async () => {
+    setup = await fx.setup();
+    m = make(setup);
+  });
+  afterAll(async () => {
+    await setup.close();
+  });
+
   it("classifies real driver errors", async () => {
-    const m = await make();
     expect(classifyDbError(await m.unique())).toBe("unique");
     expect(classifyDbError(await m.foreignKey())).toBe("foreignKey");
     expect(classifyDbError(await m.notNull())).toBe("notNull");
@@ -48,7 +52,6 @@ describe.each(dialects)("data/errors ($name)", (fx: DialectFixture) => {
   });
 
   it("recognizes real driver errors as DB errors", async () => {
-    const m = await make();
     expect(isDbError(await m.unique())).toBe(true);
     expect(isDbError(await m.foreignKey())).toBe(true);
     expect(isDbError(await m.notNull())).toBe(true);
@@ -56,7 +59,6 @@ describe.each(dialects)("data/errors ($name)", (fx: DialectFixture) => {
   });
 
   it("describes errors for logs without the bound value", async () => {
-    const m = await make();
     const err = await m.secret();
     const line = describeForLog(err);
     expect(line).toMatch(/^unique \S+ \S+$/);
@@ -86,16 +88,17 @@ describe("data/errors (synthetic)", () => {
     expect(classifyDbError(err)).toBe("other");
   });
 
-  it("maps every documented code", () => {
-    const k = (code: string) => classifyDbError({ code });
-    expect(k("SQLITE_CONSTRAINT_UNIQUE")).toBe("unique");
-    expect(k("SQLITE_CONSTRAINT_PRIMARYKEY")).toBe("unique");
-    expect(k("23505")).toBe("unique");
-    expect(k("SQLITE_CONSTRAINT_FOREIGNKEY")).toBe("foreignKey");
-    expect(k("23503")).toBe("foreignKey");
-    expect(k("SQLITE_CONSTRAINT_NOTNULL")).toBe("notNull");
-    expect(k("23502")).toBe("notNull");
-    expect(k("42883")).toBe("other");
+  it.each([
+    ["SQLITE_CONSTRAINT_UNIQUE", "unique"],
+    ["SQLITE_CONSTRAINT_PRIMARYKEY", "unique"],
+    ["23505", "unique"],
+    ["SQLITE_CONSTRAINT_FOREIGNKEY", "foreignKey"],
+    ["23503", "foreignKey"],
+    ["SQLITE_CONSTRAINT_NOTNULL", "notNull"],
+    ["23502", "notNull"],
+    ["42883", "other"],
+  ])("maps the code %s to %s", (code, kind) => {
+    expect(classifyDbError({ code })).toBe(kind);
   });
 
   it("handles non-object inputs and circular causes", () => {
@@ -124,6 +127,8 @@ describe("data/errors (synthetic)", () => {
     ],
     ["a 65-character name", { name: "A".repeat(65), code: "23505" }, "unique - 23505"],
     ["an error without a name", { code: "23505" }, "unique unknown 23505"],
+    // The exact line also shows that the message never reaches the log.
+    ["a plain Error without a code", new Error("secret"), "other Error -"],
   ])("writes only safe names and codes to the log line: %s", (_label, err, expected) => {
     expect(describeForLog(err)).toBe(expected);
   });

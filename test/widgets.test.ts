@@ -6,24 +6,10 @@ import { MESSAGES } from "../src/messages.js";
 import type { WidgetType } from "../src/types.js";
 import { FormPage, type FormPageProps } from "../src/views/form.js";
 import type { PageChrome } from "../src/views/layout.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 import { attr, type Element, parse, qs, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
-
-const meta = (over: Partial<FieldMeta> = {}): FieldMeta => ({
-  key: "f",
-  dbName: "f",
-  kind: "string",
-  notNull: true,
-  hasDefault: false,
-  isPrimaryKey: false,
-  isAutoIncrement: false,
-  isInteger: false,
-  isLongText: false,
-  isDateOnly: false,
-  isGenerated: false,
-  ...over,
-});
 
 const field = (
   widget: WidgetType,
@@ -32,7 +18,7 @@ const field = (
 ): FormField => ({
   key: "f",
   label: "f",
-  meta: meta(metaOver),
+  meta: fieldMeta({ notNull: true, ...metaOver }),
   widget,
   editable: true,
   required: true,
@@ -136,27 +122,24 @@ describe("Widget", () => {
     expect(attr(el, "value")).toBe("7");
   });
 
-  it("uses name=<key> and id=id_<key> and never emits required", () => {
-    const widgets: [WidgetType, Partial<FieldMeta>][] = [
-      ["text", {}],
-      ["password", {}],
-      ["number", { kind: "number" }],
-      ["textarea", {}],
-      ["json", { kind: "json" }],
-      ["checkbox", { kind: "boolean" }],
-      ["select", { kind: "enum" }],
-      ["date", { kind: "date", isDateOnly: true }],
-      ["datetime", { kind: "date" }],
-      ["hidden", {}],
-    ];
-    for (const [widget, m] of widgets) {
-      const f = { ...field(widget, m), key: "title", required: true };
-      const html = renderWidget(f, "");
-      const el = qs(parse(html), { attrs: { name: "title" } });
-      expect(el, widget).not.toBeNull();
-      expect(attr(el as Element, "id"), widget).toBe("id_title");
-      expect(html, widget).not.toContain("required");
-    }
+  it.each<[WidgetType, Partial<FieldMeta>]>([
+    ["text", {}],
+    ["password", {}],
+    ["number", { kind: "number" }],
+    ["textarea", {}],
+    ["json", { kind: "json" }],
+    ["checkbox", { kind: "boolean" }],
+    ["select", { kind: "enum" }],
+    ["date", { kind: "date", isDateOnly: true }],
+    ["datetime", { kind: "date" }],
+    ["hidden", {}],
+  ])("uses name=<key> and id=id_<key> and never emits required for %s", (widget, m) => {
+    const f = { ...field(widget, m), key: "title", required: true };
+    const html = renderWidget(f, "");
+    const el = qs(parse(html), { attrs: { name: "title" } });
+    expect(el).not.toBeNull();
+    expect(attr(el as Element, "id")).toBe("id_title");
+    expect(html).not.toContain("required");
   });
 
   it("renders an error list before the input", () => {

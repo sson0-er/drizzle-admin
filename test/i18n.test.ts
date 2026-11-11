@@ -9,7 +9,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
-import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, docOf, type Node, qs, qsa, text } from "./helpers/html.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -31,8 +31,6 @@ const models: NonNullable<Overrides["models"]> = {
     },
   },
 };
-
-const docOf = async (res: Response): Promise<Node> => parse(await res.text());
 
 const htmlLang = (doc: Node): string | null => {
   const html = qs(doc, { tag: "html" });

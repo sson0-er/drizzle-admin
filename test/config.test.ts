@@ -26,9 +26,8 @@ describe("createAdmin", () => {
     expect("app" in admin).toBe(true);
   });
 
-  it("db: accepts an object, rejects null, undefined and non-objects", () => {
-    expect(() => createAdmin(base)).not.toThrow();
-    for (const db of [null, undefined, "db", 1]) rejects({ db }, "db");
+  it.each([null, undefined, "db", 1])("db: rejects %j", (db) => {
+    rejects({ db }, "db");
   });
 
   it("dialect: accepts sqlite and postgres, rejects others", () => {

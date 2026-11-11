@@ -23,7 +23,7 @@ export type SetupResult = {
 export type DialectFixture = {
   name: "sqlite" | "pglite";
   dialect: Dialect;
-  setup(opts?: { logger?: Logger }): Promise<SetupResult>;
+  setup(): Promise<SetupResult>;
 };
 
 const at = (iso: string) => new Date(iso);
@@ -112,15 +112,13 @@ const EVENTS = [
   },
 ] as const;
 
-// Counting starts only after seeding, so tests can assert exact per-call query counts. A caller's
-// logger still sees every query it asked to observe, seeding included.
-function makeLogger(user: Logger | undefined) {
+// Counting starts only after seeding, so tests can assert exact per-call query counts.
+function makeLogger() {
   let n = 0;
   let live = false;
   const logger: Logger = {
-    logQuery(query, params) {
+    logQuery() {
       if (live) n++;
-      user?.logQuery(query, params);
     },
   };
   return {
@@ -132,11 +130,11 @@ function makeLogger(user: Logger | undefined) {
   };
 }
 
-async function setupSqlite(opts?: { logger?: Logger }): Promise<SetupResult> {
+async function setupSqlite(): Promise<SetupResult> {
   const client = new Database(":memory:");
   client.pragma("foreign_keys = ON");
   client.exec(DDL_SQLITE);
-  const counter = makeLogger(opts?.logger);
+  const counter = makeLogger();
   const db = drizzleSqlite(client, { logger: counter.logger });
   await db.insert(sqliteSchema.authors).values([...AUTHORS]);
   await db.insert(sqliteSchema.articles).values([...ARTICLES]);
@@ -150,10 +148,10 @@ async function setupSqlite(opts?: { logger?: Logger }): Promise<SetupResult> {
   };
 }
 
-async function setupPglite(opts?: { logger?: Logger }): Promise<SetupResult> {
+async function setupPglite(): Promise<SetupResult> {
   const client = new PGlite();
   await client.exec(DDL_PG);
-  const counter = makeLogger(opts?.logger);
+  const counter = makeLogger();
   const db = drizzlePg(client, { logger: counter.logger });
   await db.insert(pgSchema.authors).values([...AUTHORS]);
   await db.insert(pgSchema.articles).values([...ARTICLES]);

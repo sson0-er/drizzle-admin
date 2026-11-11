@@ -4,9 +4,10 @@ import { createAdmin, resolvedModels } from "../src/admin.js";
 import { allowedWidgets } from "../src/forms/fields.js";
 import type { ModelAdminOptions } from "../src/index.js";
 import type { FieldMeta } from "../src/introspect/index.js";
-import type { AdminConfig, WidgetType } from "../src/types.js";
+import type { AdminConfig, ResolvedModel, WidgetType } from "../src/types.js";
 import * as pg from "./fixtures/schema-pg.js";
 import { articles, authors, kv } from "./fixtures/schema-sqlite.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 
 const base: AdminConfig = {
   db: {},
@@ -177,20 +178,6 @@ describe("register: option checks", () => {
 });
 
 describe("allowedWidgets", () => {
-  const field = (over: Partial<FieldMeta>): FieldMeta => ({
-    key: "k",
-    dbName: "k",
-    kind: "string",
-    notNull: false,
-    hasDefault: false,
-    isPrimaryKey: false,
-    isAutoIncrement: false,
-    isInteger: false,
-    isLongText: false,
-    isDateOnly: false,
-    isGenerated: false,
-    ...over,
-  });
   const fk = { table: authors, column: "id" };
 
   it.each<[string, Partial<FieldMeta>, WidgetType[]]>([
@@ -208,11 +195,11 @@ describe("allowedWidgets", () => {
     ["json", { kind: "json" }, ["json", "textarea"]],
     ["unknown", { kind: "unknown" }, []],
   ])("%s", (_name, over, expected) => {
-    expect(allowedWidgets(field(over))).toEqual(expected);
+    expect(allowedWidgets(fieldMeta(over))).toEqual(expected);
   });
 
   it("a foreign key wins over the kind", () => {
-    expect(allowedWidgets(field({ kind: "boolean", foreignKey: fk }))).toEqual([
+    expect(allowedWidgets(fieldMeta({ kind: "boolean", foreignKey: fk }))).toEqual([
       "select",
       "text",
       "hidden",
@@ -347,6 +334,15 @@ describe("finalization", () => {
     expect(() => admin.app).toThrow("needs the referenced table to be registered");
   });
 
+  it("finalizes after a failed attempt once the referenced table is registered", () => {
+    const admin = sqliteAdmin();
+    admin.register(articles, { listFilter: ["authorId"] });
+    expect(() => admin.app).toThrow("needs the referenced table to be registered");
+    // The failure left the registry unfinalized, so register() is still allowed (decision 033).
+    admin.register(authors);
+    expect(() => admin.app).not.toThrow();
+  });
+
   it("rejects widget select on an FK to an unregistered table", () => {
     const admin = sqliteAdmin();
     admin.register(articles, { widgets: { authorId: "select" } });
@@ -376,9 +372,7 @@ describe("ResolvedModel defaults", () => {
   it("resolves defaults for a bare registration", () => {
     const admin = sqliteAdmin();
     admin.register(articles);
-    const model = resolvedModels(admin).get("articles");
-    expect(model).toBeDefined();
-    if (!model) return;
+    const model = resolvedModels(admin).get("articles") as ResolvedModel;
     expect(model.slug).toBe("articles");
     expect(model.label).toBe("articles");
     expect(model.listDisplay).toEqual(["id", "title", "body", "authorId", "publishedAt"]);

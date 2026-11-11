@@ -16,6 +16,11 @@ export function parse(html: string): Node {
   return parse5(html);
 }
 
+/** The parsed body of an HTML response. */
+export async function docOf(res: Response): Promise<Node> {
+  return parse(await res.text());
+}
+
 function isElement(node: Node): node is Element {
   return "tagName" in node;
 }

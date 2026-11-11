@@ -3,26 +3,14 @@ import { coerceForm, type FormBody, rawValues } from "../src/forms/coerce.js";
 import type { FormField, FormMode } from "../src/forms/fields.js";
 import type { FieldMeta } from "../src/introspect/index.js";
 import { MESSAGES } from "../src/messages.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 
 const messages = MESSAGES.en;
 
 const TOKYO = "Asia/Tokyo";
 
 function field(key: string, meta: Partial<FieldMeta> = {}, widget: FormField["widget"] = "text") {
-  const full: FieldMeta = {
-    key,
-    dbName: key,
-    kind: "string",
-    notNull: true,
-    hasDefault: false,
-    isPrimaryKey: false,
-    isAutoIncrement: false,
-    isInteger: false,
-    isLongText: false,
-    isDateOnly: false,
-    isGenerated: false,
-    ...meta,
-  };
+  const full = fieldMeta({ key, dbName: key, notNull: true, ...meta });
   return {
     key,
     label: key,
@@ -143,18 +131,14 @@ describe("coerceForm: kinds", () => {
     expect(run(f, "-3").data).toEqual({ n: -3 });
   });
 
-  it("rejects non-numbers and non-finite values with invalidNumber", () => {
-    const f = field("n", { kind: "number" });
-    for (const raw of ["abc", "Infinity", "NaN", "   "]) {
-      expect(run(f, raw).errors).toEqual({ n: messages.invalidNumber });
-    }
-  });
-
-  it("rejects 1.5 on an integer field with invalidInteger", () => {
-    const f = field("n", { kind: "number", isInteger: true });
-    expect(run(f, "1.5").errors).toEqual({ n: messages.invalidInteger });
-    expect(run(f, "2").data).toEqual({ n: 2 });
-  });
+  it.each(["abc", "Infinity", "NaN", "   "])(
+    "rejects the non-number or non-finite value %j with invalidNumber",
+    (raw) => {
+      expect(run(field("n", { kind: "number" }), raw).errors).toEqual({
+        n: messages.invalidNumber,
+      });
+    },
+  );
 
   it.each([
     ["0x1F", { isInteger: true }, "0x1F", { n: messages.invalidInteger }],
@@ -271,21 +255,23 @@ describe("coerceForm: date-only", () => {
     expect(run(dateField, "2026-02-30").errors).toEqual({ d: messages.invalidDate });
   });
 
-  it("keeps a date-only string as a trimmed string", () => {
-    const f = field("d", { kind: "string", isDateOnly: true }, "date");
-    for (const raw of ["2026-10-07", " 2026-10-07 "]) {
-      const { data } = run(f, raw);
+  const dateString = field("d", { kind: "string", isDateOnly: true }, "date");
+
+  it.each(["2026-10-07", " 2026-10-07 "])(
+    "keeps the date-only string %j as a trimmed string",
+    (raw) => {
+      const { data } = run(dateString, raw);
       expect(data.d).toBe("2026-10-07");
       expect(typeof data.d).toBe("string");
-    }
-  });
+    },
+  );
 
-  it("rejects impossible dates and other formats with invalidDate", () => {
-    const f = field("d", { kind: "string", isDateOnly: true }, "date");
-    for (const raw of ["2026-02-30", "2026/10/07", "2026-10-7", "2026-10-07T00:00"]) {
-      expect(run(f, raw).errors).toEqual({ d: messages.invalidDate });
-    }
-  });
+  it.each(["2026-02-30", "2026/10/07", "2026-10-7", "2026-10-07T00:00"])(
+    "rejects the impossible or differently formatted date %j with invalidDate",
+    (raw) => {
+      expect(run(dateString, raw).errors).toEqual({ d: messages.invalidDate });
+    },
+  );
 
   it("rejects a slash-separated date on a date-only Date field with invalidDate", () => {
     expect(run(dateField, "2026/10/07").errors).toEqual({ d: messages.invalidDate });

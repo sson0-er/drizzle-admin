@@ -38,9 +38,7 @@ describe.each(dialects)("app shell pages ($name)", (fixture) => {
     expect(res.headers.getSetCookie().some((c) => c.startsWith("da_session="))).toBe(true);
     const doc = parse(await res.text());
     const table = qs(doc, { tag: "table", id: "dashboard" });
-    expect(table).not.toBeNull();
-    if (table === null) return;
-    expect(qsa(table, { tag: "tr", attrs: { "data-model": "authors" } })).toHaveLength(1);
+    expect(table && qsa(table, { tag: "tr", attrs: { "data-model": "authors" } })).toHaveLength(1);
   });
 
   it("serves the stylesheet with a long-term cache header", async () => {
