@@ -72,7 +72,7 @@ Changed 2026-10-08: `initVars` (already in the code) listed as step 0; the sessi
 
 0. **initVars** (listed 2026-10-08): sets `state`, `repo` and `body: null`, so every later middleware, handler and `onError` can read them. Changed 2026-10-09 (decisions 049, 050): it also sets `locale = readLocale(c)` (auth.md `locale.ts`) and `t = MESSAGES[locale]`. Reading the unsigned cookie needs no derived key and never throws, so the locale is known for every response, including the static route and the Origin-check 403.
 1. **securityHeaders** (`securityHeaders(csp)`; Changed 2026-10-08: CSP and nosniff added, decision 044): `await next()`, then on the final response set `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `X-Content-Type-Options: nosniff` and `Content-Security-Policy: <csp>`, all unconditionally (replacing any value already set). Set `Cache-Control: no-store` unless the response already has a `Cache-Control` header (only the static route sets one). These headers reach every response that passes through the middleware: pages, redirects, 401/403/404 pages, `onError` pages and the stylesheet.
-   `csp` is built once in `buildApp` (module-private `buildCsp(authMode)` in `middleware.ts`). Builtin mode:
+   `csp` is built once in `buildApp` (`buildCsp(authMode)`, exported from `middleware.ts`). Builtin mode:
    ```
    default-src 'none'; script-src 'sha256-<SELECT_ALL_SCRIPT_SHA256>'; style-src 'self'; form-action 'self'; frame-ancestors 'none'; base-uri 'none'
    ```

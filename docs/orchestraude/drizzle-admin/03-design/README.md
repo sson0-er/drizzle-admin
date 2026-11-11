@@ -23,7 +23,7 @@ Changed 2026-10-09: OIDC example (decision 053): new component "example OIDC"; e
 |---|---|---|---|
 | admin (public API) | Public types, `createAdmin`, `register` validation, option defaults (`ResolvedModel`), registry finalization, `admin.app` / `admin.fetch` | introspect, routes, support | interfaces/admin.md |
 | introspect | Drizzle table → `ModelMeta` / `FieldMeta`; the only code touching Drizzle column internals | drizzle-orm | interfaces/introspect.md |
-| data | Repository (list/count/get/getMany/create/update/delete/options), query-condition builders, DB error classification | introspect types, support/time, drizzle-orm | interfaces/data.md |
+| data | Repository (list/get/getMany/create/update/delete/options), query-condition builders, DB error classification | introspect types, support/time, drizzle-orm | interfaces/data.md |
 | forms | Form field layout, widget choice, coercion, zod schema, validation pipeline, widget rendering | introspect types, admin types, support, data (`parseFieldValue` only) | interfaces/forms.md |
 | auth | Session cookie, CSRF token check, flash cookie, locale cookie `da_lang`, safe `next`, login redirects, permission evaluation | hono/cookie, hono/csrf, support (`Locale`, `isLocale`, `DEFAULT_LOCALE`) | interfaces/auth.md |
 | routes | Hono app assembly: middleware chain (incl. locale resolution), every page/handler in §8, actions, PRG, language switch | admin, data, forms, auth, views, support | interfaces/routes.md, interfaces/routes-handlers.md |
@@ -42,7 +42,7 @@ src/data/{repository,query,errors,db}.ts
 src/forms/{fields,coerce,schema,validate}.ts  src/forms/widgets.tsx
 src/auth/{session,csrf,flash,redirect,permissions,locale}.ts
 src/routes/{index,middleware,context,dashboard,list,actions,form,delete,login,lang}.ts
-src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx  src/views/{format,render,url}.ts
+src/views/{layout,dashboard,list,form,delete,confirm-action,login,error,icons}.tsx  src/views/{format,url}.ts
 src/static/admin-css.ts  src/static/select-all.ts
 example/{schema,seed,app,host-guard,server}.ts  CHANGELOG.md
 example/oidc/{cert,mock-idp,return-path,allowlist,mode,config,server,launch}.ts  example/oidc/app.tsx  test/helpers/oidc-global-setup.ts
