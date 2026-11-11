@@ -252,7 +252,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
       action: "delete_selected",
       _selected: "999",
     });
-    expect(del.status).not.toBe(403);
+    expect(del.status).toBe(303);
 
     const noDelete = await adminWith({
       permissions: { delete: false },
