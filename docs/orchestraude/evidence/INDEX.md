@@ -59,3 +59,5 @@ One line per entry: `- <id> | <question> | expires <yyyy-mm-dd>`
 - 2026-10-09-secure-cookie-localhost-browsers | Which browsers accept Secure cookies set over http://localhost? | expires 2026-11-08
 - 2026-10-09-oidc-example-package-types | For decision 053, which exact versions, type declarations, engines and install scripts do the OIDC example's dev dependencies bring? | expires 2027-01-07
 - 2026-10-09-oidc-example-runtime-checks | For decision 053, does the repo's toolchain support the launcher and the getUser bridge (tsx via --import, hono mount sharing the Request and headers, localhost resolution)? | expires 2027-01-07
+- 2026-11-11-hono-parsebody-malformed-body | For decision 054, what does hono's `c.req.parseBody` do with a POST body it cannot parse, and what did the admin answer? | expires 2027-02-09
+- 2026-11-11-pnpm-audit-zod-advisory | Do the dependencies in `pnpm-lock.yaml` have known vulnerabilities? | expires 2026-12-11

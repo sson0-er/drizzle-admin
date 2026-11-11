@@ -33,10 +33,11 @@ export function buildFormGroups(args: {
   model: ResolvedModel; mode: FormMode; canChange: boolean; prefix: string;
   fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;   // keyed by field key, only FK fields with slug
       // "noView": the user lacks `view` on the referenced model; routes then run no options query (decision 034)
-  refSlugOf: (key: string) => string | undefined;
 }): FormGroup[];
 export function editableFields(groups: FormGroup[]): FormField[];
 ```
+Changed 2026-11-11 (decision 054 point 3): the `refSlugOf` argument is removed; the fallback link uses `foreignKey.slug`.
+
 A missing `fkChoices` entry for an FK field with `foreignKey.slug` is treated as an empty list (`?? []`). This is intended for fields the route does not query (display-only fields); routes supply an entry for every editable FK field with a slug (decision 033 item 6).
 Changed 2026-10-07: `allowedWidgets` added (decision 021).
 Changed 2026-10-07: row for date-only strings (PG `date()` string mode) added (decision 023).
@@ -72,7 +73,7 @@ Default widget (an explicit `model.widgets[key]` wins; `register()` has already 
 | Condition (in order) | Widget |
 |---|---|
 | `foreignKey.slug` set and choices a list (not `"tooMany"` / `"noView"`) | `select` (choices from `fkChoices`) |
-| `foreignKey.slug` set and `"tooMany"` | `number` for number/bigint kinds, otherwise `text`, plus `fkFallbackHref = <prefix>/<refSlug>/` (only here: default widget or `select` override; decision 036) |
+| `foreignKey.slug` set and `"tooMany"` | `number` for number/bigint kinds, otherwise `text`, plus `fkFallbackHref = <prefix>/<foreignKey.slug>/` (only here: default widget or `select` override; decision 036) |
 | `foreignKey.slug` set and `"noView"` | `number` for number/bigint kinds, otherwise `text`; no `choices`, no `fkFallbackHref`, no `fkTooMany` hint, so no label of the referenced model reaches the page (decision 034) |
 | kind enum | `select` (choices = enumValues, label = value) |
 | kind boolean | `checkbox` |
@@ -105,7 +106,7 @@ Per field, with `raw = body[key]`:
    - `notNull && hasDefault && mode === "add"` → key omitted from `data`
    - otherwise error `t.required` (every error named in these rules is `t.<key>`; Changed 2026-10-09)
 3. Otherwise by kind (FK fields use their own kind):
-   - number (Changed 2026-10-09: the trimmed input is named `s`, so it does not shadow the `t: Messages` parameter): `s = raw.trim()`; `s === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(s)` must be finite, else `invalidNumber`. Then, for `isInteger` fields (Changed 2026-10-08, decision 045): the value is `parseFieldValue(meta, s)` (data.md); `null` → `invalidInteger`. So only plain decimal digits with an optional leading `-` in the safe-integer range (and, on PG, the column's int2/int4 range) pass: `"0x1F"`, `"0b11"`, `"1e3"`, `"1.5"`, `"+5"` and `"9007199254740993"` are `invalidInteger`, and nothing is rounded. Non-integer number fields keep `Number(s)`.
+   - number (Changed 2026-10-09: the trimmed input is named `s`, so it does not shadow the `t: Messages` parameter): `s = raw.trim()`; `s === ""` (whitespace-only input) → `invalidNumber`; otherwise `Number(s)` must be finite, else `invalidNumber`. Then, for `isInteger` fields (Changed 2026-10-08, decision 045): the value is `parseFieldValue(meta, s)` (data.md); `null` → `invalidInteger`. So only plain decimal digits with an optional leading `-` in the safe-integer range (and, on PG, the column's int2/int4 range) pass: `"0x1F"`, `"0b11"`, `"1e3"`, `"1.5"`, `"+5"` and `"9007199254740993"` are `invalidInteger`, and nothing is rounded. Non-integer number fields (Changed 2026-11-11, decision 054 point 2): `s` must also match `/^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i` (decimal notation: optional sign, fraction and exponent), else `invalidNumber`; so `"0x1F"`, `"0b11"` and `"0o17"` are rejected, and `"+5"`, `".5"`, `"5."` and `"1e3"` pass as `Number(s)`.
    - bigint: `s = raw.trim()`; `parseFieldValue(meta, s)` → the `BigInt`; `null` (not `/^-?\d+$/`, or outside the PG int8 range) → `invalidInteger` (Changed 2026-10-08, decision 045).
    - date: `meta.isDateOnly` → `parseDateOnly(raw.trim())` (UTC midnight, no time zone; decision 019); otherwise `parseDatetimeLocal(raw.trim(), timeZone)`; `null` → `invalidDate`. The time zone must not be applied to date-only values: drizzle stores `toISOString()`'s date part, so a Tokyo midnight would be saved as the previous day (evidence: 2026-10-07-drizzle-pg-date-mapping).
    - json: `JSON.parse`, else `invalidJson`.
