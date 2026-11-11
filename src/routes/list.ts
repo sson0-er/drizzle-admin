@@ -116,9 +116,8 @@ async function filterChoices(c: AdminContext, field: FieldMeta): Promise<Choice[
 
 /** `GET ${prefix}/:model/`: search, filters, ordering and pagination of one model. */
 export async function listHandler(c: AdminContext): Promise<Response> {
-  const found = modelOr404(c, c.req.param("model") ?? "");
-  if (found instanceof Response) return found;
-  const model = found;
+  const model = modelOr404(c, c.req.param("model") ?? "");
+  if (model instanceof Response) return model;
   const user = requireUser(c);
   const { repo, state, t } = c.var;
   if (!can(model, "view", user)) return errorPage(c, 403, t.forbidden);

@@ -58,7 +58,7 @@ export interface FormGroup {
   fields: FormField[];
 }
 
-export const EMPTY_CHOICE: Choice = { value: "", label: "---------" };
+const EMPTY_CHOICE: Choice = { value: "", label: "---------" };
 
 type Editability = "omitted" | "display" | "editable";
 
@@ -108,9 +108,8 @@ export function buildFormGroups(args: {
   prefix: string;
   /** Keyed by field key; only FK fields whose referenced model is registered. */
   fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;
-  refSlugOf: (key: string) => string | undefined;
 }): FormGroup[] {
-  const { model, mode, canChange, prefix, fkChoices, refSlugOf } = args;
+  const { model, mode, canChange, prefix, fkChoices } = args;
   const byKey = new Map(model.meta.fields.map((f) => [f.key, f]));
   const groups: FormGroup[] = [];
 
@@ -135,7 +134,7 @@ export function buildFormGroups(args: {
           // and get no fallback link. "noView" never links: the user may not see the referenced list.
           if (override === undefined || override === "select") {
             widget = meta.kind === "number" || meta.kind === "bigint" ? "number" : "text";
-            if (fkChoice === "tooMany") fkFallbackHref = `${prefix}/${refSlugOf(key) ?? fk.slug}/`;
+            if (fkChoice === "tooMany") fkFallbackHref = `${prefix}/${fk.slug}/`;
           }
         } else if (override === undefined) {
           widget = "select";

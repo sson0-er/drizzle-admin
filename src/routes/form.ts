@@ -87,7 +87,6 @@ async function loadGroups(
     canChange,
     prefix: c.var.state.config.prefix,
     fkChoices,
-    refSlugOf: (key) => model.meta.fields.find((f) => f.key === key)?.foreignKey?.slug,
   });
 }
 
@@ -219,9 +218,8 @@ function redirectAfterSave(
 
 /** `GET|POST ${prefix}/:model/add/` */
 export async function addHandler(c: AdminContext): Promise<Response> {
-  const found = modelOr404(c, c.req.param("model") ?? "");
-  if (found instanceof Response) return found;
-  const model = found;
+  const model = modelOr404(c, c.req.param("model") ?? "");
+  if (model instanceof Response) return model;
   const user = requireUser(c);
   const { t } = c.var;
   if (!can(model, "add", user)) return errorPage(c, 403, t.forbidden);
@@ -240,9 +238,8 @@ export async function addHandler(c: AdminContext): Promise<Response> {
 
 /** `GET|POST ${prefix}/:model/:pk/change/` (GET needs `view`, POST needs `change`). */
 export async function changeHandler(c: AdminContext): Promise<Response> {
-  const found = modelOr404(c, c.req.param("model") ?? "");
-  if (found instanceof Response) return found;
-  const model = found;
+  const model = modelOr404(c, c.req.param("model") ?? "");
+  if (model instanceof Response) return model;
   const user = requireUser(c);
   const { t } = c.var;
   const isPost = c.req.method === "POST";

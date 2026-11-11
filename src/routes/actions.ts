@@ -1,7 +1,7 @@
 import { jsx } from "hono/jsx";
 import { ACTION_PERMISSION, can } from "../auth/permissions.js";
 import { classifyDbError, isDbError } from "../data/errors.js";
-import type { HookCtx, ResolvedModel } from "../types.js";
+import type { HookCtx } from "../types.js";
 import { ConfirmActionPage } from "../views/confirm-action.js";
 import {
   type AdminContext,
@@ -26,9 +26,8 @@ function selectedIds(body: Record<string, unknown>): string[] {
 
 /** `POST ${prefix}/:model/`: bulk actions on the selected rows, then PRG back to the list state. */
 export async function actionsHandler(c: AdminContext): Promise<Response> {
-  const found = modelOr404(c, c.req.param("model") ?? "");
-  if (found instanceof Response) return found;
-  const model: ResolvedModel = found;
+  const model = modelOr404(c, c.req.param("model") ?? "");
+  if (model instanceof Response) return model;
   const user = requireUser(c);
   const { repo, state, t } = c.var;
   const body = c.var.body ?? {};
@@ -49,10 +48,14 @@ export async function actionsHandler(c: AdminContext): Promise<Response> {
   const confirmed = body._confirm === "1";
 
   const confirmPage = (actionLabel: string, isDelete: boolean, rows: Record<string, unknown>[]) => {
-    const title = actionLabel;
     return renderPage(c, 200, (flash) =>
       jsx(ConfirmActionPage, {
-        ...pageChrome(c, title, [{ label: model.label, href: listUrl }, { label: title }], flash),
+        ...pageChrome(
+          c,
+          actionLabel,
+          [{ label: model.label, href: listUrl }, { label: actionLabel }],
+          flash,
+        ),
         modelLabel: model.label,
         action,
         actionLabel,

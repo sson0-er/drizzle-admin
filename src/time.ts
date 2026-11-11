@@ -79,10 +79,9 @@ export function zonedToInstant(
   const candidates = [
     ...new Set([guess - offsetAt(guess - DAY_MS, tz), guess - offsetAt(guess + DAY_MS, tz)]),
   ];
-  const wantedLocal = guess;
   const valid = candidates.filter((c) => {
     const q = zonedParts(new Date(c), tz);
-    return utcMs(q.y, q.mo, q.d, q.h, q.mi, q.s) === wantedLocal;
+    return utcMs(q.y, q.mo, q.d, q.h, q.mi, q.s) === guess;
   });
   // Overlap (several valid instants) → first occurrence. Gap (none valid) → the later candidate,
   // which is the first valid instant after the gap.

@@ -17,9 +17,8 @@ const enc = (pk: unknown): string => encodeURIComponent(String(pk));
 
 /** `GET|POST ${prefix}/:model/:pk/delete/` */
 export async function deleteHandler(c: AdminContext): Promise<Response> {
-  const found = modelOr404(c, c.req.param("model") ?? "");
-  if (found instanceof Response) return found;
-  const model = found;
+  const model = modelOr404(c, c.req.param("model") ?? "");
+  if (model instanceof Response) return model;
   const user = requireUser(c);
   const { repo, state, t } = c.var;
   if (!can(model, "delete", user)) return errorPage(c, 403, t.forbidden);

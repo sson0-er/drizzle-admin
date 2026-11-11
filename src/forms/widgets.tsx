@@ -23,12 +23,9 @@ export function toFormValue(field: FormField, value: unknown, timeZone: string):
     case "json":
       // JSON.stringify returns undefined for functions and symbols.
       return JSON.stringify(value, null, 2) ?? "";
-    case "number":
-    case "bigint":
-      return String(value);
     default:
       // A date-only string keeps its stored `YYYY-MM-DD` (decision 023).
-      return typeof value === "string" ? value : String(value);
+      return String(value);
   }
 }
 
