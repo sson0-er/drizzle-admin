@@ -1,7 +1,6 @@
 node_modules/
 dist/
 coverage/
-example/*.sqlite*
 
 # Claude Code local settings
 .claude/settings.local.json

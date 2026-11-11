@@ -208,7 +208,7 @@ The list page has an action dropdown for the rows selected with the checkboxes.
   ```
 
 - Custom actions require the model's **`change`** permission, both to be offered in the dropdown and to run (otherwise 403). `view` is not enough.
-- `ids` are the raw `_selected` strings sent by the client. They are untrusted: they may name rows that do not exist, may not parse as keys (for example `Number("abc")` is `NaN`), and may be any number of values. `run` must parse and validate them and scope its queries itself (the example below only converts them and is not a model of validation).
+- `ids` are the raw `_selected` strings sent by the client. They are untrusted: they may name rows that do not exist, may not parse as keys (for example `Number("abc")` is `NaN`), and there may be up to 500 of them (each distinct). `run` must parse and validate them and scope its queries itself (the example below only converts them and is not a model of validation).
 - `db` is `AdminConfig.db` as given and is typed `unknown`, so cast it to your Drizzle database type:
 
   ```ts
@@ -254,7 +254,7 @@ The HMAC key of each cookie is derived per cookie from `secret` and `basePath`, 
 ### CSRF and headers
 
 - Unsafe-method requests (not GET, HEAD or OPTIONS) with a form-like content type (`application/x-www-form-urlencoded`, `multipart/form-data`, `text/plain`, or none) pass through an Origin check (Hono's `csrf` middleware): the request passes if the browser sends `Sec-Fetch-Site: same-origin` or the `Origin` header equals the request URL's origin (or `publicOrigin`, when set). Otherwise it gets a 403 page. GET and HEAD requests and other content types skip this check.
-- Every POST, whatever its content type, must carry the `_csrf` form field equal to the session's token (compared in constant time); otherwise 403. The admin's own forms include it as a hidden field.
+- Every POST, whatever its content type, must carry the `_csrf` form field equal to the session's token (compared in constant time); otherwise 403. A body that cannot be parsed (for example broken `multipart/form-data`) counts as a missing field. The admin's own forms include it as a hidden field.
 - Responses carry `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`, `X-Content-Type-Options: nosniff`, a `Content-Security-Policy` and `Cache-Control: no-store` (the stylesheet is cached instead). With the built-in login the policy is:
 
   ```
