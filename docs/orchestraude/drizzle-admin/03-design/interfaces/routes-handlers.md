@@ -103,7 +103,7 @@ Changed 2026-10-09: the login page's chrome sets `currentUrl = loginRedirectUrl(
 
 ## Language switch (`POST /_lang/`, both modes; Changed 2026-10-09, decision 051; path per Q15 option (b))
 ```ts
-export async function langHandler(c: AdminContext): Promise<Response>;   // src/routes/lang.ts
+export function langHandler(c: AdminContext): Response;   // src/routes/lang.ts
 ```
 Reached only after the Origin check and the `_csrf` token check (routes.md); the auth guard exempts it, so `U` may be null.
 1. `body = c.var.body ?? {}`; `lang` and `next` are used only when they are strings (an array or a `File` counts as missing).

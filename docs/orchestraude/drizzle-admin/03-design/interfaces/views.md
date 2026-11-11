@@ -25,7 +25,7 @@ interface PageChrome {
   csrfToken: string; flash: FlashMessage[];
   breadcrumbs: { label: string; href?: string }[];    // first item is always Home → `${prefix}/`
 }
-export function Layout(props: PageChrome & { children: Child }): JSX.Element;
+export function Layout(props: PageChrome & { children?: Child }): JSX.Element;
 ```
 Structure (the breadcrumb separator `›` is a glyph-only literal, exempt from the messages rule, decision 033 item 11): `<html lang={locale}>` (Changed 2026-10-09; was `"ja"`), `<meta charset="utf-8">`, `<meta name="viewport" content="width=device-width, initial-scale=1">`, `<title>{title} | {siteTitle}</title>`, `<link rel="stylesheet" href={`${prefix}/static/admin.css?v=${ADMIN_CSS_VERSION}`}>`; `<header id="header">` with the site title link and `div.header-tools` (Changed 2026-10-09, decision 051) containing, in this order, the language switcher (below; only when `currentUrl !== null`) and, if `user`, the existing `div.user-tools` with the user name and (if `showLogout`) `<form method="post" action={`${prefix}/logout/`}>` with the CSRF hidden input and `<button type="submit"><Icon name="logout" />{t.logout}</button>`; `div.header-tools` is rendered even when empty (minimal page without user); `<nav class="breadcrumbs">`; `<ul class="messagelist">` with `<li class={level}><Icon name={FLASH_ICONS[level]} />{text}</li>`; `<main id="content">`.
 Every POST form contains `<input type="hidden" name="_csrf" value={csrfToken}>`.
