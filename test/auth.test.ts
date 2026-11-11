@@ -1,7 +1,7 @@
 import { eq, getTableColumns, type Table } from "drizzle-orm";
 import { Hono } from "hono";
 import { serializeSigned } from "hono/utils/cookie";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { deriveCookieKey } from "../src/auth/session.js";
 import { createAdmin, type ModelAdminOptions } from "../src/index.js";
 import { MESSAGES } from "../src/messages.js";
@@ -286,6 +286,29 @@ describe.each(dialects)("login, logout and auth guard ($name)", (fixture) => {
         { withToken: false },
       );
       expect(res.status).toBe(403);
+    });
+
+    // Decision 054 point 1: before, the parse error reached onError as a logged 500. The login
+    // and language routes take a POST without a login, so the anonymous case matters most.
+    it.each([
+      { who: "logged in", path: "/admin/authors/", login: true },
+      { who: "anonymous", path: "/admin/login/", login: false },
+      { who: "anonymous", path: "/admin/_lang/", login: false },
+    ])("rejects an unreadable multipart body with 403 ($who, $path)", async ({ path, login }) => {
+      const c = login ? client : fresh();
+      const log = vi.spyOn(console, "error").mockImplementation(() => {});
+      try {
+        const res = await c.request(path, {
+          method: "POST",
+          headers: { "Content-Type": "multipart/form-data", Origin: "http://localhost" },
+          body: "not multipart",
+        });
+        expect(res.status).toBe(403);
+        expect(text(parse(await res.text()))).toContain(messages.csrfFailed);
+        expect(log).not.toHaveBeenCalled();
+      } finally {
+        log.mockRestore();
+      }
     });
 
     it("accepts the session's token", async () => {

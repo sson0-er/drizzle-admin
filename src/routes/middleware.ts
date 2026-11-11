@@ -121,12 +121,14 @@ export const authGuard: Mw = async (c, next) => {
 /** POST only: parses the body once for the handlers and requires the session's CSRF token. */
 export const csrfToken: Mw = async (c, next) => {
   if (c.req.method === "POST") {
-    const body = await c.req.parseBody({ all: true });
-    c.set("body", body);
-    const token = body[CSRF_FIELD];
-    if (typeof token !== "string" || !tokensEqual(token, c.var.session.csrf)) {
+    // A body that cannot be parsed (e.g. broken multipart) carries no token, so it fails the token
+    // check like a missing one instead of reaching onError as a 500 (decision 054 point 1).
+    const body = await c.req.parseBody({ all: true }).catch(() => null);
+    const token = body?.[CSRF_FIELD];
+    if (body === null || typeof token !== "string" || !tokensEqual(token, c.var.session.csrf)) {
       return errorPage(c, 403, c.var.t.csrfFailed);
     }
+    c.set("body", body);
   }
   await next();
 };
