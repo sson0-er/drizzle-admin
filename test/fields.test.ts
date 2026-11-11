@@ -77,7 +77,6 @@ function build(
     mode: FormMode;
     canChange: boolean;
     fkChoices: ReadonlyMap<string, Choice[] | "tooMany" | "noView">;
-    refSlugOf: (key: string) => string | undefined;
   }> = {},
 ): FormGroup[] {
   return buildFormGroups({
@@ -86,8 +85,6 @@ function build(
     canChange: over.canChange ?? true,
     prefix: "/admin",
     fkChoices: over.fkChoices ?? new Map(),
-    refSlugOf:
-      over.refSlugOf ?? ((key) => model.meta.fields.find((f) => f.key === key)?.foreignKey?.slug),
   });
 }
 
@@ -220,18 +217,6 @@ describe("buildFormGroups: default widgets", () => {
     const f = field(build(model, { fkChoices: new Map([["authorId", "tooMany"]]) }), "authorId");
     expect(f.widget).toBe("number");
     expect(f.fkFallbackHref).toBe("/admin/authors/");
-  });
-
-  it("builds the fallback link from refSlugOf, not from foreignKey.slug", () => {
-    const model = articlesAndAuthors();
-    const f = field(
-      build(model, {
-        fkChoices: new Map([["authorId", "tooMany"]]),
-        refSlugOf: () => "people",
-      }),
-      "authorId",
-    );
-    expect(f.fkFallbackHref).toBe("/admin/people/");
   });
 
   it("treats an FK to an unregistered table as a plain field", () => {

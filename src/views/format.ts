@@ -10,10 +10,6 @@ function truncate(text: string): string {
   return text.length > TRUNCATE_AT ? `${text.slice(0, TRUNCATE_AT)}…` : text;
 }
 
-function stringify(value: unknown): string {
-  return typeof value === "string" ? value : String(value);
-}
-
 function jsonText(value: unknown): string {
   try {
     // JSON.stringify returns undefined for functions and symbols.
@@ -34,7 +30,7 @@ export function formatValue(field: FieldMeta, value: unknown, tz: string, t: Mes
   if (field.kind === "json") return truncate(jsonText(value));
   if (typeof value === "bigint" || typeof value === "number") return String(value);
   if (value instanceof Uint8Array) return t.binary;
-  return truncate(stringify(value));
+  return truncate(String(value));
 }
 
 // Glyph-only literal, not a message (decision 033 item 11).
