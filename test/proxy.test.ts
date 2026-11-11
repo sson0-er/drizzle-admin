@@ -63,7 +63,6 @@ describe.each(dialects)("reverse proxy with publicOrigin ($name)", (fixture) => 
     const res = await post(c, "/admin/authors/", { action: "delete_selected" }, PUBLIC);
     expect(res.status).toBe(303);
     const flash = cookieLine(res, "da_flash");
-    expect(flash).not.toBe("");
     expect(flash).toMatch(/;\s*Secure/i);
   });
 
@@ -107,7 +106,6 @@ describe.each(dialects)("reverse proxy with publicOrigin ($name)", (fixture) => 
       },
       body: params.toString(),
     });
-    expect(res.status).not.toBe(403);
     expect(res.status).toBe(303);
   });
 

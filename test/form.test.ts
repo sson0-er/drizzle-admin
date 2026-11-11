@@ -477,6 +477,8 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const base: Record<string, string> =
         c.path === "articles" ? { title: "kept title", authorId: "1" } : {};
       const form = { ...base, ...c.form };
+      const table = c.path === "articles" ? "articles" : "authors";
+      const before = (await rowsOf(t, table)).length;
       const res = await send(client, `/admin/${c.path}/add/`, form);
       expect(res.status).toBe(400);
       const doc = await docOf(res);
@@ -485,9 +487,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       for (const [key, value] of Object.entries(form)) {
         if (controlOf(doc, key)?.type !== "select") expect(inputValue(doc, key), key).toBe(value);
       }
-      expect(await rowsOf(t, c.path === "articles" ? "articles" : "authors")).not.toContainEqual(
-        expect.objectContaining({ title: "kept title" }),
-      );
+      expect(await rowsOf(t, table)).toHaveLength(before);
     });
 
     const overflowForm = { title: "int4-overflow", authorId: "1", views: "3000000000" };
@@ -716,7 +716,8 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
         messages.added("afterboom"),
         messages.afterSaveFailed,
       ]);
-      expect(await rowWhere(t, "authors", "name", "afterboom")).toBeDefined();
+      // rowWhere throws when the row is missing.
+      await rowWhere(t, "authors", "name", "afterboom");
     });
 
     it("answers 404 when the row disappears before the update", async () => {

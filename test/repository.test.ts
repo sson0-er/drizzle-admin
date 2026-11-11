@@ -43,7 +43,6 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       const { rows, total } = await repo.list(authors, params());
       expect(total).toBe(4);
       expect(rows).toHaveLength(4);
-      expect(typeof total).toBe("number");
     });
 
     it("pages with page and perPage, keeping the total", async () => {

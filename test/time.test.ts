@@ -31,7 +31,6 @@ describe("resolveTimeZone", () => {
     expect(() => resolveTimeZone("Nope/Zone")).toThrow(
       'drizzle-admin: invalid timeZone "Nope/Zone"',
     );
-    expect(() => resolveTimeZone("Nope/Zone")).toThrow(/drizzle-admin: invalid timeZone/);
   });
 });
 

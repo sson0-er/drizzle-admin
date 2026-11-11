@@ -3,7 +3,7 @@ import { type DefaultTreeAdapterMap, parse as parse5 } from "parse5";
 export type Node = DefaultTreeAdapterMap["node"];
 export type Element = DefaultTreeAdapterMap["element"];
 
-export interface Query {
+interface Query {
   tag?: string;
   id?: string;
   /** One or more space-separated classes; all must be present. */

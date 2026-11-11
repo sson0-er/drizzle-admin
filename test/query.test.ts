@@ -130,7 +130,7 @@ describe("buildFilters: dates", () => {
     expect(q.params).toEqual(["2026-10-06T15:00:00.000Z", "2026-10-07T15:00:00.000Z"]);
   });
 
-  it("sqlite timestamp field binds numeric instants for each preset", () => {
+  it("sqlite timestamp field binds numeric instants for the month preset", () => {
     const meta = sqliteMeta(sqlite.articles);
     const { q } = filterSql(sqliteDb, sqlite.articles, meta, { publishedAt: "month" });
     // Tokyo 2026-10-01T00:00 to 2026-11-01T00:00, in epoch ms.

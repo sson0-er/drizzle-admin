@@ -333,7 +333,7 @@ describe("OIDC flow against the mock IdP", () => {
       }
     }
     idp = await startMockIdp({
-      // The global setup (test/helpers/oidc-global-setup.ts) sets OIDC_MOCK_CERT_DIR.
+      // biome-ignore lint/style/noNonNullAssertion: the global setup (test/helpers/oidc-global-setup.ts) sets OIDC_MOCK_CERT_DIR.
       ...readLocalhostCert(process.env.OIDC_MOCK_CERT_DIR!),
       port: 0,
       clientId: "test-client",
@@ -349,6 +349,7 @@ describe("OIDC flow against the mock IdP", () => {
 
   afterEach(() => {
     vi.unstubAllEnvs();
+    vi.restoreAllMocks();
   });
 
   async function makeApp(allow: Allowlist = demoOnly): Promise<Client> {
@@ -595,7 +596,6 @@ describe("OIDC flow against the mock IdP", () => {
     }
     expect(log).toHaveBeenCalledTimes(1);
     expect(log.mock.calls[0]?.[1]).not.toContain("detail-from-idp");
-    log.mockRestore();
   });
 
   it("refuses a logout from another origin", async () => {

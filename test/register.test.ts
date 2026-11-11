@@ -159,7 +159,7 @@ describe("register: option checks", () => {
     expect(resolvedModels(admin).get("authors")?.listPerPage).toBe(500);
   });
 
-  it("propagates the dialect mismatch and no-primary-key errors from introspection", () => {
+  it("propagates the dialect mismatch error from introspection", () => {
     expect(() => sqliteAdmin().register(pg.authors)).toThrow(
       'drizzle-admin: table "authors" is not a SQLite table but dialect is "sqlite"',
     );

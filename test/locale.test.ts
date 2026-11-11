@@ -5,7 +5,7 @@ import { LOCALE_COOKIE, readLocale, writeLocale } from "../src/auth/locale.js";
 const app = new Hono().get("/", (c) => c.text(readLocale(c)));
 
 describe("readLocale", () => {
-  it("reads the unsigned da_lang cookie", () => {
+  it("names the cookie da_lang", () => {
     expect(LOCALE_COOKIE).toBe("da_lang");
   });
 
