@@ -14,9 +14,10 @@ export type Dialect = "sqlite" | "postgres";
 export function introspectTable(table: Table, dialect: Dialect): ModelMeta;
 export function toSnapshot(meta: ModelMeta): unknown; // table objects replaced by table names
 ```
-Adapter shape (one per dialect):
+Adapter shape (one per dialect; `index.ts` exports the interface, `sqlite.ts` exports `sqliteAdapter` and `pg.ts` exports `pgAdapter`, both imported only by `index.ts`):
 ```ts
-interface DialectAdapter {
+export interface DialectAdapter {
+  label: string;                                 // "SQLite" / "PostgreSQL"; names the dialect in the wrong-dialect error
   isTable(table: unknown): boolean;              // is(table, SQLiteTable) / is(table, PgTable)
   getConfig(table: Table): {
     primaryKeyColumns: Column[];                 // from config.primaryKeys[*].columns (table-level PKs)

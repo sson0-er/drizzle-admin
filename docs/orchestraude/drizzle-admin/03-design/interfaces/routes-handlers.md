@@ -22,7 +22,7 @@ Changed 2026-10-08: FK labels, links and filters require `view` on the reference
 Changed 2026-10-08: FK filter choices use `defaultOrdering(ref)`, so an unordered referenced model is sorted by primary key descending, not ascending (decision 013 item 7, L083).
 Changed 2026-10-08: `password`-widget columns are not sortable (`o` drops their key, header `sortHref: null`) and a masked cell gets no FK link (decision 037 point 6, L011, L010).
 
-Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`. For any resolved model `R`, `defaultOrdering(R)` = `R.ordering` when non-empty, otherwise `[{ key: R.meta.pk.key, desc: true }]` (primary key descending; decision 013 items 4 and 7). The list page ordering without `o` (step 2), the FK filter choices (step 5) and the FK select choices (Add step 2, Change) all use it, so the 200-row cap picks the same rows the referenced model's own list page shows first. Whether this is a shared helper or an inline expression is an implementation choice.
+Notation: for an FK field with `foreignKey.slug`, `ref` = `state.models.get(slug)` and `refVisible` = `can(ref, "view", U)`. For any resolved model `R`, `defaultOrdering(R)` = `R.ordering` when non-empty, otherwise `[{ key: R.meta.pk.key, desc: true }]` (primary key descending; decision 013 items 4 and 7). The list page ordering without `o` (step 2), the FK filter choices (step 5) and the FK select choices (Add step 2, Change) all use it, so the 200-row cap picks the same rows the referenced model's own list page shows first. It is the exported helper `defaultOrdering(model: ResolvedModel): ResolvedModel["ordering"]` in `src/routes/context.ts`, used by `list.ts` and `form.ts`.
 
 1. `M` or 404; `view` permission or 403.
 2. Parse the query (decision 013 item 6):
@@ -113,6 +113,6 @@ Reached only after the Origin check and the `_csrf` token check (routes.md); the
 ## Conventions
 Changed 2026-10-07: `HookCtx` fixed (decision 015).
 
-- `enc(pk)` = `encodeURIComponent(String(pk))`. Route `:pk` is used as received from `c.req.param("pk")` (Hono decoding of reserved characters unverified; tests use numeric and UUID keys).
+- `enc(pk)` = `encodeURIComponent(String(pk))`. Route `:pk` is used as received from `c.req.param("pk")` (Hono decoding of reserved characters unverified; route tests use numeric keys and plain text keys, and a text key with a space or `/` is only checked as the encoded `Location` / `next`, not fetched; UUID keys are covered by the `parseFieldValue` unit tests only).
 - `ctx` for hooks = `{ mode, user: U, db: state.config.db }` (`HookCtx`, decision 015). `mode` is `"add"` / `"change"` for `beforeSave` / `afterSave` and `"delete"` for `beforeDelete`.
 - Every successful POST ends in a 303 (PRG). Every rendered error page uses the layout (Origin-check 403 included; routes.md "Error handling").

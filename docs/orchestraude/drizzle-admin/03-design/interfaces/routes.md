@@ -38,6 +38,9 @@ export function requireUser(c: AdminContext): AdminUser;   // throws if null (gu
 export function modelOr404(c: AdminContext, slug: string): ResolvedModel | Response;
   // 404 page (t.notFound) when the slug is unknown OR the model is hidden from the user:
   // !canAny(model, requireUser(c)) (decision 043). Both cases give the identical response.
+export function defaultOrdering(model: ResolvedModel): ResolvedModel["ordering"];
+  // model.ordering when non-empty, otherwise [{ key: model.meta.pk.key, desc: true }]
+  // (decision 013 items 4 and 7); used by list.ts and form.ts (routes-handlers.md "Notation")
 export function cookieOpts(c: AdminContext): CookieOpts;   // { key: c.var.cookieKeys.session, prefix, maxAgeSec, publicOrigin }
 export function flashOpts(c: AdminContext): FlashOpts;     // { key: c.var.cookieKeys.flash, prefix, publicOrigin }
 export async function renderPage(
