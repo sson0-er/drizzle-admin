@@ -52,8 +52,8 @@ export function isSecure(c: Context, publicOrigin: string | null): boolean {
 }
 
 /**
- * Attributes shared by every set and delete of a session or flash cookie. A delete only removes
- * the cookie when its attributes match the set, so all four call sites must stay in sync.
+ * Attributes shared by every set and delete of the session, flash and locale cookies. A delete
+ * only removes the cookie when its attributes match the set, so every call site must stay in sync.
  */
 export function cookieAttrs(c: Context, prefix: string, publicOrigin: string | null) {
   return {

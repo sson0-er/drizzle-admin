@@ -110,7 +110,7 @@ export async function createOidcExampleApp(opts: {
   app.route("/admin", admin.app);
 
   app.get("/oidc/login", oidcAuthMiddleware(), async (c) => {
-    // After the middleware a session always exists here.
+    // biome-ignore lint/style/noNonNullAssertion: after the middleware a session always exists here.
     const id = identityOf(await getAuth(c))!;
     if (!isAllowed(id, opts.allow)) {
       return c.html(<AccessDeniedPage name={id.email || id.sub} />, 403);
