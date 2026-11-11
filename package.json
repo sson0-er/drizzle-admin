@@ -1,6 +1,6 @@
 {
   "name": "@sson0-er/drizzle-admin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Django Admin-style, server-rendered CRUD admin for Drizzle ORM tables",
   "license": "MIT",
   "author": "Shoma Sonoda",
