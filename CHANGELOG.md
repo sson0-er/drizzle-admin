@@ -1,5 +1,18 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+- A POST whose body cannot be parsed (for example broken `multipart/form-data`) now gets the 403 "Invalid request (CSRF)" page. Before, it caused a 500 and an error log line, also for requests without a login on the login and language-switch routes.
+- Number fields that are not integers accept decimal notation only. `0x1F`, `0b11` and `0o17` are now rejected with "Enter a number." instead of being saved as 31, 3 and 15.
+- `zod` is required at `^4.6.6` (was `^4.6.5`) because of the advisory GHSA-mrhx-c7xc-m3w5.
+- The stylesheet no longer contains the unused rules `tr.selected`, `.button` and `button.deletelink`.
+
+### Added
+
+- README: the OpenID Connect example (`pnpm example:oidc` in the repository; the example is not part of the package).
+
 ## 0.1.0 - 2026-10-09
 
 Initial release.

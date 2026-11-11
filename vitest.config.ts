@@ -2,7 +2,7 @@ import { defineConfig } from "vitest/config";
 
 export default defineConfig({
   test: {
-    include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
+    include: ["test/**/*.test.ts"],
     environment: "node",
     // Each PGlite-backed `setup()` boots a WASM Postgres, which exceeds the
     // default 5 s timeout when many test files run in parallel. Bounded, so a
