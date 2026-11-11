@@ -264,7 +264,7 @@ describe("ADMIN_CSS shapes", () => {
     },
     {
       name: "button",
-      rule: "button, .button, .object-tools a.addlink {",
+      rule: "button, .object-tools a.addlink {",
       needles: ["border-radius: 8px", "min-height: 48px"],
     },
   ])("the $name rule has its shape", ({ rule, needles }) => {
