@@ -157,7 +157,7 @@ input:hover, select:hover, textarea:hover { border-color: var(--border-hover); }
 .errorlist + input, .errorlist + select, .errorlist + textarea { border-color: var(--error-fg); }
 input[type=checkbox] { width: 20px; height: 20px; margin: 0; vertical-align: middle; accent-color: var(--primary); }
 
-button, .button, .object-tools a.addlink {
+button, .object-tools a.addlink {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -173,7 +173,7 @@ button, .button, .object-tools a.addlink {
   text-decoration: none;
   cursor: pointer;
 }
-button:hover, .button:hover, .object-tools a.addlink:hover {
+button:hover, .object-tools a.addlink:hover {
   background: var(--primary-hover);
   border-color: var(--primary-hover);
   color: var(--on-primary);
@@ -181,7 +181,7 @@ button:hover, .button:hover, .object-tools a.addlink:hover {
   text-decoration-thickness: 1px;
   text-underline-offset: 3px;
 }
-button:active, .button:active, .object-tools a.addlink:active { background: var(--primary-active); border-color: var(--primary-active); }
+button:active, .object-tools a.addlink:active { background: var(--primary-active); border-color: var(--primary-active); }
 
 #changelist-search button, button[name=index], button[name=_addanother], button[name=_continue] {
   background: var(--body-bg);
@@ -223,7 +223,7 @@ button:active, .button:active, .object-tools a.addlink:active { background: var(
   background: var(--danger-active);
   border-color: var(--danger-active);
 }
-a.deletelink, button.deletelink {
+a.deletelink {
   display: inline-flex;
   align-items: center;
   min-height: 48px;
@@ -235,7 +235,7 @@ a.deletelink, button.deletelink {
   font-weight: 700;
   text-decoration: none;
 }
-a.deletelink:hover, button.deletelink:hover { background: var(--danger-tint); color: var(--danger-hover); text-decoration: underline; }
+a.deletelink:hover { background: var(--danger-tint); color: var(--danger-hover); text-decoration: underline; }
 
 .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 24px 0 0; }
 .submit-row a.deletelink { margin-inline-start: auto; }
@@ -259,7 +259,6 @@ th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: 
 thead th { border-bottom: 2px solid var(--border-strong); color: var(--heading-fg); font-weight: 700; white-space: nowrap; }
 tbody th { color: var(--heading-fg); font-weight: 700; }
 tbody tr:nth-child(even) { background: var(--surface-alt); }
-tr.selected { background: var(--selected-bg); }
 
 #changelist-filter {
   order: 2;
