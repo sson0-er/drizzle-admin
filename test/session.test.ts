@@ -242,11 +242,12 @@ describe("clearSession cookie attributes", () => {
 });
 
 describe("isSecure", () => {
-  it("follows the same table", () => {
-    const ctx = (url: string) => ({ req: { url } }) as never;
-    expect(isSecure(ctx("http://x/"), null)).toBe(false);
-    expect(isSecure(ctx("https://x/"), null)).toBe(true);
-    expect(isSecure(ctx("http://x/"), "https://a.example")).toBe(true);
-    expect(isSecure(ctx("https://x/"), "http://a.example")).toBe(false);
+  it.each([
+    [null, "http://x/", false],
+    [null, "https://x/", true],
+    ["https://a.example", "http://x/", true],
+    ["http://a.example", "https://x/", false],
+  ])("follows the same table: publicOrigin=%s url=%s -> %s", (publicOrigin, url, secure) => {
+    expect(isSecure({ req: { url } } as never, publicOrigin)).toBe(secure);
   });
 });

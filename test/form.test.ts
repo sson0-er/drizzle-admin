@@ -11,7 +11,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { type DialectFixture, dialects } from "./helpers/db.js";
-import { attr, type Element, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, docOf, type Element, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
 
@@ -67,20 +67,10 @@ async function adminOn(
   return client;
 }
 
-async function send(client: Client, path: string, form: Record<string, string | string[]> = {}) {
-  // The first POST needs a session, which any GET issues.
-  if (client.cookie("da_session") === undefined) await client.get("/admin/");
-  return client.post(path, form);
-}
-
 /** A change submission as a browser sends it: the page's own form values with some overridden. */
 async function change(client: Client, path: string, overrides: Record<string, string>) {
   const form = formOf(await docOf(await client.get(path)));
-  return send(client, path, { ...form, ...overrides });
-}
-
-async function docOf(res: Response): Promise<Node> {
-  return parse(await res.text());
+  return client.post(path, { ...form, ...overrides });
 }
 
 /** The success page after a 303: the flash shows once. */
@@ -155,12 +145,12 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
   };
   const ctxOf = (mode: "add" | "change") => ({
     mode,
-    user: { id: expect.any(String), name: expect.any(String) },
+    user: TEST_USER,
     db: expect.anything(),
   });
 
   beforeAll(async () => {
-    t = await makeAdmin(fixture, { config: { timeZone: "Asia/Tokyo" } });
+    t = await makeAdmin(fixture);
     client = await adminOn(t, fixture, models);
   });
   afterAll(async () => {
@@ -168,16 +158,13 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
   });
 
   describe("pages", () => {
-    it("renders the add page for every model", async () => {
-      for (const slug of ["authors", "articles", "kv"]) {
-        const res = await client.get(`/admin/${slug}/add/`);
-        expect(res.status, slug).toBe(200);
-        const doc = await docOf(res);
-        expect(qs(doc, { tag: "form", id: "model-form" }), slug).not.toBeNull();
-        for (const name of ["_save", "_addanother", "_continue"]) {
-          expect(hasButton(doc, name), `${slug} ${name}`).toBe(true);
-        }
-      }
+    it.each(["authors", "articles", "kv"])("renders the add page of %s", async (slug) => {
+      const res = await client.get(`/admin/${slug}/add/`);
+      expect(res.status).toBe(200);
+      const doc = await docOf(res);
+      expect(qs(doc, { tag: "form", id: "model-form" })).not.toBeNull();
+      const buttons = ["_save", "_addanother", "_continue"];
+      expect(buttons.filter((name) => hasButton(doc, name))).toEqual(buttons);
     });
 
     // Runs before the tests that add authors, so the four seeded authors are all there is.
@@ -193,28 +180,25 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       expect(values).toEqual(c.ids);
     });
 
-    it("renders the change page for every model", async () => {
-      for (const path of ["authors/1", "articles/1", "kv/a"]) {
-        const res = await client.get(`/admin/${path}/change/`);
-        expect(res.status, path).toBe(200);
-        const doc = await docOf(res);
-        expect(hasButton(doc, "_save"), path).toBe(true);
-        expect(qs(doc, { tag: "a", cls: "deletelink" }), path).not.toBeNull();
-      }
+    it.each(["authors/1", "articles/1", "kv/a"])("renders the change page of %s", async (path) => {
+      const res = await client.get(`/admin/${path}/change/`);
+      expect(res.status).toBe(200);
+      const doc = await docOf(res);
+      expect(hasButton(doc, "_save")).toBe(true);
+      expect(qs(doc, { tag: "a", cls: "deletelink" })).not.toBeNull();
     });
 
-    it("answers 404 for an unknown model or primary key", async () => {
-      for (const path of [
-        "nope/add/",
-        "nope/1/change/",
-        "authors/9999/change/",
-        "kv/zzz/change/",
-      ]) {
-        expect((await client.get(`/admin/${path}`)).status, path).toBe(404);
-      }
-      const res = await send(client, "/admin/authors/9999/change/", { name: "x" });
+    it.each<{ method: "GET" | "POST"; path: string; form?: Record<string, string> }>([
+      { method: "GET", path: "nope/add/" },
+      { method: "GET", path: "nope/1/change/" },
+      { method: "GET", path: "authors/9999/change/" },
+      { method: "GET", path: "kv/zzz/change/" },
+      { method: "POST", path: "authors/9999/change/", form: { name: "x" } },
+      { method: "POST", path: "nope/add/", form: {} },
+    ])("answers 404 for $method $path (unknown model or primary key)", async (c) => {
+      const url = `/admin/${c.path}`;
+      const res = c.method === "GET" ? await client.get(url) : await client.post(url, c.form);
       expect(res.status).toBe(404);
-      expect((await send(client, "/admin/nope/add/", {})).status).toBe(404);
     });
 
     it("fills the change form from the stored row and offers FK choices", async () => {
@@ -231,7 +215,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
   describe("happy path", () => {
     it("adds an author with text, boolean, enum and timestamp columns", async () => {
-      const res = await send(client, "/admin/authors/add/", {
+      const res = await client.post("/admin/authors/add/", {
         name: "ann",
         email: "ann@example.com",
         active: "on",
@@ -248,7 +232,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("shows the flash only once", async () => {
-      const res = await send(client, "/admin/authors/add/", { name: "once" });
+      const res = await client.post("/admin/authors/add/", { name: "once" });
       const location = res.headers.get("Location") ?? "";
       expect(
         qs(await docOf(await client.get(location)), { tag: "ul", cls: "messagelist" }),
@@ -259,14 +243,14 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("shows a check icon on the success flash after an add", async () => {
-      const res = await send(client, "/admin/authors/add/", { name: "flash-icon" });
+      const res = await client.post("/admin/authors/add/", { name: "flash-icon" });
       const doc = await docOf(await client.get(res.headers.get("Location") ?? ""));
       const li = qs(doc, { tag: "li", cls: "success" }) as Node;
       expect(qsa(li, { tag: "svg", attrs: { "data-icon": "check" } })).toHaveLength(1);
     });
 
     it("applies column defaults and stores null for empty nullable fields", async () => {
-      const res = await send(client, "/admin/authors/add/", { name: "dflt", email: "" });
+      const res = await client.post("/admin/authors/add/", { name: "dflt", email: "" });
       expect(res.status).toBe(303);
       const row = await rowWhere(t, "authors", "name", "dflt");
       expect(row).toMatchObject({ email: null, active: false, role: "viewer" });
@@ -274,7 +258,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("adds an article with FK, long text, timestamp, json, integer, real and bigint", async () => {
-      const res = await send(client, "/admin/articles/add/", {
+      const res = await client.post("/admin/articles/add/", {
         title: "typed",
         body: "line1\nline2",
         authorId: "2",
@@ -299,7 +283,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("stores null for empty nullable articles columns", async () => {
-      await send(client, "/admin/articles/add/", {
+      await client.post("/admin/articles/add/", {
         title: "sparse",
         authorId: "1",
         body: "",
@@ -320,7 +304,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("adds a row with a text primary key", async () => {
-      const res = await send(client, "/admin/kv/add/", { key: "k1", value: "v1" });
+      const res = await client.post("/admin/kv/add/", { key: "k1", value: "v1" });
       expect(res.status).toBe(303);
       expect(await flashTexts(client, res)).toEqual([messages.added("k1")]);
       expect(await rowWhere(t, "kv", "key", "k1")).toEqual({ key: "k1", value: "v1" });
@@ -329,7 +313,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     it("changes every column type of an article and keeps the redirect flash", async () => {
       const seeded = await insertRow(t, "articles", { title: "chg", authorId: 1, views: 1 });
       const path = `/admin/articles/${String(seeded.id)}/change/`;
-      const res = await send(client, path, {
+      const res = await client.post(path, {
         title: "chg2",
         body: "b",
         authorId: "3",
@@ -367,7 +351,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       });
       const path = `/admin/articles/${String(seeded.id)}/change/`;
       const form = formOf(await docOf(await client.get(path)));
-      expect((await send(client, path, form)).status).toBe(303);
+      expect((await client.post(path, form)).status).toBe(303);
       expect(await rowWhere(t, "articles", "id", seeded.id)).toEqual(seeded);
     });
 
@@ -377,7 +361,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const form = formOf(await docOf(await client.get(path)));
       expect(form.active).toBe("on");
       delete form.active;
-      await send(client, path, { ...form, role: "viewer" });
+      await client.post(path, { ...form, role: "viewer" });
       expect(await rowWhere(t, "authors", "id", seeded.id)).toMatchObject({
         active: false,
         role: "viewer",
@@ -386,7 +370,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
     it("changes a row with a text primary key without renaming it", async () => {
       await insertRow(t, "kv", { key: "chgkey", value: "old" });
-      const res = await send(client, "/admin/kv/chgkey/change/", { key: "renamed", value: "new" });
+      const res = await client.post("/admin/kv/chgkey/change/", { key: "renamed", value: "new" });
       expect(res.status).toBe(303);
       expect(await rowWhere(t, "kv", "key", "chgkey")).toEqual({ key: "chgkey", value: "new" });
       expect((await rowsOf(t, "kv")).some((r) => r.key === "renamed")).toBe(false);
@@ -479,7 +463,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const form = { ...base, ...c.form };
       const table = c.path === "articles" ? "articles" : "authors";
       const before = (await rowsOf(t, table)).length;
-      const res = await send(client, `/admin/${c.path}/add/`, form);
+      const res = await client.post(`/admin/${c.path}/add/`, form);
       expect(res.status).toBe(400);
       const doc = await docOf(res);
       expect(errorsOf(doc, c.field)).toContain(c.message);
@@ -495,14 +479,14 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     it.runIf(fixture.name === "pglite")(
       "add: views=3000000000 is rejected on PG (int4)",
       async () => {
-        const res = await send(client, "/admin/articles/add/", overflowForm);
+        const res = await client.post("/admin/articles/add/", overflowForm);
         expect(res.status).toBe(400);
         expect(errorsOf(await docOf(res), "views")).toContain(messages.invalidInteger);
       },
     );
 
     it.runIf(fixture.name === "sqlite")("add: views=3000000000 is stored on SQLite", async () => {
-      const res = await send(client, "/admin/articles/add/", overflowForm);
+      const res = await client.post("/admin/articles/add/", overflowForm);
       expect(res.status).toBe(303);
       expect(await rowWhere(t, "articles", "title", "int4-overflow")).toMatchObject({
         views: 3000000000,
@@ -512,7 +496,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     it("change: a coercion error -> 400 with the raw values kept", async () => {
       const seeded = await insertRow(t, "articles", { title: "bad-change", authorId: 1, views: 5 });
       const path = `/admin/articles/${String(seeded.id)}/change/`;
-      const res = await send(client, path, { title: "edited", authorId: "1", views: "nope" });
+      const res = await client.post(path, { title: "edited", authorId: "1", views: "nope" });
       expect(res.status).toBe(400);
       const doc = await docOf(res);
       expect(errorsOf(doc, "views")).toContain(messages.invalidNumber);
@@ -527,7 +511,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("reports a unique violation as a form error", async () => {
-      const res = await send(client, "/admin/authors/add/", { name: "alice" });
+      const res = await client.post("/admin/authors/add/", { name: "alice" });
       expect(res.status).toBe(400);
       const doc = await docOf(res);
       expect(qs(doc, { tag: "p", cls: "errornote" })).not.toBeNull();
@@ -547,7 +531,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("reports a foreign key violation", async () => {
-      const res = await send(client, "/admin/articles/add/", {
+      const res = await client.post("/admin/articles/add/", {
         title: "orphan",
         authorId: "99999",
       });
@@ -559,7 +543,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const c = await adminOn(t, fixture, {
         articles: { hooks: { beforeSave: (data) => ({ ...data, title: null }) } },
       });
-      const res = await send(c, "/admin/articles/add/", { title: "x", authorId: "1" });
+      const res = await c.post("/admin/articles/add/", { title: "x", authorId: "1" });
       expect(res.status).toBe(400);
       expect(text(await docOf(res))).toContain(messages.dbNotNull);
     });
@@ -570,7 +554,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           validate: (data) => ({ name: `bad ${String(data.name)}`, _form: "form-level problem" }),
         },
       });
-      const res = await send(c, "/admin/authors/add/", { name: "vfail" });
+      const res = await c.post("/admin/authors/add/", { name: "vfail" });
       expect(res.status).toBe(400);
       const doc = await docOf(res);
       expect(errorsOf(doc, "name")).toContain("bad vfail");
@@ -581,7 +565,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     });
 
     it("ignores `id` and unknown keys in the body", async () => {
-      const res = await send(client, "/admin/authors/add/", {
+      const res = await client.post("/admin/authors/add/", {
         name: "mass",
         id: "777",
         bogus: "x",
@@ -609,7 +593,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const addDoc = await docOf(add);
       expect(hasRow(addDoc, "email")).toBe(false);
       expect(hasRow(addDoc, "id")).toBe(false);
-      await send(c, "/admin/authors/add/", { name: "ro-add", email: "evil@example.com" });
+      await c.post("/admin/authors/add/", { name: "ro-add", email: "evil@example.com" });
       expect(await rowWhere(t, "authors", "name", "ro-add")).toMatchObject({ email: null });
 
       const seeded = await insertRow(t, "authors", { name: "ro-chg", email: "keep@example.com" });
@@ -644,7 +628,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           },
         },
       });
-      await send(c, "/admin/authors/add/", { name: "hooked", role: "admin" });
+      await c.post("/admin/authors/add/", { name: "hooked", role: "admin" });
       const row = await rowWhere(t, "authors", "name", "HOOKED");
       expect(calls).toHaveLength(1);
       expect(calls[0]?.data).toMatchObject({ name: "hooked", role: "admin" });
@@ -667,7 +651,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
       const c = await adminOn(t, fixture, {
         authors: { hooks: { afterSave: (row, ctx) => void calls.push({ row, ctx: { ...ctx } }) } },
       });
-      await send(c, "/admin/authors/add/", { name: "after1" });
+      await c.post("/admin/authors/add/", { name: "after1" });
       const saved = await rowWhere(t, "authors", "name", "after1");
       expect(calls[0]?.row).toEqual(saved);
       expect(calls[0]?.ctx).toEqual(ctxOf("add"));
@@ -691,7 +675,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           },
         },
       });
-      const res = await send(c, "/admin/authors/add/", { name: "nohook" });
+      const res = await c.post("/admin/authors/add/", { name: "nohook" });
       expect(res.status).toBe(400);
       const body = await res.text();
       expect(text(parse(body))).toContain(messages.hookFailed);
@@ -710,7 +694,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           },
         },
       });
-      const res = await send(c, "/admin/authors/add/", { name: "afterboom" });
+      const res = await c.post("/admin/authors/add/", { name: "afterboom" });
       expect(res.status).toBe(303);
       expect(await flashTexts(c, res)).toEqual([
         messages.added("afterboom"),
@@ -735,25 +719,25 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           },
         },
       });
-      const res = await send(c, "/admin/kv/gone/change/", { value: "y" });
+      const res = await c.post("/admin/kv/gone/change/", { value: "y" });
       expect(res.status).toBe(404);
     });
   });
 
   describe("buttons", () => {
     it("add redirects by button", async () => {
-      const save = await send(client, "/admin/authors/add/", { name: "btn1", _save: "1" });
+      const save = await client.post("/admin/authors/add/", { name: "btn1", _save: "1" });
       expect(save.headers.get("Location")).toBe("/admin/authors/");
-      const another = await send(client, "/admin/authors/add/", { name: "btn2", _addanother: "1" });
+      const another = await client.post("/admin/authors/add/", { name: "btn2", _addanother: "1" });
       expect(another.headers.get("Location")).toBe("/admin/authors/add/");
-      const cont = await send(client, "/admin/authors/add/", { name: "btn3", _continue: "1" });
+      const cont = await client.post("/admin/authors/add/", { name: "btn3", _continue: "1" });
       const id = (await rowWhere(t, "authors", "name", "btn3")).id;
       expect(cont.headers.get("Location")).toBe(`/admin/authors/${String(id)}/change/`);
       for (const res of [save, another, cont]) expect(res.status).toBe(303);
     });
 
     it("add continue encodes a text primary key", async () => {
-      const res = await send(client, "/admin/kv/add/", {
+      const res = await client.post("/admin/kv/add/", {
         key: "a b/c",
         value: "v",
         _continue: "1",
@@ -777,7 +761,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
     it("forbids add without the add permission", async () => {
       const c = await adminOn(t, fixture, { authors: { permissions: { add: false } } });
       expect((await c.get("/admin/authors/add/")).status).toBe(403);
-      expect((await send(c, "/admin/authors/add/", { name: "denied" })).status).toBe(403);
+      expect((await c.post("/admin/authors/add/", { name: "denied" })).status).toBe(403);
       expect((await rowsOf(t, "authors")).some((r) => r.name === "denied")).toBe(false);
     });
 
@@ -792,7 +776,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
         expect(hasButton(doc, name)).toBe(false);
       expect(qs(doc, { tag: "a", cls: "deletelink" })).toBeNull();
       expect(controlOf(doc, "name")).toBeNull();
-      expect((await send(c, "/admin/authors/1/change/", { name: "alice" })).status).toBe(403);
+      expect((await c.post("/admin/authors/1/change/", { name: "alice" })).status).toBe(403);
     });
 
     it("renders a boolean mark for a read-only boolean field of an active author", async () => {
@@ -867,7 +851,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
 
     it("creates the row from an author id typed into the fallback input", async () => {
       await fillAuthors(201);
-      const res = await send(own.client, "/admin/articles/add/", {
+      const res = await own.client.post("/admin/articles/add/", {
         title: "fk-typed",
         authorId: "2",
       });
@@ -899,14 +883,14 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           const note = `day-${timeZone}`;
           const add = await docOf(await client.get("/admin/events/add/"));
           expect(controlOf(add, "day")?.type).toBe("date");
-          const res = await send(client, "/admin/events/add/", { day: "2026-10-07", note });
+          const res = await client.post("/admin/events/add/", { day: "2026-10-07", note });
           expect(res.status).toBe(303);
           expect(await textOf("day", note)).toBe("2026-10-07");
 
           const path = `/admin/events/${await idOf(note)}/change/`;
           const doc = await docOf(await client.get(path));
           expect(inputValue(doc, "day")).toBe("2026-10-07");
-          const kept = await send(client, path, { ...formOf(doc), note });
+          const kept = await client.post(path, { ...formOf(doc), note });
           expect(kept.status).toBe(303);
           expect(await textOf("day", note)).toBe("2026-10-07");
         });
@@ -917,7 +901,7 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           expect(
             qs(rowOf(add, "due"), { tag: "input", attrs: { type: "date", name: "due" } }),
           ).not.toBeNull();
-          const res = await send(client, "/admin/events/add/", {
+          const res = await client.post("/admin/events/add/", {
             day: "2026-10-07",
             due: "2026-10-07",
             note,
@@ -928,12 +912,12 @@ describe.each(dialects)("add and change forms ($name)", (fixture) => {
           const path = `/admin/events/${await idOf(note)}/change/`;
           const doc = await docOf(await client.get(path));
           expect(controlOf(doc, "due")).toEqual({ type: "date", value: "2026-10-07" });
-          expect((await send(client, path, formOf(doc))).status).toBe(303);
+          expect((await client.post(path, formOf(doc))).status).toBe(303);
           expect(await textOf("due", note)).toBe("2026-10-07");
         });
 
         it("rejects a date written with slashes and keeps the raw value", async () => {
-          const res = await send(client, "/admin/events/add/", {
+          const res = await client.post("/admin/events/add/", {
             day: "2026-10-07",
             due: "2026/10/07",
             note: `bad-${timeZone}`,

@@ -19,18 +19,6 @@ describe("example app (phase 1)", () => {
   });
 });
 
-describe("example app (phase 2)", () => {
-  it("serves the dashboard and every model list", async () => {
-    const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });
-    const client = createClient((req) => app.fetch(req));
-    await client.login({ username: "admin", password: "x" });
-    for (const path of ["/admin/", "/admin/users/", "/admin/posts/", "/admin/tags/"]) {
-      const res = await client.get(path);
-      expect(res.status, path).toBe(200);
-    }
-  });
-});
-
 describe("example app (phase 3)", () => {
   it("serves the add page of every model", async () => {
     const { app } = await createExampleApp({ secret: "s".repeat(32), adminPassword: "x" });

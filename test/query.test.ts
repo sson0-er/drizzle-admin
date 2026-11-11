@@ -14,6 +14,7 @@ import {
 import { type FieldMeta, introspectTable, type ModelMeta } from "../src/introspect/index.js";
 import * as pg from "./fixtures/schema-pg.js";
 import * as sqlite from "./fixtures/schema-sqlite.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 
 const pgDb = drizzlePg.mock();
 const sqliteDb = drizzleSqlite.mock();
@@ -292,20 +293,8 @@ describe("parsePk / parseFieldValue", () => {
   });
 
   describe("value domains", () => {
-    const fieldWith = (patch: Partial<FieldMeta>): FieldMeta => ({
-      key: "k",
-      dbName: "k",
-      kind: "number",
-      notNull: true,
-      hasDefault: false,
-      isPrimaryKey: false,
-      isAutoIncrement: false,
-      isInteger: true,
-      isLongText: false,
-      isDateOnly: false,
-      isGenerated: false,
-      ...patch,
-    });
+    const fieldWith = (patch: Partial<FieldMeta>): FieldMeta =>
+      fieldMeta({ kind: "number", isInteger: true, ...patch });
     const int16 = fieldWith({ valueCheck: "int16" });
     const int32 = fieldWith({ valueCheck: "int32" });
     const int64 = fieldWith({ kind: "bigint", isInteger: false, valueCheck: "int64" });

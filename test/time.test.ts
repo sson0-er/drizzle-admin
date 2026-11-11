@@ -99,22 +99,20 @@ describe("parseDatetimeLocal / toDatetimeLocal", () => {
     );
   });
 
-  it("returns null for malformed or impossible values", () => {
-    for (const bad of [
-      "",
-      "2026-10-07",
-      "2026-10-07 14:05",
-      "2026-10-07T14",
-      "2026-10-07T14:05:9",
-      "2026-10-07T14:05Z",
-      "2026-13-01T00:00",
-      "2026-02-30T00:00",
-      "2026-10-07T24:00",
-      "2026-10-07T12:60",
-      "2026-10-07T12:00:60",
-    ]) {
-      expect(parseDatetimeLocal(bad, TOKYO), bad).toBeNull();
-    }
+  it.each([
+    "",
+    "2026-10-07",
+    "2026-10-07 14:05",
+    "2026-10-07T14",
+    "2026-10-07T14:05:9",
+    "2026-10-07T14:05Z",
+    "2026-13-01T00:00",
+    "2026-02-30T00:00",
+    "2026-10-07T24:00",
+    "2026-10-07T12:60",
+    "2026-10-07T12:00:60",
+  ])("returns null for the malformed or impossible value %j", (bad) => {
+    expect(parseDatetimeLocal(bad, TOKYO)).toBeNull();
   });
 });
 
@@ -124,21 +122,19 @@ describe("date-only helpers", () => {
     expect(parseDateOnly("2028-02-29")?.toISOString()).toBe("2028-02-29T00:00:00.000Z");
   });
 
-  it("parseDateOnly returns null for malformed or impossible dates", () => {
-    for (const bad of [
-      "2026-13-01",
-      "2026-02-30",
-      "2027-02-29",
-      "2026/10/07",
-      "2026-10-7",
-      "2026-10-07T00:00",
-      "",
-      " 2026-10-07",
-      "2026-00-10",
-      "2026-10-00",
-    ]) {
-      expect(parseDateOnly(bad), bad).toBeNull();
-    }
+  it.each([
+    "2026-13-01",
+    "2026-02-30",
+    "2027-02-29",
+    "2026/10/07",
+    "2026-10-7",
+    "2026-10-07T00:00",
+    "",
+    " 2026-10-07",
+    "2026-00-10",
+    "2026-10-00",
+  ])("parseDateOnly returns null for the malformed or impossible date %j", (bad) => {
+    expect(parseDateOnly(bad)).toBeNull();
   });
 
   it("toDateOnly and formatDate read UTC parts", () => {

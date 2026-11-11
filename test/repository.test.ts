@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { createRepository, type DbRow, type ListParams } from "../src/data/repository.js";
 import { introspectTable } from "../src/introspect/index.js";
 import { type DialectFixture, dialects, type SetupResult } from "./helpers/db.js";
@@ -19,14 +19,8 @@ const params = (over: Partial<ListParams> = {}): ListParams => ({
 const col = (rows: DbRow[], key: string) => rows.map((r) => r[key]);
 
 describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
-  const open: SetupResult[] = [];
-  afterEach(async () => {
-    await Promise.all(open.splice(0).map((s) => s.close()));
-  });
-
-  async function make() {
+  async function connect() {
     const s = await fx.setup();
-    open.push(s);
     const repo = createRepository({
       db: s.db,
       dialect: fx.dialect,
@@ -37,16 +31,38 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     return { s, repo, authors: meta("authors"), articles: meta("articles"), kv: meta("kv") };
   }
 
+  // Tests that only read share one database, because booting PGlite for each of them dominated
+  // the suite. Their query counts are deltas, since `queryCount()` keeps running across tests.
+  let shared: Awaited<ReturnType<typeof connect>>;
+  beforeAll(async () => {
+    shared = await connect();
+  });
+  afterAll(async () => {
+    await shared.s.close();
+  });
+
+  const open: SetupResult[] = [];
+  afterEach(async () => {
+    await Promise.all(open.splice(0).map((s) => s.close()));
+  });
+
+  /** A database of its own, for a test that writes. */
+  async function make() {
+    const made = await connect();
+    open.push(made.s);
+    return made;
+  }
+
   describe("list", () => {
     it("returns the total and rows", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       const { rows, total } = await repo.list(authors, params());
       expect(total).toBe(4);
       expect(rows).toHaveLength(4);
     });
 
     it("pages with page and perPage, keeping the total", async () => {
-      const { repo, articles } = await make();
+      const { repo, articles } = shared;
       const ordering = [{ key: "views", desc: false }];
       const p1 = await repo.list(articles, params({ ordering, page: 1, perPage: 3 }));
       const p3 = await repo.list(articles, params({ ordering, page: 3, perPage: 3 }));
@@ -59,7 +75,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("orders ascending and descending, then by pk", async () => {
-      const { repo, articles, authors } = await make();
+      const { repo, articles, authors } = shared;
       const asc = await repo.list(articles, params({ ordering: [{ key: "views", desc: false }] }));
       expect(col(asc.rows, "views")).toEqual([10, 20, 30, 40, 50, 60, 70]);
       const desc = await repo.list(articles, params({ ordering: [{ key: "views", desc: true }] }));
@@ -70,16 +86,16 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("issues exactly 2 queries per call", async () => {
-      const { s, repo, articles } = await make();
-      expect(s.queryCount()).toBe(0);
+      const { s, repo, articles } = shared;
+      const before = s.queryCount();
       await repo.list(articles, params());
-      expect(s.queryCount()).toBe(2);
+      expect(s.queryCount() - before).toBe(2);
       await repo.list(articles, params({ q: "alpha", searchFields: ["title"], page: 2 }));
-      expect(s.queryCount()).toBe(4);
+      expect(s.queryCount() - before).toBe(4);
     });
 
     it("total reflects search and filters", async () => {
-      const { repo, articles } = await make();
+      const { repo, articles } = shared;
       const r = await repo.list(
         articles,
         params({ q: "Rate", searchFields: ["title"], perPage: 1 }),
@@ -90,21 +106,21 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 
     describe("search", () => {
       it("matches case-insensitively as a substring", async () => {
-        const { repo, articles } = await make();
+        const { repo, articles } = shared;
         const r = await repo.list(articles, params({ q: "  ALPH ", searchFields: ["title"] }));
         // SQLite LIKE is case-insensitive for ASCII; PG uses ilike.
         expect(col(r.rows, "title")).toEqual(["Alpha"]);
       });
 
       it("treats % literally", async () => {
-        const { repo, articles } = await make();
+        const { repo, articles } = shared;
         const r = await repo.list(articles, params({ q: "100%", searchFields: ["title"] }));
         expect(col(r.rows, "title")).toEqual(["Rate 100% done"]);
         expect(r.total).toBe(1);
       });
 
       it("treats _ literally", async () => {
-        const { repo, articles } = await make();
+        const { repo, articles } = shared;
         const r = await repo.list(articles, params({ q: "snake_case", searchFields: ["title"] }));
         expect(col(r.rows, "title")).toEqual(["snake_case"]);
       });
@@ -118,7 +134,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       });
 
       it("searches several fields with OR", async () => {
-        const { repo, authors } = await make();
+        const { repo, authors } = shared;
         const r = await repo.list(
           authors,
           params({
@@ -131,7 +147,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       });
 
       it("ignores an empty q", async () => {
-        const { repo, authors } = await make();
+        const { repo, authors } = shared;
         const r = await repo.list(authors, params({ q: "   ", searchFields: ["name"] }));
         expect(r.total).toBe(4);
       });
@@ -139,7 +155,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 
     describe("filters", () => {
       it("boolean", async () => {
-        const { repo, authors } = await make();
+        const { repo, authors } = shared;
         const on = await repo.list(authors, params({ filters: { active: "1" } }));
         const off = await repo.list(authors, params({ filters: { active: "0" } }));
         expect(on.total).toBe(3);
@@ -147,14 +163,14 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       });
 
       it("enum", async () => {
-        const { repo, authors } = await make();
+        const { repo, authors } = shared;
         const r = await repo.list(authors, params({ filters: { role: "viewer" } }));
         expect(r.total).toBe(2);
         expect(col(r.rows, "role")).toEqual(["viewer", "viewer"]);
       });
 
       it("foreign key", async () => {
-        const { repo, articles } = await make();
+        const { repo, articles } = shared;
         const r = await repo.list(
           articles,
           params({ filters: { authorId: "2" }, ordering: [{ key: "id", desc: false }] }),
@@ -163,7 +179,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       });
 
       it("date preset on a timestamp, in the injected timeZone and now", async () => {
-        const { repo, articles } = await make();
+        const { repo, articles } = shared;
         const order = [{ key: "id", desc: false }];
         // Tokyo "today" is [2026-10-06T15:00Z, 2026-10-07T15:00Z): only Alpha (2026-10-07T00:00Z).
         const today = await repo.list(
@@ -189,7 +205,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
       });
 
       it("ignores invalid filter values", async () => {
-        const { repo, authors, articles } = await make();
+        const { repo, authors, articles } = shared;
         expect(
           (await repo.list(authors, params({ filters: { active: "x", role: "nope" } }))).total,
         ).toBe(4);
@@ -203,26 +219,27 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 
   describe("get", () => {
     it("returns the row, or null when absent", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       expect((await repo.get(authors, "2"))?.name).toBe("bob");
       expect(await repo.get(authors, "99")).toBeNull();
     });
 
     it("returns null for an invalid pk without querying", async () => {
-      const { s, repo, authors } = await make();
+      const { s, repo, authors } = shared;
+      const before = s.queryCount();
       expect(await repo.get(authors, "abc")).toBeNull();
       expect(await repo.get(authors, "1.5")).toBeNull();
       expect(await repo.get(authors, "")).toBeNull();
-      expect(s.queryCount()).toBe(0);
+      expect(s.queryCount() - before).toBe(0);
     });
 
     it("works with a text pk", async () => {
-      const { repo, kv } = await make();
+      const { repo, kv } = shared;
       expect(await repo.get(kv, "b")).toEqual({ key: "b", value: "two" });
     });
 
     it("round-trips a bigint column by equality", async () => {
-      const { repo, articles } = await make();
+      const { repo, articles } = shared;
       expect((await repo.get(articles, "1"))?.big).toBe(10n);
       expect((await repo.get(articles, "3"))?.big).toBeNull();
     });
@@ -230,23 +247,25 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 
   describe("getMany", () => {
     it("returns the matching rows", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       const rows = await repo.getMany(authors, ["1", "3", "99"]);
       expect(col(rows, "name").sort()).toEqual(["alice", "carol"]);
     });
 
     it("drops invalid pks and dedupes", async () => {
-      const { s, repo, authors } = await make();
+      const { s, repo, authors } = shared;
+      const before = s.queryCount();
       const rows = await repo.getMany(authors, ["2", "2", "x", "2.5"]);
       expect(col(rows, "name")).toEqual(["bob"]);
-      expect(s.queryCount()).toBe(1);
+      expect(s.queryCount() - before).toBe(1);
     });
 
     it("issues no query when nothing valid remains", async () => {
-      const { s, repo, authors } = await make();
+      const { s, repo, authors } = shared;
+      const before = s.queryCount();
       expect(await repo.getMany(authors, [])).toEqual([]);
       expect(await repo.getMany(authors, ["x"])).toEqual([]);
-      expect(s.queryCount()).toBe(0);
+      expect(s.queryCount() - before).toBe(0);
     });
   });
 
@@ -260,7 +279,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("propagates the driver's unique violation unchanged", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       const error = (await repo.create(authors, { name: "alice" }).catch((e: unknown) => e)) as {
         message: string;
         code?: string;
@@ -281,18 +300,19 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("returns null for a missing row", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       expect(await repo.update(authors, "99", { email: "x" })).toBeNull();
     });
 
     it("returns null for an invalid pk without querying", async () => {
-      const { s, repo, authors } = await make();
+      const { s, repo, authors } = shared;
+      const before = s.queryCount();
       expect(await repo.update(authors, "abc", { email: "x" })).toBeNull();
-      expect(s.queryCount()).toBe(0);
+      expect(s.queryCount() - before).toBe(0);
     });
 
     it("returns get() for empty data", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       expect((await repo.update(authors, "1", {}))?.name).toBe("alice");
       expect(await repo.update(authors, "99", {})).toBeNull();
     });
@@ -313,16 +333,17 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("issues no query for an empty or fully invalid list", async () => {
-      const { s, repo, articles } = await make();
+      const { s, repo, articles } = shared;
+      const before = s.queryCount();
       expect(await repo.delete(articles, [])).toBe(0);
       expect(await repo.delete(articles, ["x", "y"])).toBe(0);
-      expect(s.queryCount()).toBe(0);
+      expect(s.queryCount() - before).toBe(0);
     });
   });
 
   describe("options", () => {
     it("returns value and label in the given ordering, limited", async () => {
-      const { repo, authors } = await make();
+      const { repo, authors } = shared;
       const opts = await repo.options(authors, {
         limit: 3,
         ordering: [{ key: "name", desc: true }],
@@ -336,7 +357,7 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
     });
 
     it("stringifies a text pk", async () => {
-      const { repo, kv } = await make();
+      const { repo, kv } = shared;
       const opts = await repo.options(kv, {
         limit: 10,
         ordering: [],
@@ -354,14 +375,8 @@ describe.each(dialects)("repository ($name)", (fx: DialectFixture) => {
 // PG-only: non-text search and date-only columns (decisions 018, 019, 023).
 describe("repository (pglite events)", () => {
   const fx = dialects.find((d) => d.name === "pglite") as DialectFixture;
-  const open: SetupResult[] = [];
-  afterEach(async () => {
-    await Promise.all(open.splice(0).map((s) => s.close()));
-  });
-
-  async function make() {
+  async function connect() {
     const s = await fx.setup();
-    open.push(s);
     if (!s.schema.events) throw new Error("pglite fixture has no events table");
     const repo = createRepository({
       db: s.db,
@@ -369,13 +384,22 @@ describe("repository (pglite events)", () => {
       timeZone: TOKYO,
       now: () => NOW,
     });
-    return { repo, events: introspectTable(s.schema.events, "postgres") };
+    return { s, repo, events: introspectTable(s.schema.events, "postgres") };
   }
+
+  // As above: one database for the tests that only read.
+  let shared: Awaited<ReturnType<typeof connect>>;
+  beforeAll(async () => {
+    shared = await connect();
+  });
+  afterAll(async () => {
+    await shared.s.close();
+  });
 
   const order = [{ key: "id", desc: false }];
 
   it("searches a uuid column", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(
       events,
       params({
@@ -388,7 +412,7 @@ describe("repository (pglite events)", () => {
   });
 
   it("searches a numeric column", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(
       events,
       params({ q: "99.95", searchFields: ["amount"], ordering: order }),
@@ -397,7 +421,7 @@ describe("repository (pglite events)", () => {
   });
 
   it("searches a pgEnum column", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(
       events,
       params({ q: "calm", searchFields: ["mood"], ordering: order }),
@@ -406,7 +430,7 @@ describe("repository (pglite events)", () => {
   });
 
   it("searches code, amount and mood together", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(
       events,
       params({ q: "busy", searchFields: ["code", "amount", "mood"], ordering: order }),
@@ -415,14 +439,14 @@ describe("repository (pglite events)", () => {
   });
 
   it("filters a date-only (Date) column by the Tokyo calendar date", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(events, params({ filters: { day: "today" }, ordering: order }));
     // The previous and next day are excluded even though UTC "today" would be 2026-10-06.
     expect(col(r.rows, "note")).toEqual(["today", "today, no due"]);
   });
 
   it("filters a date-only string column by the Tokyo calendar date", async () => {
-    const { repo, events } = await make();
+    const { repo, events } = shared;
     const r = await repo.list(events, params({ filters: { due: "today" }, ordering: order }));
     // Previous day, next day and the null row are excluded.
     expect(col(r.rows, "note")).toEqual(["today"]);
@@ -430,14 +454,19 @@ describe("repository (pglite events)", () => {
   });
 
   it("round-trips date-only values through create and update", async () => {
-    const { repo, events } = await make();
-    const row = await repo.create(events, {
-      day: new Date("2026-12-31T00:00:00Z"),
-      due: "2026-12-31",
-    });
-    expect(row.day).toEqual(new Date("2026-12-31T00:00:00Z"));
-    expect(row.due).toBe("2026-12-31");
-    const updated = await repo.update(events, String(row.id), { due: null });
-    expect(updated?.due).toBeNull();
+    // The only test here that writes, so it takes a database of its own.
+    const { s, repo, events } = await connect();
+    try {
+      const row = await repo.create(events, {
+        day: new Date("2026-12-31T00:00:00Z"),
+        due: "2026-12-31",
+      });
+      expect(row.day).toEqual(new Date("2026-12-31T00:00:00Z"));
+      expect(row.due).toBe("2026-12-31");
+      const updated = await repo.update(events, String(row.id), { due: null });
+      expect(updated?.due).toBeNull();
+    } finally {
+      await s.close();
+    }
   });
 });

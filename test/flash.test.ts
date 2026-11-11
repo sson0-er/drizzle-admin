@@ -113,6 +113,8 @@ describe("flash", () => {
       .get("set-cookie")
       ?.split(";")[0]
       ?.slice(SESSION_COOKIE.length + 1);
+    // Guards against the extraction yielding undefined: "da_flash=undefined" is rejected as well.
+    expect(decodeURIComponent(value ?? "")).toContain('"csrf":"x"');
     const { res, body } = await consume(app, `${FLASH_COOKIE}=${value}`);
     expect(body).toEqual([]);
     expectDeleted(res);

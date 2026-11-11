@@ -6,24 +6,12 @@ import { validateSubmission } from "../src/forms/validate.js";
 import type { FieldMeta } from "../src/introspect/index.js";
 import { MESSAGES } from "../src/messages.js";
 import type { ResolvedModel } from "../src/types.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 
 const messages = MESSAGES.en;
 
 function field(key: string, meta: Partial<FieldMeta> = {}): FormField {
-  const full: FieldMeta = {
-    key,
-    dbName: key,
-    kind: "string",
-    notNull: true,
-    hasDefault: false,
-    isPrimaryKey: false,
-    isAutoIncrement: false,
-    isInteger: false,
-    isLongText: false,
-    isDateOnly: false,
-    isGenerated: false,
-    ...meta,
-  };
+  const full = fieldMeta({ key, dbName: key, notNull: true, ...meta });
   return { key, label: key, meta: full, widget: "text", editable: true, required: full.notNull };
 }
 

@@ -16,7 +16,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
-import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, docOf, type Node, parse, qs, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
 
@@ -511,8 +511,6 @@ const authorForm = {
   role: "viewer",
   createdAt: "2026-01-01T09:00",
 };
-
-const docOf = async (res: Response): Promise<Node> => parse(await res.text());
 
 /** Values of the options in `select[name=action]`; `null` when the dropdown is not rendered. */
 function actionOptions(doc: Node): string[] | null {

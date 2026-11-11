@@ -11,7 +11,7 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
-import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, docOf, type Node, qs, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
 
@@ -21,16 +21,6 @@ type RawDb = {
   insert(table: Table): { values(rows: Rec): { returning(): PromiseLike<Rec[]> } };
   delete(table: Table): { where(condition: unknown): PromiseLike<unknown> };
 };
-
-async function docOf(res: Response): Promise<Node> {
-  return parse(await res.text());
-}
-
-/** The first POST needs a session, which any GET issues. */
-async function send(client: Client, path: string, form: Record<string, string | string[]> = {}) {
-  if (client.cookie("da_session") === undefined) await client.get("/admin/");
-  return client.post(path, form);
-}
 
 describe.each(dialects)("delete ($name)", (fixture) => {
   let t: TestAdmin;
@@ -110,13 +100,13 @@ describe.each(dialects)("delete ($name)", (fixture) => {
 
   it("answers 404 for an unknown primary key or model", async () => {
     expect((await client.get("/admin/authors/9999/delete/")).status).toBe(404);
-    expect((await send(client, "/admin/authors/9999/delete/")).status).toBe(404);
+    expect((await client.post("/admin/authors/9999/delete/")).status).toBe(404);
     expect((await client.get("/admin/nope/1/delete/")).status).toBe(404);
   });
 
   it("deletes the row and flashes the success message on the list", async () => {
     const author = await addAuthor("to-delete");
-    const res = await send(client, `/admin/authors/${String(author.id)}/delete/`);
+    const res = await client.post(`/admin/authors/${String(author.id)}/delete/`);
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     expect((await rows("authors")).some((r) => r.id === author.id)).toBe(false);
@@ -135,7 +125,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
         },
       },
     });
-    const res = await send(c, `/admin/authors/${String(author.id)}/delete/`);
+    const res = await c.post(`/admin/authors/${String(author.id)}/delete/`);
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     // The flash is consumed by the first GET, so read all items and their level from one page.
@@ -147,7 +137,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
 
   it("keeps an author that an article references and flashes the FK error", async () => {
     // Fixture author 1 owns articles.
-    const res = await send(client, "/admin/authors/1/delete/");
+    const res = await client.post("/admin/authors/1/delete/");
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     expect(await flashes(client, res, "error")).toEqual([messages.dbForeignKey]);
@@ -160,13 +150,13 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     const c = await adminWith({
       hooks: { beforeDelete: (row, ctx) => void calls.push({ row, ctx: { ...ctx } }) },
     });
-    const res = await send(c, `/admin/authors/${String(author.id)}/delete/`);
+    const res = await c.post(`/admin/authors/${String(author.id)}/delete/`);
     expect(res.status).toBe(303);
     expect(calls).toHaveLength(1);
     expect(calls[0]?.row).toEqual(author);
     expect(calls[0]?.ctx).toEqual({
       mode: "delete",
-      user: { id: expect.any(String), name: expect.any(String) },
+      user: TEST_USER,
       db: expect.anything(),
     });
     expect(calls[0]?.ctx.db).toBe(t.db);
@@ -182,7 +172,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
         },
       },
     });
-    const res = await send(c, `/admin/authors/${String(author.id)}/delete/`);
+    const res = await c.post(`/admin/authors/${String(author.id)}/delete/`);
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     const shown = await flashes(c, res, "error");
@@ -192,7 +182,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
 
   describe("bulk delete (delete_selected)", () => {
     const bulk = (c: Client, form: Record<string, string | string[]>, query = "") =>
-      send(c, `/admin/authors/${query}`, form);
+      c.post(`/admin/authors/${query}`, form);
 
     it("lists each row's toString on the confirmation page and deletes nothing", async () => {
       const a = await addAuthor("bulk-a");
@@ -306,7 +296,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
     it.each(requests)("$name with a non-FK DB error flashes dbOther", async (r) => {
       const author = await addAuthor(`db-other ${r.name}`);
       const c = await adminWith({}, dbFailingOnDelete(dbError()));
-      const res = await send(c, r.path(author.id), r.form(author.id));
+      const res = await c.post(r.path(author.id), r.form(author.id));
       expect(res.status).toBe(303);
       expect(res.headers.get("Location")).toBe("/admin/authors/");
       expect(await flashes(c, res, "error")).toEqual([messages.dbOther]);
@@ -319,7 +309,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
       // onError logs the error; keep the test output clean.
       const log = vi.spyOn(console, "error").mockImplementation(() => {});
       try {
-        const res = await send(c, r.path(author.id), r.form(author.id));
+        const res = await c.post(r.path(author.id), r.form(author.id));
         expect(res.status).toBe(500);
         expect(await res.text()).not.toContain("a bug");
       } finally {
@@ -335,7 +325,7 @@ describe.each(dialects)("delete ($name)", (fixture) => {
       ["with _confirm=1", { _confirm: "1" }],
     ])("%s flashes noSelection and deletes nothing", async (_name, extra) => {
       const before = (await rows("authors")).length;
-      const res = await send(client, "/admin/authors/", {
+      const res = await client.post("/admin/authors/", {
         action: "delete_selected",
         _selected: "999999",
         ...extra,

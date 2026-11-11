@@ -1,27 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
-import type { FieldMeta } from "../src/introspect/index.js";
 import { MESSAGES } from "../src/messages.js";
 import { cellBoolean, formatCell, formatValue, TRUNCATE_AT } from "../src/views/format.js";
+import { fieldMeta as field } from "./helpers/field-meta.js";
 
 const TOKYO = "Asia/Tokyo";
 const NY = "America/New_York";
-
-function field(overrides: Partial<FieldMeta> = {}): FieldMeta {
-  return {
-    key: "f",
-    dbName: "f",
-    kind: "string",
-    notNull: false,
-    hasDefault: false,
-    isPrimaryKey: false,
-    isAutoIncrement: false,
-    isInteger: false,
-    isLongText: false,
-    isDateOnly: false,
-    isGenerated: false,
-    ...overrides,
-  };
-}
 
 const cell = (args: Partial<Parameters<typeof formatCell>[0]> & { value: unknown }) =>
   formatCell({ field: field(), row: {}, tz: TOKYO, t: MESSAGES.en, ...args });

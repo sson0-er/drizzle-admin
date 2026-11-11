@@ -14,6 +14,7 @@ import { Layout, type PageChrome } from "../src/views/layout.js";
 import { ListPage, type ListPageProps } from "../src/views/list.js";
 import { LoginPage } from "../src/views/login.js";
 import { sortHref, withQuery } from "../src/views/url.js";
+import { fieldMeta } from "./helpers/field-meta.js";
 import { attr, type Element, type Node, parse, qs as q1, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
@@ -201,9 +202,7 @@ describe("Layout", () => {
     const nav = q1(parse(String(Layout({ ...chrome, children: "" }))), {
       tag: "nav",
       cls: "breadcrumbs",
-    });
-    expect(nav).not.toBeNull();
-    if (!nav) return;
+    }) as Element;
     const first = q1(nav, { tag: "a" });
     expect(first && text(first)).toBe(messages.home);
     expect(first && attr(first, "href")).toBe("/admin/");
@@ -218,9 +217,7 @@ describe("Layout", () => {
         { level: "error", text: "bad" },
       ],
     });
-    const list = q1(doc, { tag: "ul", cls: "messagelist" });
-    expect(list).not.toBeNull();
-    if (!list) return;
+    const list = q1(doc, { tag: "ul", cls: "messagelist" }) as Element;
     for (const [level, t] of [
       ["success", "ok"],
       ["warning", "hmm"],
@@ -332,9 +329,7 @@ describe("DashboardPage", () => {
   const doc = parse(String(DashboardPage({ ...chrome, models })));
 
   it("renders one row per model with a change link", () => {
-    const table = q1(doc, { tag: "table", id: "dashboard" });
-    expect(table).not.toBeNull();
-    if (!table) return;
+    const table = q1(doc, { tag: "table", id: "dashboard" }) as Element;
     for (const m of models) {
       const rows = qsa(table, { tag: "tr", attrs: { "data-model": m.slug } });
       expect(rows).toHaveLength(1);
@@ -470,9 +465,7 @@ describe("ListPage", () => {
   });
 
   it("renders the paginator with 5 numbers around the current page", () => {
-    const p = q1(doc, { tag: "p", cls: "paginator" });
-    expect(p).not.toBeNull();
-    if (!p) return;
+    const p = q1(doc, { tag: "p", cls: "paginator" }) as Element;
     const current = qsa(p, { tag: "span", cls: "this-page" });
     expect(current).toHaveLength(1);
     expect(current[0] && text(current[0])).toBe("3");
@@ -531,19 +524,7 @@ describe("FormPage password display", () => {
   const password: FormField = {
     key: "pw",
     label: "pw",
-    meta: {
-      key: "pw",
-      dbName: "pw",
-      kind: "string",
-      notNull: true,
-      hasDefault: false,
-      isPrimaryKey: false,
-      isAutoIncrement: false,
-      isInteger: false,
-      isLongText: false,
-      isDateOnly: false,
-      isGenerated: false,
-    },
+    meta: fieldMeta({ key: "pw", dbName: "pw", notNull: true }),
     widget: "password",
     editable: false,
     required: true,

@@ -11,15 +11,11 @@ import {
   type TestAdmin,
 } from "./helpers/app.js";
 import { dialects } from "./helpers/db.js";
-import { attr, type Node, parse, qs, qsa, text } from "./helpers/html.js";
+import { attr, docOf, type Node, qs, qsa, text } from "./helpers/html.js";
 
 const messages = MESSAGES.en;
 
 type RunCtx = { ids: string[]; db: unknown; user: unknown };
-
-async function docOf(res: Response): Promise<Node> {
-  return parse(await res.text());
-}
 
 describe.each(dialects)("actions ($name)", (fixture) => {
   let t: TestAdmin;
@@ -58,11 +54,6 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     await c.login();
     return c;
   }
-  /** The first POST needs a session, which any GET issues. */
-  async function post(c: Client, path: string, form: Record<string, string | string[]>) {
-    if (c.cookie("da_session") === undefined) await c.get("/admin/");
-    return c.post(path, form);
-  }
   async function flashes(c: Client, res: Response, cls?: string) {
     const doc = await docOf(await c.get(res.headers.get("Location") ?? ""));
     const list = qs(doc, { tag: "ul", cls: "messagelist" });
@@ -91,7 +82,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   });
 
   it("warns and returns to the list when nothing is selected", async () => {
-    const res = await post(client, "/admin/authors/", { action: "tag" });
+    const res = await client.post("/admin/authors/", { action: "tag" });
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     expect(await flashes(client, res, "warning")).toEqual([messages.noSelection]);
@@ -99,15 +90,15 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   });
 
   it("flashes an error for an unknown action", async () => {
-    const res = await post(client, "/admin/authors/", { action: "nope", _selected: "1" });
+    const res = await client.post("/admin/authors/", { action: "nope", _selected: "1" });
     expect(res.status).toBe(303);
     expect(await flashes(client, res, "error")).toEqual([messages.unknownAction]);
-    const empty = await post(client, "/admin/authors/", { _selected: "1" });
+    const empty = await client.post("/admin/authors/", { _selected: "1" });
     expect(await flashes(client, empty, "error")).toEqual([messages.unknownAction]);
   });
 
   it("runs a custom action once with deduped string ids, db and user, and flashes its message", async () => {
-    const res = await post(client, "/admin/authors/", {
+    const res = await client.post("/admin/authors/", {
       action: "tag",
       _selected: ["2", "1", "2"],
     });
@@ -115,30 +106,30 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     expect(runs.tag).toHaveLength(1);
     expect(runs.tag?.[0]?.ids).toEqual(["2", "1"]);
     expect(runs.tag?.[0]?.db).toBe(t.db);
-    expect(runs.tag?.[0]?.user).toEqual({ id: expect.any(String), name: expect.any(String) });
+    expect(runs.tag?.[0]?.user).toEqual(TEST_USER);
     expect(await flashes(client, res, "success")).toEqual(["Tagged!"]);
   });
 
   it("accepts a single _selected value", async () => {
-    const res = await post(client, "/admin/authors/", { action: "tag", _selected: "3" });
+    const res = await client.post("/admin/authors/", { action: "tag", _selected: "3" });
     expect(res.status).toBe(303);
     expect(runs.tag?.[0]?.ids).toEqual(["3"]);
   });
 
   it("flashes actionDone when the action returns nothing", async () => {
-    const res = await post(client, "/admin/authors/", { action: "quiet", _selected: "1" });
+    const res = await client.post("/admin/authors/", { action: "quiet", _selected: "1" });
     expect(runs.quiet).toHaveLength(1);
     expect(await flashes(client, res, "success")).toEqual([messages.actionDone]);
   });
 
   it("flashes actionFailed when the action throws, without the error text", async () => {
-    const res = await post(client, "/admin/authors/", { action: "boom", _selected: "1" });
+    const res = await client.post("/admin/authors/", { action: "boom", _selected: "1" });
     expect(res.status).toBe(303);
     expect(await flashes(client, res, "error")).toEqual([messages.actionFailed]);
   });
 
   it("asks for confirmation first, then runs on _confirm=1", async () => {
-    const first = await post(client, "/admin/authors/?q=a", {
+    const first = await client.post("/admin/authors/?q=a", {
       action: "ask",
       _selected: ["1", "2"],
     });
@@ -161,7 +152,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     expect(text(form)).toContain(messages.confirmYes);
     expect(text(form)).toContain(messages.cancel);
 
-    const second = await post(client, "/admin/authors/", {
+    const second = await client.post("/admin/authors/", {
       action: "ask",
       _selected: ["1", "2"],
       _confirm: "1",
@@ -173,26 +164,23 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   });
 
   it("warns and skips the confirmation page when no selected row exists any more", async () => {
-    const res = await post(client, "/admin/authors/", { action: "ask", _selected: "999999" });
+    const res = await client.post("/admin/authors/", { action: "ask", _selected: "999999" });
     expect(res.status).toBe(303);
     expect(res.headers.get("Location")).toBe("/admin/authors/");
     expect(await flashes(client, res, "warning")).toEqual([messages.noSelection]);
     expect(runs.ask).toHaveLength(0);
   });
 
-  it("redirects to the list URL plus the original query string", async () => {
+  it.each<{ name: string; form: Record<string, string> }>([
+    { name: "a custom action", form: { action: "quiet", _selected: "1" } },
+    { name: "an empty selection", form: { action: "quiet" } },
+    { name: "an unknown action", form: { action: "nope", _selected: "1" } },
+    { name: "a throwing action", form: { action: "boom", _selected: "1" } },
+  ])("redirects to the list URL plus the original query string after $name", async ({ form }) => {
     const query = "?q=a&o=-id";
-    const cases: Record<string, string | string[]>[] = [
-      { action: "quiet", _selected: "1" },
-      { action: "quiet" },
-      { action: "nope", _selected: "1" },
-      { action: "boom", _selected: "1" },
-    ];
-    for (const form of cases) {
-      const res = await post(client, `/admin/authors/${query}`, form);
-      expect(res.status).toBe(303);
-      expect(res.headers.get("Location")).toBe(`/admin/authors/${query}`);
-    }
+    const res = await client.post(`/admin/authors/${query}`, form);
+    expect(res.status).toBe(303);
+    expect(res.headers.get("Location")).toBe(`/admin/authors/${query}`);
   });
 
   describe("selection cap", () => {
@@ -204,7 +192,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
 
     it("warns and deletes nothing when more than 500 ids are selected for delete_selected", async () => {
       const before = await rowCount(client);
-      const res = await post(client, "/admin/authors/", {
+      const res = await client.post("/admin/authors/", {
         action: "delete_selected",
         _confirm: "1",
         _selected: ids(501),
@@ -218,7 +206,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     });
 
     it("does not run a custom action for more than 500 ids", async () => {
-      const res = await post(client, "/admin/authors/", { action: "tag", _selected: ids(501) });
+      const res = await client.post("/admin/authors/", { action: "tag", _selected: ids(501) });
       expect(res.status).toBe(303);
       const items = await flashItems(client, res);
       expect(items.map((li) => text(li).trim())).toEqual([messages.tooManySelected(500)]);
@@ -227,7 +215,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
     });
 
     it("counts distinct ids: 500 ids with duplicates still reach the confirmation page", async () => {
-      const res = await post(client, "/admin/authors/", {
+      const res = await client.post("/admin/authors/", {
         action: "delete_selected",
         _selected: [...ids(500), "1", "2", "3"],
       });
@@ -236,7 +224,7 @@ describe.each(dialects)("actions ($name)", (fixture) => {
   });
 
   it("answers 404 for an unknown model", async () => {
-    expect((await post(client, "/admin/nope/", { action: "x", _selected: "1" })).status).toBe(404);
+    expect((await client.post("/admin/nope/", { action: "x", _selected: "1" })).status).toBe(404);
   });
 
   it("requires change for custom actions and delete for delete_selected (403)", async () => {
@@ -244,11 +232,11 @@ describe.each(dialects)("actions ($name)", (fixture) => {
       permissions: { change: false },
       actions: [{ name: "tag", label: "Tag", run: record("tag") }],
     });
-    const res = await post(noChange, "/admin/authors/", { action: "tag", _selected: "1" });
+    const res = await noChange.post("/admin/authors/", { action: "tag", _selected: "1" });
     expect(res.status).toBe(403);
     expect(runs.tag).toHaveLength(0);
     // delete stays allowed, so change does not gate delete_selected
-    const del = await post(noChange, "/admin/authors/", {
+    const del = await noChange.post("/admin/authors/", {
       action: "delete_selected",
       _selected: "999",
     });
@@ -259,12 +247,11 @@ describe.each(dialects)("actions ($name)", (fixture) => {
       actions: [{ name: "tag", label: "Tag", run: record("tag") }],
     });
     expect(
-      (await post(noDelete, "/admin/authors/", { action: "delete_selected", _selected: "1" }))
+      (await noDelete.post("/admin/authors/", { action: "delete_selected", _selected: "1" }))
         .status,
     ).toBe(403);
-    expect(
-      (await post(noDelete, "/admin/authors/", { action: "tag", _selected: "1" })).status,
-    ).toBe(303);
+    const tagged = await noDelete.post("/admin/authors/", { action: "tag", _selected: "1" });
+    expect(tagged.status).toBe(303);
     expect(runs.tag).toHaveLength(1);
   });
 });

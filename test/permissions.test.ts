@@ -32,12 +32,12 @@ describe("can", () => {
     expect(can(model, "change", bob)).toBe(false);
   });
 
-  it("defaults to true when unspecified", () => {
-    const model = modelWith({});
-    for (const perm of ["view", "add", "change", "delete"] as Perm[]) {
-      expect(can(model, perm, alice)).toBe(true);
-    }
-  });
+  it.each(["view", "add", "change", "delete"] as Perm[])(
+    "defaults %s to true when unspecified",
+    (perm) => {
+      expect(can(modelWith({}), perm, alice)).toBe(true);
+    },
+  );
 
   it("evaluates each permission independently", () => {
     const model = modelWith({ permissions: { delete: false } });

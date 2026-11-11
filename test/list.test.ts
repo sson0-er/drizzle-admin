@@ -104,6 +104,17 @@ function header(doc: Node, key: string): { sort: string | null; params: URLSearc
 
 const AUTHOR_DISPLAY = ["id", "name", "email", "active", "role"];
 
+// The `today` presets compare rows dated in `beforeAll` with the clock of a later request, so the
+// describes that use them pin the clock: a midnight in between would otherwise move the rows out
+// of "today". The instant is far from the fixture dates and falls on different calendar dates in
+// Tokyo (2027-01-16) and New York (2027-01-15).
+const FIXED_NOW = new Date("2027-01-15T16:00:00Z");
+/** Call before `makeAdmin`: a session issued under another clock would be rejected as stale. */
+const pinClock = () => {
+  vi.useFakeTimers({ toFake: ["Date"] });
+  vi.setSystemTime(FIXED_NOW);
+};
+
 describe.each(dialects)("list page ($name)", (fixture) => {
   let t: TestAdmin;
   beforeAll(async () => {
@@ -228,6 +239,16 @@ describe.each(dialects)("list page ($name)", (fixture) => {
     }
   });
 
+  it("lists no rows for a valid FK key outside the offered choices and marks all as selected", async () => {
+    // Decision 033 item 5: the value still filters the rows although no choice stands for it.
+    const { status, doc } = await page(t, "/admin/articles/?f_authorId=999999");
+    expect(status).toBe(200);
+    expect(rowsOf(doc)).toHaveLength(0);
+    const items = qsa(filterBox(doc, "authorId"), { tag: "li" });
+    expect(items.map((li) => attr(li, "class"))).toEqual(["selected", null, null, null, null]);
+    expect(text(items[0] as Node).trim()).toBe(messages.all);
+  });
+
   it("cycles the header link asc -> desc -> off and tracks data-sort", async () => {
     const none = header((await page(t, "/admin/authors/?q=a")).doc, "name");
     expect(none.sort).toBe("none");
@@ -279,11 +300,9 @@ describe.each(dialects)("list page ($name)", (fixture) => {
     expect(qs(beyond.doc, { tag: "span", cls: "result-count" })).not.toBeNull();
   });
 
-  it("treats a bad p as page 1", async () => {
-    for (const p of ["0", "-2", "abc", "1.5", ""]) {
-      const { doc } = await page(t, `/admin/articles/?p=${encodeURIComponent(p)}`);
-      expect(column(doc, "id")).toEqual(["7", "6", "5"]);
-    }
+  it.each(["0", "-2", "abc", "1.5", ""])("treats the bad p %j as page 1", async (p) => {
+    const { doc } = await page(t, `/admin/articles/?p=${encodeURIComponent(p)}`);
+    expect(column(doc, "id")).toEqual(["7", "6", "5"]);
   });
 
   it("drops p from search, filter and sort links", async () => {
@@ -376,6 +395,7 @@ describe.each(dialects)("list page with extra rows ($name)", (fixture) => {
   const LONG_TITLE = "x".repeat(150);
 
   beforeAll(async () => {
+    pinClock();
     t = await makeAdmin(fixture, {
       models: {
         authors: { toString: (row) => String(row.name) },
@@ -397,6 +417,7 @@ describe.each(dialects)("list page with extra rows ($name)", (fixture) => {
     await raw(t).insert(articles).values(extra);
   });
   afterAll(async () => {
+    vi.useRealTimers();
     await t.close();
   });
 
@@ -570,6 +591,7 @@ const pg = dialects.find((d): d is DialectFixture => d.name === "pglite") as Dia
 describe.each(["Asia/Tokyo", "America/New_York"])("f_due=today in %s (pglite)", (timeZone) => {
   let t: TestAdmin;
   beforeAll(async () => {
+    pinClock();
     t = await makeAdmin(pg, {
       config: { timeZone },
       models: { events: { listDisplay: ["id", "due", "note"], listFilter: ["due"] } },
@@ -578,13 +600,14 @@ describe.each(["Asia/Tokyo", "America/New_York"])("f_due=today in %s (pglite)", 
     const today = calendarPresetRange("today", new Date(), timeZone).start;
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const event = (note: string, due: Date) => ({ day: due, due: toDateOnly(due), note });
-    // Only these two rows exist, so the filter result is exact whatever day the test runs on.
+    // Only these two rows exist, so the filter result is exact.
     await raw(t).delete(events);
     await raw(t)
       .insert(events)
       .values([event("is-today", today), event("is-yesterday", yesterday)]);
   });
   afterAll(async () => {
+    vi.useRealTimers();
     await t.close();
   });
 
