@@ -27,6 +27,10 @@ function isChecked(raw: string | undefined): boolean {
 
 type Parsed = { value: unknown } | { error: string };
 
+// `Number()` also reads 0x / 0o / 0b literals; a number field takes decimal notation only
+// (decision 054 point 2).
+const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)(e[+-]?\d+)?$/i;
+
 function parseByKind(field: FormField, raw: string, timeZone: string, t: Messages): Parsed {
   const { meta } = field;
   switch (meta.kind) {
@@ -35,7 +39,9 @@ function parseByKind(field: FormField, raw: string, timeZone: string, t: Message
       // Number("") is 0, so a whitespace-only input must be rejected explicitly.
       const n = trimmed === "" ? Number.NaN : Number(trimmed);
       if (!Number.isFinite(n)) return { error: t.invalidNumber };
-      if (!meta.isInteger) return { value: n };
+      if (!meta.isInteger) {
+        return DECIMAL.test(trimmed) ? { value: n } : { error: t.invalidNumber };
+      }
       const value = parseFieldValue(meta, trimmed);
       return value === null ? { error: t.invalidInteger } : { value };
     }

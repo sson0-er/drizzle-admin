@@ -183,6 +183,20 @@ describe("coerceForm: kinds", () => {
     },
   );
 
+  // Number() reads these as 31, 31, 3 and 15 (decision 054 point 2).
+  it.each(["0x1F", "0X1F", "0b11", "0o17"])("rejects %s on a non-integer field", (raw) => {
+    expect(run(field("n", { kind: "number" }), raw).errors).toEqual({ n: messages.invalidNumber });
+  });
+
+  it.each([
+    ["+5", 5],
+    [".5", 0.5],
+    ["5.", 5],
+    ["-1.5E-2", -0.015],
+  ])("accepts the decimal form %s on a non-integer field", (raw, value) => {
+    expect(run(field("n", { kind: "number" }), raw)).toEqual({ data: { n: value }, errors: {} });
+  });
+
   it.each([
     ["integer with whitespace", { isInteger: true }, " 42 ", 42],
     ["non-integer exponent", {}, "1e3", 1000],
