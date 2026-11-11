@@ -37,7 +37,7 @@ Every custom property is a color, written as lowercase `#rrggbb`. Both `:root` b
 | `--primary-active` | `#000060` (blue-1200) | `#d9e6ff` (blue-100) | solid active fill |
 | `--on-primary` | `#ffffff` | `#000060` (blue-1200) | text on solid buttons and the current page |
 | `--primary-tint` | `#c5d7fb` (blue-200) | `#000071` (blue-1100) | outline button and page-link hover fill |
-| `--selected-bg` | `#e8f1fe` (blue-50) | `#000071` (blue-1100) | selected filter choice, `tr.selected` |
+| `--selected-bg` | `#e8f1fe` (blue-50) | `#000071` (blue-1100) | selected filter choice |
 | `--danger` | `#ce0000` (red-900) | `#ff7171` (red-400) | danger fill and danger outline text |
 | `--danger-hover` | `#a90000` (red-1000) | `#ff9696` (red-300) | danger hover |
 | `--danger-active` | `#850000` (red-1100) | `#ffbbbb` (red-200) | danger active fill |
@@ -139,18 +139,18 @@ Buttons. Variants are chosen by existing selectors; no class is added to the mar
 | outline | `#changelist-search button`, `button[name=index]` (run), `button[name=_addanother]`, `button[name=_continue]` |
 | text | `#header button` (logout), `.submit-row a:not(.deletelink)` (cancel links on `DeletePage` and `ConfirmActionPage`) |
 | danger solid | `#delete-form button[type=submit]`, `form.delete-action button[type=submit]` (`ConfirmActionPage` with `isDelete`; the class is already rendered) |
-| danger outline | `a.deletelink` (form page link to the delete page), `button.deletelink` (kept, unused) |
+| danger outline | `a.deletelink` (form page link to the delete page) |
 
 Dashboard `a.addlink` / `a.changelink`, cell links, sort links, filter links and breadcrumbs stay plain links.
 ```css
-button, .button, .object-tools a.addlink {
+button, .object-tools a.addlink {
   display: inline-flex; align-items: center; justify-content: center; min-height: 48px; padding: 8px 24px;
   border: 1px solid var(--primary); border-radius: 8px; background: var(--primary); color: var(--on-primary);
   font: inherit; font-weight: 700; line-height: 1.5; text-decoration: none; cursor: pointer; }
-button:hover, .button:hover, .object-tools a.addlink:hover {
+button:hover, .object-tools a.addlink:hover {
   background: var(--primary-hover); border-color: var(--primary-hover); color: var(--on-primary);
   text-decoration: underline; text-decoration-thickness: 1px; text-underline-offset: 3px; }
-button:active, .button:active, .object-tools a.addlink:active { background: var(--primary-active); border-color: var(--primary-active); }
+button:active, .object-tools a.addlink:active { background: var(--primary-active); border-color: var(--primary-active); }
 
 #changelist-search button, button[name=index], button[name=_addanother], button[name=_continue] {
   background: var(--body-bg); border-color: currentColor; color: var(--primary); }
@@ -168,9 +168,9 @@ button:active, .button:active, .object-tools a.addlink:active { background: var(
   background: var(--danger-hover); border-color: var(--danger-hover); color: var(--on-danger); }
 #delete-form button[type=submit]:active, form.delete-action button[type=submit]:active {
   background: var(--danger-active); border-color: var(--danger-active); }
-a.deletelink, button.deletelink { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 24px;
+a.deletelink { display: inline-flex; align-items: center; min-height: 48px; padding: 8px 24px;
   border: 1px solid currentColor; border-radius: 8px; background: var(--body-bg); color: var(--danger); font-weight: 700; text-decoration: none; }
-a.deletelink:hover, button.deletelink:hover { background: var(--danger-tint); color: var(--danger-hover); text-decoration: underline; }
+a.deletelink:hover { background: var(--danger-tint); color: var(--danger-hover); text-decoration: underline; }
 
 .submit-row { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; margin: 24px 0 0; }
 .submit-row a.deletelink { margin-inline-start: auto; }
@@ -194,7 +194,6 @@ th, td { padding: 8px 12px; border-bottom: 1px solid var(--border); text-align: 
 thead th { border-bottom: 2px solid var(--border-strong); color: var(--heading-fg); font-weight: 700; white-space: nowrap; }
 tbody th { color: var(--heading-fg); font-weight: 700; }
 tbody tr:nth-child(even) { background: var(--surface-alt); }
-tr.selected { background: var(--selected-bg); }
 
 #changelist-filter { order: 2; flex: 0 0 240px; border: 1px solid var(--border); border-radius: 8px;
   background: var(--body-bg); font-size: 14px; line-height: 1.5; }
