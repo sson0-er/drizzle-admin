@@ -1,15 +1,16 @@
-# 054: Audit follow-ups: unreadable POST body, decimal-only numbers, `refSlugOf`, unused CSS, FK choices on POST
+# 054: Audit follow-ups: unreadable POST body, decimal-only numbers, `refSlugOf`, unused CSS, FK choices on POST, pre-spec banner
 
 - Date: 2026-11-11
 - Status: accepted
 
 ## Context
-A whole-project audit (2026-11-11) found five points where the code and the design had to change or an existing behavior had to be recorded. The user approved the recommended option for each (2026-11-11).
+A whole-project audit (2026-11-11) found six points where the code and the design had to change or an existing behavior had to be recorded. The user approved the recommended option for each (2026-11-11).
 1. A POST whose body cannot be parsed (for example `multipart/form-data` without a valid boundary) made `c.req.parseBody` reject inside the `csrfToken` middleware. The error reached `onError`: a 500 page and a `console.error` line. `/login/` and `/_lang/` accept a POST without a login, so an anonymous client could trigger it at will.
 2. Coercion of a non-integer number field used `Number(s)` alone (forms.md rule 3), so `0x1F`, `0b11` and `0o17` were stored as 31, 3 and 15. Integer fields already reject them (decision 045).
 3. `buildFormGroups` took `refSlugOf(key)` and built the FK fallback link from `refSlugOf(key) ?? fk.slug`. The only caller looked up `foreignKey.slug` of the same field, so both values were always equal.
 4. The stylesheet kept `tr.selected`, `.button` and `button.deletelink`; no view renders an element they match.
 5. The add and change handlers load the FK choices before they know whether a POST will succeed, so a successful save runs one `options` query per FK field whose result is not used.
+6. `docs/pre-specs.md` has no note that it is the original specification, while it still describes a Japanese-only UI, the old package name and no `/_lang/` route. Decision 052 point 1 says the file is historical and is not edited.
 
 ## Decision
 1. `csrfToken` treats a body that `parseBody` cannot read like a missing token: 403 error page with `t.csrfFailed`, nothing logged. `body` is set in the context only after the token check passes.
@@ -17,6 +18,7 @@ A whole-project audit (2026-11-11) found five points where the code and the desi
 3. `refSlugOf` is removed from `buildFormGroups`; `fkFallbackHref` is `<prefix>/<foreignKey.slug>/`.
 4. The three rules are removed from `ADMIN_CSS` and from views-style.md. The `--selected-bg` token stays (selected filter choice).
 5. No change: the FK choices are still loaded before the save. Recorded as accepted in `review-policy.md`.
+6. A status banner is added above the title of `docs/pre-specs.md`: original specification, superseded where the decisions or the design say otherwise, with the main differences listed. The body stays as written. This amends decision 052 point 1 only for the banner; `CLAUDE.md` "Where things live" names the file.
 
 ## Alternatives considered
 - Point 1, answer 400: needs a new message key in both dictionaries and a new status for the same client-visible meaning ("this request could not be verified").
@@ -25,11 +27,13 @@ A whole-project audit (2026-11-11) found five points where the code and the desi
 - Point 2, apply the pattern to integer fields too: it would change their error from `invalidInteger` to `invalidNumber` for no gain (decision 045 already rejects the input).
 - Point 3, keep the parameter for a future caller with another slug source: no such caller exists, and the redundant lookup had already been raised twice in review (L011, L128).
 - Point 5, load the choices lazily (only for a GET or a failed POST): the widget of an FK field depends on the choices, so the handler would need a second code path to build the groups; an admin save is rare enough that one bounded query (201 rows at most) per FK field does not justify it.
+- Point 6, bring the body up to date: it would duplicate the design and lose the record of what was originally asked for.
 
 ## Rationale
 - Point 1: hono's `parseBody` rejects with a `TypeError` for an unparsable form body and resolves to `{}` for other content types (evidence: 2026-11-11-hono-parsebody-malformed-body). The token check is the first thing that needs the body, and a request without a readable token already answers 403 (routes.md, middleware 7).
 - Point 2: `Number("0x1F") === 31`, `Number("0b11") === 3`, `Number("0o17") === 15` (ECMAScript StringNumericLiteral). HTML number inputs submit decimal notation only, so the stricter rule only affects hand-made requests and `text` overrides.
 - Points 3 and 4: dead code; removing it changes no rendered page (the stylesheet hash, and so the `?v=` cache key, changes).
+- Point 6: design README "The pre-spec remains normative except where a decision ... says otherwise" stays true; the banner only makes that visible in the file itself.
 
 ## Consequences
 - routes.md (middleware 7), forms.md (`buildFormGroups` signature, the tooMany row, coercion rule 3), views-style.md (variant table, button and delete-link rules, results table), test-strategy.md (cases below).

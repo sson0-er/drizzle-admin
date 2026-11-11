@@ -117,7 +117,7 @@ Rules:
 - `permissions: contents: read` at the top level and nowhere widened; `persist-credentials: false` keeps the token out of `.git/config`. No secrets are used.
 - Node and pnpm come from `mise.toml` through `jdx/mise-action` (no versions in the workflow, no `packageManager` field, decision 001); the mise binary itself is pinned with `version` and verified by the action against signed checksums (evidence: 2026-10-09-github-actions-pinning). `MISE_NODE_VERSION: "22"` selects the newest Node 22 release for the second job.
 - `pnpm install --frozen-lockfile` fails when `pnpm-lock.yaml` does not match `package.json`.
-- Unverified until the first run (the implementer reports it): that the job-level `MISE_NODE_VERSION` reaches mise-action's install step (the script's `node --version` line shows v22), and that mise needs no `mise trust` for this tools-only `mise.toml`. If either fails, the fix is recorded in the task History and this file is updated.
+- Verified by the first CI run (2026-10-09, run 37932078402, recorded in the task 55 History): the job-level `MISE_NODE_VERSION` reaches mise-action's install step (`smoke-node22` ran on Node 22.23.3), and mise needs no `mise trust` for this tools-only `mise.toml`.
 - Any other failure of `smoke-node22` (for example better-sqlite3's bundled prebuild not loading on Node 22 under `--ignore-scripts`, a page check, or the `require()` check) means the task is reported blocked with the failing output; `engines`, `--ignore-scripts` and the job are not changed without a new decision (decision 052 point 12).
 
 ## `.github/dependabot.yml`

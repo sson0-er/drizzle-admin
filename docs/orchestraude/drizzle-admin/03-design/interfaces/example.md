@@ -55,8 +55,8 @@ Changed 2026-10-08: `hostname = process.env.HOST || "127.0.0.1"`, so an empty `H
 
 - `new Database(":memory:")`, `PRAGMA foreign_keys = ON`, `createSchema`, `drizzle(sqlite)`, `await seed(db)`.
 - `createAdmin({ db, dialect: "sqlite", basePath: "/admin", siteTitle: "drizzle-admin demo", secret, auth: { verifyCredentials } })`
-  - `secret = process.env.ADMIN_SECRET ?? <random 32-byte hex generated at startup>`; sessions do not survive a restart unless it is set.
-  - `verifyCredentials`: username `admin`, password `process.env.ADMIN_PASSWORD ?? "admin"`. Prints a warning at startup when the default password is in use.
+  - `secret = process.env.ADMIN_SECRET ?? <random 32-byte hex generated at startup>`; sessions do not survive a restart unless it is set. Prints a note at startup when `ADMIN_SECRET` is not set.
+  - `verifyCredentials`: username `admin`, password `process.env.ADMIN_PASSWORD ?? "admin"`. Prints a warning at startup when `ADMIN_PASSWORD` is not set (an explicit `ADMIN_PASSWORD=admin` prints nothing).
 - Registrations:
   - users: the §5.1 options (listDisplay id/email/isActive/createdAt, searchFields email/name, listFilter isActive and role, ordering `-createdAt`, readonlyFields createdAt, toString email). Action `deactivate` sets `isActive = false` for the ids and has `confirm: true`. Action `activate` does the opposite without confirmation.
   - posts: listDisplay id/title/authorId/status/publishedAt, searchFields title, listFilter status/authorId/publishedAt, listPerPage 20, toString title.

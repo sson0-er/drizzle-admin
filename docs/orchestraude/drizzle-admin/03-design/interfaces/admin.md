@@ -22,6 +22,13 @@ export type {
 ```
 Nothing else is exported (ModelMeta, ResolvedModel and the repository are internal).
 
+`src/admin.ts` also exports two internal functions for tests; `src/index.ts` does not re-export them:
+```ts
+export function resolveConfig(config: AdminConfig): AdminState["config"];   // the validation and normalization createAdmin runs first
+export function resolvedModels(admin: Admin): ReadonlyMap<string, ResolvedModel>;   // registered models by slug, in registration order
+```
+`resolvedModels` reads a module-private `WeakMap<Admin, …>` filled by `createAdmin` and returns an empty map for any other object. Used by `test/config.test.ts` (`resolveConfig`) and `test/register.test.ts`, `test/fields.test.ts`, `test/permissions.test.ts` (`resolvedModels`).
+
 ### Public types (`src/types.ts`)
 Changed 2026-10-07: added `AdminConfig.publicOrigin` (decision 017) and fixed `HookCtx` (decision 015).
 
@@ -182,6 +189,8 @@ interface AdminState {
 }
 ```
 `Dialect = "sqlite" | "postgres"`.
+
+`src/types.ts` also defines the internal `FormBody = Record<string, string | File | (string | File)[]>`, the form body as parsed by `c.req.parseBody({ all: true })`; `src/forms/coerce.ts` re-exports it (forms.md) and `AdminVars.body` uses it (routes.md).
 
 ## Errors
 - All configuration and registration errors are synchronous `Error`s with the `drizzle-admin: ` prefix and the table name (when known), option name and offending key in the message. Tests match on these substrings.

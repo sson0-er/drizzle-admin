@@ -58,6 +58,8 @@ Changed 2026-10-08: `ListPage` `columns[].sortHref` is `string | null`; `null` (
 | `LoginPage` | `next; username; error?` | `form#login-form` (POST `${prefix}/login/`), `input[name=username]`, `input[name=password]`, hidden `next`, `p.errornote` |
 | `ErrorPage` | `status; message` | `h1`, `p.error-message` |
 
+Exported types: `PageChrome` (`layout.tsx`); the extra props as `ListPageProps` and `Cell` (`list.tsx`; `src/routes/list.ts` builds them), `FormPageProps` (`form.tsx`), `DeletePageProps` (`delete.tsx`), `ConfirmActionPageProps` (`confirm-action.tsx`) and `LoginPageProps` (`login.tsx`); `SortState = "asc" | "desc" | "none"` (`url.ts`). `DashboardPage` and `ErrorPage` declare their extra props inline.
+
 Changed 2026-10-09 (decision 049): every text a page renders itself (button labels, headings, `resultCount`, `formHasErrors`, `confirmDelete(...)`, `confirmAction(...)`, the login labels, ...) is `props.t.<key>`; `FormPage` passes `t` to `Widget` and `DisplayValue`, and `ListPage` passes it to `BooleanMark`. Props carrying user-provided text (`modelLabel`, `objectLabel`, `actionLabel` of a custom action, cell texts, `message` of `ErrorPage`) are rendered as given; the caller has already chosen the locale for any message it passes.
 
 `ListPage` props:
@@ -155,7 +157,7 @@ Security rule: icon names are passed only as literals (or via `FLASH_ICONS`, who
 | `triangle-alert` | `M8 2l6.5 11.5h-13zM8 6.5v3M8 11.5v.01` | flash `warning` |
 | `circle-alert` | `M14 8a6 6 0 1 1-12 0a6 6 0 1 1 12 0zM8 5v3.5M8 11v.01` | flash `error` |
 
-The path data is a reference drawing (not render-checked); the implementer may refine the geometry inside the 16×16 box without changing names, placement or the character rule. No other control gets an icon: the action `run` button, the login button, paginator, filter, breadcrumb and cell links stay text-only (Q10). `BooleanMark` is used in two places: boolean list cells (`Cell.bool`) and read-only boolean form fields, through `DisplayValue` (forms.md; Q9). Because icons contain no text nodes, the text content of every existing link, button and flash item is unchanged. Only boolean values change their text, from `✓` / `✗` to `messages.yes` / `messages.no` (the visually hidden span), both in list cells and in `span.readonly` on the form page. Flash levels stay `success` / `warning` / `error`; there is no `info` level (Q8).
+The path data is a reference drawing (not render-checked); the implementer may refine the geometry inside the 16×16 box without changing names, placement or the character rule. No other control gets an icon: the action `run` button, the login button, paginator, filter, breadcrumb and cell links stay text-only (Q10). `BooleanMark` is used in two places: boolean list cells (`Cell.bool`) and read-only boolean form fields, through `DisplayValue` (forms.md; Q9). Because icons contain no text nodes, the text content of every existing link, button and flash item is unchanged. Only boolean values change their text, from `✓` / `✗` to `t.yes` / `t.no` of the request's dictionary (the visually hidden span), both in list cells and in `span.readonly` on the form page. Flash levels stay `success` / `warning` / `error`; there is no `info` level (Q8).
 
 ### Static modules
 Changed 2026-10-08: `ADMIN_CSS` restyled after DADS values (decision 040); the rules moved to [views-style.md](views-style.md); the exports are unchanged.

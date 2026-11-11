@@ -7,6 +7,10 @@
 Requirements: dependencies beyond pre-spec §3 are recorded with reasons. We also have to decide which packages are runtime dependencies, peers or dev-only.
 
 ## Decision
+Changed 2026-10-09: hono became a peer dependency (`^4.13.13`) and an exact-pinned dev dependency (decision 052 point 3); zod stays a regular dependency. The text below is kept as decided on 2026-10-07.
+
+Changed 2026-11-11: zod is required at `^4.6.6` because of the advisory GHSA-mrhx-c7xc-m3w5 (evidence: 2026-11-11-pnpm-audit-zod-advisory).
+
 - peerDependencies: drizzle-orm `^0.45.3` (decision 002).
 - dependencies: hono `^4.13.13`, zod `^4.6.5`.
 - devDependencies (exact): drizzle-orm 0.45.3, typescript 7.0.2, vitest 5.0.3, @biomejs/biome 2.5.15, better-sqlite3 13.0.3, @types/better-sqlite3 9.6.0, @electric-sql/pglite 0.5.8, parse5 8.0.1, @hono/node-server 2.1.3, tsx 4.23.15, @types/node 24.19.1.

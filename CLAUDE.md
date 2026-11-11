@@ -9,6 +9,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 ## Commands
 - `pnpm test` (vitest), `pnpm typecheck`, `pnpm lint` (biome), `pnpm build` (tsc to `dist/`).
 - `scripts/verify.sh` runs all four in order and is the gate for every change.
+- `pnpm format` applies biome's fixes (`biome check --write .`); it is not part of the gate.
 - `scripts/smoke-pack.sh` packs the package, installs the tarball into a temporary project and type-checks and runs a consumer on SQLite and PGlite (needs the npm registry; not part of `verify.sh`).
 - CI (`.github/workflows/ci.yml`) runs `scripts/verify.sh` and the smoke test on push and pull request to `main`; actions are pinned to commit SHAs, which Dependabot updates monthly (`.github/dependabot.yml`).
 - `pnpm example` starts the demo on `127.0.0.1:3000`; override with `HOST` / `PORT`, set `ADMIN_PASSWORD` / `ADMIN_SECRET`.
@@ -46,6 +47,7 @@ Project guide for contributors and coding agents. The full design lives in `docs
 - Decisions: `docs/orchestraude/decisions/`. Evidence: `docs/orchestraude/evidence/`.
 - Accepted low findings and adopted conventions: `docs/orchestraude/review-policy.md`.
 - Task files: `docs/orchestraude/drizzle-admin/tasks/`.
+- Original specification: `docs/pre-specs.md` (kept as written; decisions and the design override it).
 
 ## Workflow for agents
 - Do not commit, push or rewrite history unless asked.

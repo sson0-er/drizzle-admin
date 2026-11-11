@@ -91,7 +91,8 @@ Changed 2026-10-08: rule 2's "empty" is exactly missing or `""`, so whitespace-o
 Changed 2026-10-08: integer and bigint input use `parseFieldValue` from `src/data/query.ts`, the same rule as URL keys and filters (decision 045).
 
 ```ts
-export type FormBody = Record<string, string | File | (string | File)[]>; // from c.req.parseBody({ all: true })
+export type { FormBody };   // re-export; defined in src/types.ts as
+                            //   Record<string, string | File | (string | File)[]>, from c.req.parseBody({ all: true })
 export function coerceForm(fields: FormField[], body: FormBody, mode: FormMode, timeZone: string, t: Messages):
   { data: Record<string, unknown>; errors: Record<string, string> };   // t: Changed 2026-10-09, decision 049
 export function rawValues(fields: FormField[], body: FormBody): Record<string, string>; // for re-render

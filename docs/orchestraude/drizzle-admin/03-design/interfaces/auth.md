@@ -49,12 +49,12 @@ Changed 2026-10-07: `originCheck` takes `publicOrigin` (decision 017). Exact-mat
 export const CSRF_FIELD = "_csrf";
 export function originCheck(publicOrigin: string | null): MiddlewareHandler;
   // publicOrigin === null → csrf()  (default: Origin must equal the request URL origin)
-  // otherwise             → csrf({ origin: publicOrigin })  (intended: exact match; unverified, see below)
+  // otherwise             → csrf({ origin: publicOrigin })  (exact match, proven by `test/csrf.test.ts`, see below)
   // secFetchSite stays at its default ("same-origin"); hono/csrf passes if either check passes
 export function tokensEqual(a: string, b: string): boolean; // constant time
 ```
 See evidence 2026-10-07-hono-csrf-origin-option for the `origin` option and the OR combination with Sec-Fetch-Site.
-Whether hono compares the string `origin` option by exact equality is unverified (evidence: 2026-10-07-hono-csrf-origin-option). By user decision (decision 020), `csrf.test.ts` must prove it. With `publicOrigin = "https://admin.example.com"`, a form POST without `Sec-Fetch-Site` passes with Origin `https://admin.example.com`. It gets 403 with each of `https://admin.example.com:8443`, `https://admin.example.com/`, `https://admin.example.com.evil.example` and `http://admin.example.com`. If any case behaves differently, the implementer reports the task as blocked and does not change `originCheck` without a new decision.
+The evidence left open whether hono compares the string `origin` option by exact equality (evidence: 2026-10-07-hono-csrf-origin-option), so by user decision (decision 020) `test/csrf.test.ts` proves it, and it holds with hono 4.13.13. With `publicOrigin = "https://admin.example.com"`, a form POST without `Sec-Fetch-Site` passes with Origin `https://admin.example.com`. It gets 403 with each of `https://admin.example.com:8443`, `https://admin.example.com/`, `https://admin.example.com.evil.example` and `http://admin.example.com`. If a hono upgrade makes any case behave differently, `originCheck` is not changed without a new decision.
 `tokensEqual`: returns false if the lengths differ; otherwise XOR-accumulates all char codes over the full length. No early exit.
 
 ### `flash.ts`

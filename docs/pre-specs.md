@@ -1,3 +1,13 @@
+> **Status (2026-11-11): original specification, kept as written.** It was the input to the design and is superseded wherever `docs/orchestraude/decisions/` or `docs/orchestraude/drizzle-admin/03-design/` say otherwise; for current behavior read the design and the README. Main differences from the text below:
+> - §2: the UI is English (default) and Japanese with a header switcher and the `da_lang` cookie, not Japanese only (decisions 049-051).
+> - §3, §5.1: the package is `@sson0-er/drizzle-admin`, and `hono` is a peer dependency like `drizzle-orm` (decision 052).
+> - §4: the layout also has `src/routes/`, `src/time.ts`, `auth/{locale,permissions,redirect}.ts`, `data/{db,errors}.ts`, `forms/{fields,validate}.ts` and more view modules; the stylesheet is the string module `src/static/admin-css.ts`; `admin.ts` holds the `createAdmin` factory, not a class.
+> - §5.2: `AdminConfig` has `publicOrigin` (decision 017); `HookCtx` is `{ mode, user, db }` (decision 015); custom actions need the `change` permission (decision 016); unset `add` / `change` / `delete` follow `view` (decision 043).
+> - §7: `Repository` has `getMany`, `update` returns `DbRow | null`, and `options` takes `{ limit, ordering, toLabel }`; PostgreSQL search casts columns to text (decision 018).
+> - §8, §9: `POST /_lang/` is added (decision 051); date-only columns get the `date` widget (decisions 019, 023) and the `password` widget never echoes a value (decision 037).
+> - §10: responses also carry a Content-Security-Policy and `X-Content-Type-Options: nosniff` (decision 044), and cookie keys are derived per instance and per cookie (decision 042).
+> - §14: there is no `NOTES.md`; choices are recorded in `docs/orchestraude/decisions/` (`01-requirements.md`).
+
 # drizzle-admin Implementation Spec
 
 Build a library that provides a Django Admin–style CRUD admin interface, rendered entirely on the server, simply by registering Drizzle ORM table definitions.
