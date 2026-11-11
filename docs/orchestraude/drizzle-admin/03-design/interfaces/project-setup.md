@@ -29,7 +29,7 @@ Changed 2026-10-09 (decision 052 point 9, Q16): `files` also lists `src`, so the
 ```jsonc
 {
   "name": "@sson0-er/drizzle-admin",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Django Admin-style, server-rendered CRUD admin for Drizzle ORM tables",
   "license": "MIT",
   "author": "Shoma Sonoda",
@@ -114,7 +114,7 @@ MIT License text, `Copyright (c) 2026 Shoma Sonoda`.
 ### CHANGELOG.md (decisions 048, 052)
 Changed 2026-10-09 (decision 052): this is the first release, so the former `## Unreleased` lists (decisions 042-051, written as changes against an earlier version) are replaced by initial-release notes; nothing assumes a previous release (no "signed out once after upgrading", no "existing users switch once").
 
-English. Changed 2026-11-11: changes after 0.1.0 are listed in an `## Unreleased` section between the title and the 0.1.0 entry. The title and the 0.1.0 entry are exactly:
+English. Changed 2026-11-11: changes after 0.1.0 are listed in an `## Unreleased` section between the title and the newest released entry; the release commit renames that heading to `## <version> - <YYYY-MM-DD>` and sets `version` in `package.json` (0.1.1 on 2026-11-11). Later entries are not repeated here. The title and the 0.1.0 entry are exactly:
 ```markdown
 # Changelog
 
